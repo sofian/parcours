@@ -1608,9 +1608,41 @@ All schema and config design for v1 is complete: nineteen category
 schemas (see Category schemas), `vocab.yaml` (draft), `views.yaml`
 (draft), and `identity.yaml` (see Identity / personal-info config) are
 all drafted, cross-checked against a real CCV export and the user's own
-LaTeX CV. What remains is implementation, not design: scaffolding
-`parcours/` (see Code architecture), writing the handlers, and building
-out `parco`'s commands (see CLI).
+LaTeX CV. The foundation layer is implemented (see Code architecture):
+schema/vocab/labels loading, ISO partial dates, common field validation,
+the handler architecture (`GenericHandler`, `PublicationsHandler`),
+DuckDB-backed CSV access, and `parco lint`. What remains is the rest of
+the CLI (add/edit wizard, sync, build, refresh/import) — see CLI.
+
+## Known limitations / follow-up from the foundation implementation
+
+Parked during the foundation plan's final review as Minor (non-blocking)
+findings — pick these up in whichever future plan next touches the area:
+
+- Several core loaders disagree on error handling for missing/malformed
+  *config* files (some raise raw `OSError`/`KeyError`, one path
+  (`load_all_schemas` on a missing `categories/` dir) silently succeeds
+  with no schemas at all, meaning a misconfigured repo can lint clean).
+  `parco lint`'s own config errors are now caught (`ConfigError`, exit
+  code 2), but the underlying loaders were not made consistent with each
+  other. Worth a documented, uniform loader contract before the next
+  loader is added.
+- `DedupRule.outcome` (from a schema's `dedup: - when: ... as: ...`) is
+  not validated against `{"duplicate", "related"}` at load time — a typo
+  (`as: duplicat`) silently produces a `Match.kind` the duplicate-picker
+  (not yet built) won't recognize.
+- `validate_common` only checks date validity for a `type: date` field
+  when the field also declares `precision:` — currently harmless since
+  every real schema's date fields declare one, but worth tightening.
+- `run_lint`'s labels-completeness check constructs `LintIssue` with the
+  label's `category` column in the `field` position, which means
+  something different (a CSV column name) at every other call site.
+- No lint check yet for duplicate `id` values within a single category,
+  even though `id` is the primary key `find_matches` relies on.
+- No `.github/workflows/` CI exists yet, despite Testing & CI's
+  requirement (pytest × 3 OSes × 2 Pythons, plus `parco lint` against
+  fixture data). This was never scheduled in the foundation plan and
+  should be picked up explicitly, not silently deferred again.
 
 ## Open questions to resolve during implementation
 
