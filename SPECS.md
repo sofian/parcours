@@ -65,7 +65,7 @@ plus CV-specific fields Zotero doesn't track.
   `degree_status`, etc. — see the full compiled draft under vocab.yaml,
   after Category schemas). Enforced at write time (`add`/`edit` reject
   invalid values) and re-checked by `parco lint`.
-- **Bilingual fields:** paired `_en`/`_fr` columns for content that's
+- **Bilingual fields:** paired `_en`/`_fr` fields for content that's
   genuinely translated (most category titles are proper nouns and
   aren't — see `require_one_of` under Category schemas).
 - **Status field is required for publications** — see `publication_status`
@@ -106,7 +106,7 @@ schema may also name a custom handler by dotted import path
   target category in config.
 - **Zotero-citekey resolution is a shared capability, not exclusive to
   `publications`.** Any category whose schema declares a `citekey`
-  column plus Zotero `options` (bib/json paths) gets it resolved against
+  field plus Zotero `options` (bib/json paths) gets it resolved against
   the export and becomes `Citable` — this is how `press` optionally
   links a row to its Zotero record without needing its own handler.
 - **The `publications` handler is reused by categories other than
@@ -118,14 +118,14 @@ schema may also name a custom handler by dotted import path
   belong in your own `publications` table, but is exactly as
   Zotero-linked. The handler's CSL `type_map` → `type` derivation is
   **optional**: it only runs when a schema declares both `options.type_map`
-  and a `type` column, which `review`/`catalog` don't (they need no
+  and a `type` field, which `review`/`catalog` don't (they need no
   further subdivision; the category itself says what they are).
 - **Interface stays interface-free:** handlers live in the core layer, so
   they never prompt or print. They describe the fields the wizard should
   ask about, return structured validation and dedup results, and raise
   typed exceptions. The CLI does all asking.
-- **Required fields are per-column schema config**, not handler code —
-  e.g. `status` is a required column in the publications schema rather
+- **Required fields are per-field schema config**, not handler code —
+  e.g. `status` is a required field in the publications schema rather
   than a rule baked into the core.
 - **Trust boundary:** custom handlers are resolved as importable Python
   modules only. `parco` never auto-executes code found in the data repo.
@@ -152,27 +152,27 @@ Handler options (e.g. export paths) live in the schema's `options:` block.
 ## Category schemas (drafts)
 
 One file per category at `categories/<name>.yaml` in the data repo.
-Column keys: `name`, `type` (`string` default, `int`, `number`, `bool`,
+Field keys: `name`, `type` (`string` default, `int`, `number`, `bool`,
 `text`, `date`), `required`, `vocab`, `default`, `generated`,
-`precision` (`date` columns only). `date` columns always hold ISO
+`precision` (`date` fields only). `date` fields always hold ISO
 partial dates (`2024`, `2024-09`, `2024-09-30`) — `precision` sets the
 **minimum** acceptable granularity (`year`, `month`, or `day`), never a
-maximum: a column declared `precision: year` still accepts a full
+maximum: a field declared `precision: year` still accepts a full
 `2024-09-30` if you happen to know it, it just doesn't require one. The
-wizard asks for a date at the column's minimum granularity and offers to
+wizard asks for a date at the field's minimum granularity and offers to
 go more precise (year → month → day) rather than demanding a fixed
 format, since real recall is uneven — some dates you'll remember to the
 day, most only to the year.
 
 **Dedup rules** (used by the `generic` handler): each rule is a list of
 conditions that must all hold, plus an outcome (`duplicate` or
-`related`). Matchers: `exact` (column), `fuzzy` (one or more columns;
-matches if any does), `overlap` (start and end date columns, compared as
-intervals; a blank end is ongoing), `same_year` (one date column; for
+`related`). Matchers: `exact` (field), `fuzzy` (one or more fields;
+matches if any does), `overlap` (start and end date fields, compared as
+intervals; a blank end is ongoing), `same_year` (one date field; for
 categories with a single point-in-time date rather than a range).
 
-**`require_one_of`** (schema-level, alongside `columns`/`dedup`): a list
-of column-name lists, each requiring **at least one** column in that
+**`require_one_of`** (schema-level, alongside `fields`/`dedup`): a list
+of field-name lists, each requiring **at least one** field in that
 list to be non-blank, without forcing all of them. This is for content
 that's often genuinely single-language rather than translated — most
 artwork/exhibition titles are proper nouns given in whichever language
@@ -182,10 +182,22 @@ This is **distinct from `labels.csv`'s "missing translation = fail
 loudly" rule** (see Labels / translations below): that rule is about a
 small, finite set of UI-facing strings (section names, vocab value
 labels) that genuinely should exist in both languages, not about
-per-row content columns on category data, where forcing both sides
+per-row content fields on category data, where forcing both sides
 would mean inventing translations that don't really exist. `lint` warns
-only if **no** column in a `require_one_of` group is filled — not if
+only if **no** field in a `require_one_of` group is filled — not if
 only one is.
+
+**`weight`** (a standard optional `int` field, present in every schema
+right after `id`): a manual ordering hint, higher = appears earlier.
+Not every CV entry has a precise date — decades-old material especially
+often has only a rough date, or none at all — but the *relative order*
+between entries is usually still known (e.g. from where they sat in a
+previously hand-maintained CV document). `weight` captures that
+knowledge explicitly rather than relying on CSV row order, which isn't
+reliably preserved through edits. `order_by` in profiles/views can
+reference it as a tiebreaker alongside date-based ordering (e.g.
+`order_by: date desc, weight desc`), or, for `skills` (which has no
+dates at all), as the only ordering mechanism.
 
 ### CCV export structure (documented from a real export)
 
@@ -279,8 +291,9 @@ options:
     paper-conference: conference-paper
     chapter: book-chapter
     book: book
-columns:
+fields:
   - {name: id,       generated: true}                       # pub-2026-004
+  - {name: weight,   type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: citekey,  required: true}                        # must resolve in the export
   - {name: status,   required: true, vocab: publication_status}
   - {name: refereed, type: bool}
@@ -295,7 +308,7 @@ columns:
   exported CSL-JSON and joined on the citekey when building views. This
   is a join between the CSV and the export, not between tables.
 - **Every row's citekey must resolve in the export** — no local fallback
-  columns. In-progress work is added to Zotero first (manuscript/preprint
+  fields. In-progress work is added to Zotero first (manuscript/preprint
   item types); `status` tracks the stage. `lint` flags unresolved keys.
 - Zotero's exports are the pair of files Better BibTeX keeps in sync
   (BibTeX for citekeys, CSL-JSON for full metadata). No live Zotero
@@ -315,8 +328,9 @@ columns:
 ```yaml
 name: grants
 handler: generic
-columns:
+fields:
   - {name: id,           generated: true}                   # grant-frqsc-2026
+  - {name: weight,       type: int}                         # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en,     required: true}
   - {name: title_fr,     required: true}
   - {name: funder,       required: true}                    # free text
@@ -337,7 +351,7 @@ dedup:
 
 - Views resolve `title` to `title_en` / `title_fr` from the profile's
   language, so profiles never mention suffixes. A blank required `_fr` or
-  `_en` column is a lint error (missing translation).
+  `_en` field is a lint error (missing translation).
 - Amounts are stored, which is one reason the data repo is private.
   Converted amounts are described under Currency conversion below.
 - RenderCV mapping (in `views.yaml`): a grant becomes a `NormalEntry` —
@@ -348,8 +362,9 @@ dedup:
 ```yaml
 name: service
 handler: generic
-columns:
+fields:
   - {name: id,           generated: true}                       # svc-2026-004
+  - {name: weight,       type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: type,         required: true, vocab: service_type}   # graduate-examination / funding-review / manuscript-review / volunteer / membership / committee / program-development
   - {name: role,         required: true}                        # free text — CCV's own Role field is a controlled list for some
                                                                   # service types and free text for others, so a merged vocab
@@ -383,7 +398,7 @@ dedup:
     "Member of the program revision committee").
 - `Number of Applications Assessed` and `Funding Organization` (from
   CCV's funding-review fields) are dropped — the latter duplicates
-  `organization`, and the former isn't worth a column.
+  `organization`, and the former isn't worth a field.
 - `program-development` (from CCV's Program Development records, filed
   under CCV's "Teaching Activities" wrapper but service in substance —
   see CCV export structure) uses CCV's "Date First Taught" field as
@@ -397,18 +412,15 @@ dedup:
 ```yaml
 name: outreach
 handler: generic
-columns:
+fields:
   - {name: id,                 generated: true}                              # outreach-2026-004
+  - {name: weight,             type: int}                                    # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: activity_type,      required: true, vocab: outreach_activity_type} # community-engagement / consulting-for-industry / ...
   - {name: target_stakeholder, vocab: outreach_stakeholder}                   # general-public / industry / ...
   - {name: organization,       required: true}                               # free text — "Group/Organization/Business Serviced"
   - {name: role}                                                              # free text
   - {name: start_date,         type: date, precision: month, required: true}
   - {name: end_date,           type: date, precision: month}                 # blank = ongoing
-  - {name: outcome_en}
-  - {name: outcome_fr}                                                       # Outcome / Deliverable
-  - {name: evidence_en}
-  - {name: evidence_fr}                                                      # Evidence of Uptake/Impact
   - {name: description_en}
   - {name: description_fr}                                                   # free-form; unused in the reference export, kept for reuse
   - {name: url}                                                              # References / Citations / Web Sites
@@ -417,28 +429,26 @@ dedup:
     as: duplicate
 ```
 
-- `outcome_en`/`_fr` and `evidence_en`/`_fr` are kept as separate columns
-  rather than merged into one, unlike `service.detail` — in the reference
-  export both are filled together in 22 of 30 records, so merging would
-  lose information that's genuinely present at the same time (`service`'s
-  merge was safe only because each type populates exactly one of the
-  three source fields, never more than one).
 - `activity_type` and `target_stakeholder` are small, CCV-controlled
   lists (5 distinct values each in the reference export) — good vocab
   candidates, unlike `organization`.
+- CCV's `Outcome / Deliverable` and `Evidence of Uptake/Impact` fields
+  (bilingual; 30/30 and 22/30 filled in the reference export
+  respectively) are dropped, along with the earlier note about keeping
+  them separate rather than merged — not tracked here.
 
 ### artworks (handler: generic)
 
 ```yaml
 name: artworks
 handler: generic
-columns:
+fields:
   - {name: id,             generated: true}                     # artwork-2026-004
+  - {name: weight,         type: int}                           # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}                                             # usually only one filled — see require_one_of
   - {name: role,           required: true, vocab: artwork_role}  # author / collaborator
-  - {name: venue}                                                # free text
-  - {name: date,           type: date, precision: day, required: true}  # date of first performance/exhibition
+  - {name: date,           type: date, precision: year, required: true}  # production year
   - {name: description_en}
   - {name: description_fr}                                       # CCV's "Description / Contribution Value"
   - {name: contributors}                                         # free text names list, like grants' co_investigators
@@ -466,14 +476,19 @@ dedup:
   `description` carries whatever detail is needed instead.
 - `Number of Contributors` is dropped — blank in 53 of 56 reference
   records, and derivable from `contributors` anyway.
+- `venue` is dropped — not tracked here.
+- `date` is the **production year**, not a performance/exhibition date —
+  `precision: year` (a floor, not a ceiling, per Category schemas above:
+  a more precise date is still fine if known, just not required).
 
 ### students (handler: generic)
 
 ```yaml
 name: students
 handler: generic
-columns:
+fields:
   - {name: id,                     generated: true}                       # student-2026-004
+  - {name: weight,                 type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: student_name,           required: true}                        # free text
   - {name: role,                   required: true, vocab: student_role}   # principal-supervisor / co-supervisor
   - {name: institution}                                                    # free text
@@ -483,8 +498,7 @@ columns:
   - {name: supervision_end_date,   type: date, precision: month}          # blank = ongoing
   - {name: degree_start_date,      type: date, precision: month}
   - {name: degree_end_date,        type: date, precision: month}          # actual completion; blank until finished
-  - {name: thesis_title_en}
-  - {name: thesis_title_fr}
+  - {name: thesis_title}                                                   # no translation
   - {name: present_position}                                               # free text — outcome tracking
   - {name: present_organization}
 dedup:
@@ -498,9 +512,8 @@ dedup:
 - `degree_status` is what the original spec called `student_outcome` —
   renamed to match the actual CCV field
   (`completed`/`in-progress`/`withdrawn`/`all-but-degree`).
-- `thesis_title` gets the `_en`/`_fr` treatment like `artworks.title`,
-  since CCV stores it as one field — import fills the matching side,
-  leaves the other blank.
+- `thesis_title` is a single, untranslated field — a thesis title isn't
+  translated, unlike some other single-CCV-field titles elsewhere.
 - **Dropped:** CCV's `Degree Name` and `Specialization` (bilingual,
   near-empty in the reference export, redundant with `degree_type`),
   `Degree Expected Date` (sparse; a blank `degree_end_date` already
@@ -512,8 +525,9 @@ dedup:
 ```yaml
 name: teaching
 handler: generic
-columns:
+fields:
   - {name: id,           generated: true}                # teaching-2026-004
+  - {name: weight,       type: int}                      # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: course_label, required: true}                 # e.g. EDM1600, COM1001 — CCV has no equivalent, filled in manually
   - {name: title_en}
   - {name: title_fr}
@@ -544,13 +558,13 @@ dedup:
 ```yaml
 name: presentations
 handler: generic
-columns:
+fields:
   - {name: id,        generated: true}                                  # presentation-2026-004
+  - {name: weight,    type: int}                                        # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}                                                    # usually only one filled
   - {name: event,     required: true}                                   # Conference / Event Name, free text
   - {name: location,  required: true}                                   # city + country as one glossary-backed value, e.g. "Berlin, Germany"
-  - {name: audience,  vocab: presentation_audience}                     # researcher / knowledge-user / general-public
   - {name: invited,   type: bool}
   - {name: keynote,   type: bool}
   - {name: date,      type: date, precision: month, required: true}     # at least year+month, like grants.start_date
@@ -576,7 +590,7 @@ dedup:
   Title` splits to `title_en`/`title_fr`, import fills the matching side
   and leaves the other blank — `require_one_of` covers the common case
   where only one language is ever given.
-- **`location` was originally two columns** (a country and a city,
+- **`location` was originally two fields** (a country and a city,
   matching CCV's own split) — collapsed into one after settling how
   place names get translated (see Labels / translations): a single
   glossary-backed value covers both parts together as one unit (e.g.
@@ -588,6 +602,8 @@ dedup:
   actual location values) is simply literal fallback text, no glossary
   entry needed.
 - `Competitive?` is dropped — blank in 44 of 45 reference records.
+- `Main Audience` (CCV's `researcher`/`knowledge-user`/`general-public`
+  list) is dropped — not tracked here.
 
 ### press (handler: generic)
 
@@ -596,8 +612,9 @@ name: press
 handler: generic
 options:
   zotero: {bib: zotero/library.bib, json: zotero/library.json}  # for rows that set citekey
-columns:
+fields:
   - {name: id,           generated: true}                    # press-2026-004
+  - {name: weight,       type: int}                          # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: citekey}                                            # optional — set when also a Zotero-catalogued item
                                                                  # (e.g. a written review); enables `parco cite` on
                                                                  # this row (see Category handlers: shared Zotero
@@ -618,11 +635,11 @@ dedup:
     as: duplicate
 ```
 
-- No `type` column for now — CCV's Broadcast/Text distinction is
+- No `type` field for now — CCV's Broadcast/Text distinction is
   captured well enough by `program` being blank for text pieces, without
   needing a controlled value; can be added later if needed.
 - `outlet`/`program` split mirrors CCV's own `Network`+`Program` (kept as
-  two columns rather than merged, unlike the earlier draft), with
+  two fields rather than merged, unlike the earlier draft), with
   `outlet` also covering CCV's `Forum` for text pieces (a text piece has
   no `Program` equivalent, so it's left blank).
 - CCV's `End Date` (Broadcast Interviews only) is dropped — checked
@@ -637,8 +654,9 @@ handler: publications
 options:
   bib: zotero/library.bib
   json: zotero/library.json
-columns:
+fields:
   - {name: id,       generated: true}       # review-2026-004
+  - {name: weight,   type: int}             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: citekey,  required: true}        # must resolve in the export, same rule as publications
 ```
 
@@ -656,8 +674,9 @@ handler: publications
 options:
   bib: zotero/library.bib
   json: zotero/library.json
-columns:
+fields:
   - {name: id,       generated: true}       # catalog-2026-004
+  - {name: weight,   type: int}             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: citekey,  required: true}
 ```
 
@@ -670,8 +689,9 @@ you. Same reasoning and handler reuse as `review`. No CCV equivalent.
 ```yaml
 name: education
 handler: generic
-columns:
+fields:
   - {name: id,                generated: true}                       # edu-2026-004
+  - {name: weight,            type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: degree_type,       required: true, vocab: degree_type}     # bachelors / bachelors-honours / masters / doctorate / postdoc — shared vocab with students
   - {name: degree_name_en,    required: true}
   - {name: degree_name_fr,    required: true}                         # e.g. "Ph. D. Humanities" / "Ph. D. Sciences humaines"
@@ -681,8 +701,7 @@ columns:
   - {name: degree_status,     required: true, vocab: degree_status}   # completed / in-progress / withdrawn / all-but-degree — shared vocab with students
   - {name: start_date,        type: date, precision: month, required: true}
   - {name: end_date,          type: date, precision: month}           # blank = ongoing
-  - {name: thesis_title_en}
-  - {name: thesis_title_fr}                                           # blank for degrees without a thesis (e.g. postdoc, bachelor's)
+  - {name: thesis_title}                                              # no translation; blank for degrees without a thesis (e.g. postdoc, bachelor's)
   - {name: advisor}                                                    # free text — CCV has no equivalent field
   - {name: note_en}
   - {name: note_fr}                                                    # e.g. "Completed with honours"
@@ -695,7 +714,7 @@ dedup:
   as `students.degree_type`/`students.degree_status` — same real-world
   concept (degree types and outcomes), just applied to you instead of
   someone you supervised, so one `vocab.yaml` entry serves both schemas.
-- `degree_name` and `specialization` are kept as two columns, matching
+- `degree_name` and `specialization` are kept as two fields, matching
   CCV, even though the CV typically renders them combined (e.g.
   "Humanities (Fine Arts)") — that combination is a `views.yaml`
   rendering concern, not a schema one.
@@ -713,14 +732,15 @@ dedup:
 ```yaml
 name: positions
 handler: generic
-columns:
+fields:
   - {name: id,               generated: true}                       # pos-2026-004
+  - {name: weight,           type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: type,             required: true, vocab: position_type}   # academic / non-academic / affiliation
   - {name: title_en,         required: true}
   - {name: title_fr,         required: true}
   - {name: organization,     required: true}                         # free text — CCV mostly supplies "Other Organization" here, not the refTable
-  - {name: department}                                                # free text
   - {name: faculty}                                                   # free text — e.g. "School of Media"
+  - {name: department}                                                # free text
   - {name: position_status,  vocab: position_status}                  # e.g. full-time / part-time / casual
   - {name: start_date,       type: date, precision: month, required: true}
   - {name: end_date,         type: date, precision: month}            # blank = ongoing
@@ -739,17 +759,17 @@ dedup:
   always use CCV's free-text `Other Organization` field instead (Hexagram,
   mXlab, Perte de Signal, Koumbit aren't in CCV's institution list), so
   the importer should read whichever CCV field actually has a value.
-- `department` and `faculty` are kept as two separate columns rather
+- `faculty` and `department` are kept as two separate fields rather
   than merged — checked against the data: both are filled
   *simultaneously* in the same academic records (11/11 and 7/11), so
   merging would lose information genuinely present at once, the same
-  reasoning as `outreach`'s outcome/evidence columns.
+  reasoning as `outreach`'s outcome/evidence fields.
 - **Dropped:** `Academic Rank`, `Tenure Status` and tenure dates, and
   `Work Description`/`Activity Description` (bilingual highlights) —
   the latter is 0% filled across all 26 reference records regardless of
   type, meaning CCV never carries this text even though the LaTeX CV's
   professional-experience entries are full of it; that text would need
-  manual entry either way, so it isn't a CCV-import gap, just a column
+  manual entry either way, so it isn't a CCV-import gap, just a field
   this schema doesn't track.
 - `title` is bilingual (`title_en`/`title_fr`) for every row, even
   though CCV's academic/non-academic subtypes use a single string
@@ -761,8 +781,9 @@ dedup:
 ```yaml
 name: recognitions
 handler: generic
-columns:
+fields:
   - {name: id,               generated: true}                          # award-2026-004
+  - {name: weight,           type: int}                                # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: recognition_type, required: true, vocab: recognition_type}   # citation / distinction / prize
   - {name: name,             required: true}                            # free text
   - {name: organization,     required: true}                            # free text — refTable or "Other Organization" fallback, same pattern as positions/education
@@ -805,8 +826,9 @@ No CCV equivalent — grounded entirely in the LaTeX CV.
 ```yaml
 name: exhibitions
 handler: generic
-columns:
+fields:
   - {name: id,           generated: true}                          # exh-2026-004
+  - {name: weight,       type: int}                                # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}                                                # usually only one filled
   - {name: event}                                                    # free text — festival/series, e.g. "MUTEK Forum"
@@ -824,9 +846,9 @@ dedup:
 ```
 
 - `location` is one glossary-backed value covering city and country
-  together (see Labels / translations), not separate columns.
+  together (see Labels / translations), not separate fields.
 - Scoped strictly to exhibitions **you exhibited in** — no `role`
-  column; a separate `curatorship` category below covers when you were
+  field; a separate `curatorship` category below covers when you were
   the curator instead.
 - Modeled as a **date range** (`start_date`/`end_date`), not a single
   point in time like `artworks` — the LaTeX source's own comments show
@@ -843,14 +865,15 @@ dedup:
 
 Same shape as `exhibitions` — a curated show is still an exhibition,
 just one where you're credited as curator rather than as the exhibiting
-artist, so it gets its own table rather than a `role` column mixed into
+artist, so it gets its own table rather than a `role` field mixed into
 `exhibitions`.
 
 ```yaml
 name: curatorship
 handler: generic
-columns:
+fields:
   - {name: id,           generated: true}                          # cur-2026-004
+  - {name: weight,       type: int}                                # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}
   - {name: event}
@@ -876,8 +899,9 @@ organization name doubles as the program name).
 ```yaml
 name: residencies
 handler: generic
-columns:
+fields:
   - {name: id,           generated: true}                       # res-2026-004
+  - {name: weight,       type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: organization, required: true}                        # free text — e.g. "Hexagram", "LABoral"
   - {name: location,     required: true}                         # city + country as one glossary-backed value
   - {name: start_date,   type: date, precision: month, required: true}
@@ -895,8 +919,9 @@ section (6 entries).
 ```yaml
 name: software
 handler: generic
-columns:
+fields:
   - {name: id,             generated: true}                       # sw-2026-004
+  - {name: weight,         type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: role,           required: true, vocab: software_role}   # lead-developer / co-developer / developer / contributor
   - {name: title,          required: true}                         # project name, e.g. "Plaquette" — a proper noun, no translation
   - {name: description_en, required: true}
@@ -909,7 +934,7 @@ dedup:
     as: duplicate
 ```
 
-- `title` is a single column, not `title_en`/`title_fr` — a project
+- `title` is a single field, not `title_en`/`title_fr` — a project
   name like "Plaquette" or "MapMap" doesn't get translated, unlike
   `description`, which genuinely is bilingual in all 6 reference
   entries (unlike `artworks`/`exhibitions`, where titles are the
@@ -935,31 +960,28 @@ too).
 ```yaml
 name: skills
 handler: generic
-columns:
+fields:
   - {name: id,        generated: true}                        # skill-2026-004
+  - {name: weight,    type: int}                              # optional; higher = appears earlier — the ordering mechanism here, since skills have no dates at all
   - {name: category,  required: true, vocab: skill_category}   # expertise / programming / framework / platform / software / spoken-language / other
-  - {name: name}                                                # free text — untranslated technical terms
-  - {name: name_en}
-  - {name: name_fr}                                             # bilingual — for expertise / spoken-language / other
+  - {name: name_en}                                             # untranslated technical terms just go here, name_fr left blank
+  - {name: name_fr}
   - {name: level,     vocab: language_level}                    # native / fluent / intermediate / basic — spoken-language only
 require_one_of:
-  - [name, name_en, name_fr]
+  - [name_en, name_fr]
 dedup:
-  - when: [{exact: category}, {fuzzy: [name, name_en, name_fr]}]
+  - when: [{exact: category}, {fuzzy: [name_en, name_fr]}]
     as: duplicate
 ```
 
-- Which of `name` vs. `name_en`/`name_fr` gets used depends on
-  `category`, not enforced per-value by the schema (our declarative
-  format doesn't have conditional-required-by-vocab-value) — the wizard
-  guides which fields to ask for based on the chosen category, and
-  `require_one_of` just guarantees the row isn't entirely blank.
-  Dedup's cross-column fuzzy check works in practice because dedup
-  already filters to the same `category` first, and within one category
-  every row consistently uses the same field.
+- No separate untranslated `name` field — since `require_one_of`
+  already means only one side needs filling, an untranslated technical
+  term (e.g. "Python") just goes in `name_en` and leaves `name_fr`
+  blank, rather than needing a third field for that case.
 - No dates — unlike every other category, skills aren't dated CV
-  entries; row order in the CSV is the display order (no separate rank
-  column), matching how the original LaTeX lists them in a curated,
+  entries, so `weight` is the *only* ordering mechanism here (elsewhere
+  it refines or overrides date-based order; here it's the whole story),
+  matching how the original LaTeX lists them in a curated,
   non-alphabetical order.
 - `level` only applies to `spoken-language` rows; blank otherwise.
 
@@ -1024,25 +1046,25 @@ Amounts can be converted to a reporting currency, mainly for statistics.
 
 - `labels.csv` — flat lookup table for **all** UI-facing strings, not just
   section titles: section names, field labels, category value labels.
-  Columns: `id, category, en, fr` (category distinguishes e.g. `section`
+  Fields: `id, category, en, fr` (category distinguishes e.g. `section`
   vs `role` vs `pub-type` so the flat table stays organized).
 - **Missing translation = fail loudly** (or at minimum warn), never
   silently fall back to another language — checked by `parco lint`. This
   rule applies to `labels.csv`'s own finite set of UI-facing strings; it
-  does **not** apply to per-row content columns on category data (see
+  does **not** apply to per-row content fields on category data (see
   `require_one_of` under Category schemas), where a missing translation
   is often not an oversight at all.
 - **`labels.csv` also serves as a content glossary**, not just UI chrome
   — e.g. `category: location` rows translate a whole place name in one
   unit (id `the-hague`: en "The Hague, Netherlands", fr "La Haye,
   Pays-Bas"), the same pattern as the user's existing LaTeX `\gtr{}`
-  glossary. Any category's `location` column (see `exhibitions`,
+  glossary. Any category's `location` field (see `exhibitions`,
   `curatorship`, `residencies`, `presentations`) is looked up against
   these rows when rendering; an unmatched value (an obscure place with
   no glossary entry) falls back to the literal text as typed — the
   glossary is an enhancement, never a requirement, so entering an
   unrecognized place never blocks data entry. This is why the "missing
-  translation" lint rule above doesn't extend to these columns: most
+  translation" lint rule above doesn't extend to these fields: most
   places will never have a glossary entry, and that's expected, not an
   error.
 
@@ -1073,8 +1095,6 @@ service_type: [graduate-examination, funding-review, manuscript-review, voluntee
 
 outreach_activity_type: [community-engagement, startup-involvement, technology-improvement, business-innovation, industry-consulting]
 outreach_stakeholder: [general-public, private-nonprofit, utility, industry-association, industry-business]
-
-presentation_audience: [researcher, knowledge-user, general-public]
 
 position_type: [academic, non-academic, affiliation]
 position_status: [full-time, part-time]
@@ -1114,7 +1134,7 @@ Notes on values not directly lifted from a CCV `lov` list:
   notes) but are included as real, expected activities.
 
 Not vocab-constrained even though `degree_type` might suggest it should
-be: `organization`, `venue`, `location`, and other free-text columns
+be: `organization`, `venue`, `location`, and other free-text fields
 throughout — deliberately open, per each schema's own notes (too many
 distinct real-world values to enumerate, e.g. every institution or
 venue that's ever hosted something).
@@ -1183,7 +1203,7 @@ actual `identity.yaml`, in the private data repo, not here.)
 - Section `title` is **not** hardcoded per profile — resolved from
   `labels.csv` via the section's `id`, keyed to `meta.language`.
 - **Views are defined in `views.yaml` in the data repo**, not in code.
-  Each named view maps to a table, its columns, and a RenderCV entry
+  Each named view maps to a table, its fields, and a RenderCV entry
   type (see views.yaml (draft), below). The tool ships a starter
   `views.yaml`; no category names are hardcoded.
 
@@ -1214,13 +1234,13 @@ journal, +date only — no start/end range), `OneLineEntry` (label,
 details — no dates), `BulletEntry` (bullet), `TextEntry` (a raw
 string, not a structured entry).
 
-**Mechanism:** each view maps a category's columns onto one entry
-type's fields. A field value is either a literal column name (direct
-copy) or a `"{col}"` template string (composed/formatted). A bare
+**Mechanism:** each view maps a category's fields onto one entry
+type's fields. A field value is either a literal field name (direct
+copy) or a `"{field}"` template string (composed/formatted). A bare
 `{title}` in a template auto-resolves to `title_en`/`title_fr` — or
-just `title` if the column isn't a bilingual pair — based on the
+just `title` if the field isn't a bilingual pair — based on the
 profile's own language, the same resolution `labels.csv` already uses;
-this is the general rule for every bilingual column, not something each
+this is the general rule for every bilingual field, not something each
 view has to spell out.
 
 Entry type per category:
@@ -1229,15 +1249,15 @@ Entry type per category:
 |---|---|---|
 | publications, review, catalog | `PublicationEntry` | title/authors/journal/doi from Zotero via citekey |
 | grants | `NormalEntry` | highlights: funder+role, amount+currency, co_investigators |
-| artworks | `NormalEntry` | single `date`; highlights: role, contributors, venue |
+| artworks | `NormalEntry` | single `date` (production year); highlights: role, contributors |
 | students | `NormalEntry` | start/end = supervision dates; highlights: degree_type/status, institution, thesis_title |
 | teaching | `ExperienceEntry` | company=organization, position=course_label+title; single `date` per offering |
 | service | `ExperienceEntry` | company=organization, position=role; highlights: type, detail |
 | outreach | `ExperienceEntry` | summary=outcome; highlights: evidence, description |
-| presentations | `NormalEntry` | single `date`; summary=event; highlights: audience, invited/keynote |
+| presentations | `NormalEntry` | single `date`; summary=event; highlights: invited/keynote |
 | press | `NormalEntry` | single `date`; highlights: author, program |
 | education | `EducationEntry` | institution=organization, area=specialization, degree=degree_name; summary=thesis_title; highlights: advisor, note |
-| positions | `ExperienceEntry` | company=organization, position=title; highlights: department, faculty, position_status |
+| positions | `ExperienceEntry` | company=organization, position=title; highlights: faculty, department, position_status |
 | recognitions | `NormalEntry` | highlights: organization, amount+currency, description |
 | exhibitions, curatorship | `NormalEntry` | highlights: event, venue, curator |
 | residencies | `NormalEntry` | name=organization; no highlights needed |
@@ -1274,7 +1294,7 @@ skills-terms:                              # programming / framework / platform 
   entry_type: OneLineEntry
   fields:
     label: "{category}"                    # resolved via labels.csv, e.g. "Programming"
-    details: "{name, joined by ', '}"      # GROUP_CONCAT over the group's rows, in row order
+    details: "{name_en, joined by ', '}"   # GROUP_CONCAT over the group's rows, in row order
 skills-language:
   source: skills
   filter: { category: [spoken-language] }
@@ -1282,7 +1302,7 @@ skills-language:
   entry_type: OneLineEntry
   fields:
     label: "Languages"
-    details: "{name} ({level}), joined by ', '"
+    details: "{name_en} ({level}), joined by ', '"
 skills-text:                               # expertise / other
   source: skills
   filter: { category: [expertise, other] }
@@ -1488,8 +1508,8 @@ parco import ccv --file <export.xml> --dry-run
 - CCV XML importer is a planned one-time/periodic bulk-seed tool. The
   export structure and category mapping are documented (see CCV export
   structure, under Category schemas), from a real exported file; the
-  per-column field mapping is finalized alongside each remaining
-  category's schema.
+  per-field mapping is finalized alongside each remaining category's
+  schema.
 
 ### Validation
 ```
