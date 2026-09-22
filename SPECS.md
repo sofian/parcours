@@ -1658,26 +1658,38 @@ all drafted, cross-checked against a real CCV export and the user's own
 LaTeX CV. The foundation layer is implemented (see Code architecture):
 schema/vocab/labels loading, ISO partial dates, common field validation,
 the handler architecture (`GenericHandler`, `PublicationsHandler`),
-DuckDB-backed CSV access, and `parco lint`. What remains is the rest of
-the CLI (add/edit wizard, sync, build, refresh/import) — see CLI.
+DuckDB-backed CSV access, and `parco lint`. The `add`/`edit`/`delete`
+wizard is also implemented (see CLI's "Data entry"): field-by-field
+prompting with vocab numbered-choice and `require_one_of` handling,
+substring search + numbered pick for `edit`/`delete`, the
+confirm-before-write + duplicate-check screen, and per-write git
+auto-commit (`core/entries.py`). What remains is `sync`, `build`, and
+`refresh`/`import` — see CLI.
 
-## Known limitations / follow-up from the foundation implementation
+## Known limitations / follow-up from prior plans' final reviews
 
-Parked during the foundation plan's final review as Minor (non-blocking)
-findings — pick these up in whichever future plan next touches the area:
+Parked as Minor (non-blocking) findings during final review — pick these
+up in whichever future plan next touches the area:
 
 - Several core loaders disagree on error handling for missing/malformed
   *config* files (some raise raw `OSError`/`KeyError`, one path
   (`load_all_schemas` on a missing `categories/` dir) silently succeeds
   with no schemas at all, meaning a misconfigured repo can lint clean).
-  `parco lint`'s own config errors are now caught (`ConfigError`, exit
-  code 2), but the underlying loaders were not made consistent with each
-  other. Worth a documented, uniform loader contract before the next
-  loader is added.
+  `parco lint`'s own config errors are caught (`ConfigError`, exit code
+  2); the wizard's `add`/`edit` commands now catch the same for
+  vocab/handler loading (`Config error: ...`, exit 2), but a malformed
+  category schema YAML (e.g. missing `name:`) still crashes `add`/`edit`/
+  `delete` with an uncaught `KeyError` — `_load_schema_or_exit` sits
+  outside that boundary, unlike `lint`'s, which wraps schema loading too.
+  Not reachable via normal use (requires a hand-corrupted schema file).
+  Worth a documented, uniform loader contract — and extending
+  `_load_schema_or_exit` to catch the same exceptions — before the next
+  loader or wizard command is added.
 - `DedupRule.outcome` (from a schema's `dedup: - when: ... as: ...`) is
   not validated against `{"duplicate", "related"}` at load time — a typo
   (`as: duplicat`) silently produces a `Match.kind` the duplicate-picker
-  (not yet built) won't recognize.
+  (built, but only warns/confirms — doesn't branch on `kind` beyond
+  `duplicate` vs. anything-else) won't recognize as `related`.
 - `validate_common` only checks date validity for a `type: date` field
   when the field also declares `precision:` — currently harmless since
   every real schema's date fields declare one, but worth tightening.
@@ -1688,8 +1700,44 @@ findings — pick these up in whichever future plan next touches the area:
   even though `id` is the primary key `find_matches` relies on.
 - No `.github/workflows/` CI exists yet, despite Testing & CI's
   requirement (pytest × 3 OSes × 2 Pythons, plus `parco lint` against
-  fixture data). This was never scheduled in the foundation plan and
-  should be picked up explicitly, not silently deferred again.
+  fixture data). Still not scheduled in any plan yet — should be picked
+  up explicitly, not silently deferred again.
+- The wizard's dedup-warning screen prints the matched rule's raw Python
+  `repr` (e.g. `Matched dedup rule [{'fuzzy': 'title_en'}]`) plus the
+  existing row's bare id, with no summary of what that existing entry
+  actually is — `_row_summary` (already used by the search/pick screen)
+  would make this warning actionable instead of just a soft block the
+  user can't meaningfully judge.
+- `confirm_and_check_duplicates`'s second confirmation always reads
+  "Add anyway?", including during `edit` (where nothing is being
+  "added") — should read differently depending on the calling command.
+- `pick_row` re-prompting: every other prompt in the wizard (vocab
+  choices, required fields) re-asks on invalid input; `pick_row` aborts
+  the whole `edit`/`delete` command on one mistyped number instead of
+  re-prompting — an inconsistency within the same tool, not a crash.
+- `--field value` prefill flags require a space (`--title_en "A Widget"`)
+  — the more common `--title_en="A Widget"` equals-sign form is rejected
+  with a confusing "missing value" error rather than being parsed.
+- `find_data_repo`'s try/except-`DataRepoNotFound` block is duplicated
+  across all four commands (`lint`/`add`/`edit`/`delete`) in `cli/main.py`
+  instead of factored into a shared `_find_repo_or_exit`, matching the
+  existing `_load_schema_or_exit`/`_load_vocab_and_handler_or_exit`
+  naming pattern.
+- Tests don't isolate `PARCO_DATA_DIR`; since `find_data_repo` checks it
+  before any cwd-relative marker, a real value set in the environment
+  running the test suite could redirect a test run at a real data repo
+  rather than a fixture. An autouse `conftest.py` fixture clearing it
+  would close this — can't corrupt data, only misdirect a test run, but
+  contradicts the "core tests touch no... real data" testing rule in
+  spirit.
+- `core/entries.py`'s auto-commit does `git add <file>` then a bare
+  `git commit -m <message>` (no `-- <file>` scoping), so any other
+  already-staged file in the data repo rides along into the same commit.
+  This matches this doc's own literal example commands, so it's
+  spec-faithful as shipped — but arguably should be scoped
+  (`git commit -m <message> -- <file>`) to guarantee "one logical change
+  per commit" regardless of what else might be staged. Needs an explicit
+  decision, not a silent code change, since it's a spec choice.
 
 ## Open questions to resolve during implementation
 
