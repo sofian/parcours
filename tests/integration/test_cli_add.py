@@ -27,7 +27,7 @@ dedup:
 def test_add_writes_a_new_row_and_commits(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     monkeypatch.chdir(repo)
-    monkeypatch.setattr("parcours.core.entries._git_commit", lambda *a, **k: None)
+    monkeypatch.setattr("parcours.core.entries.git_commit", lambda *a, **k: None)
 
     result = runner.invoke(app, ["add", "widgets"], input="A Widget\n1\ny\n")
 
@@ -41,7 +41,7 @@ def test_add_writes_a_new_row_and_commits(tmp_path, monkeypatch):
 def test_add_aborts_when_confirm_declined(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     monkeypatch.chdir(repo)
-    monkeypatch.setattr("parcours.core.entries._git_commit", lambda *a, **k: None)
+    monkeypatch.setattr("parcours.core.entries.git_commit", lambda *a, **k: None)
 
     result = runner.invoke(app, ["add", "widgets"], input="A Widget\n1\nn\n")
 
@@ -54,7 +54,7 @@ def test_add_warns_on_duplicate_and_can_proceed_anyway(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     (repo / "widgets.csv").write_text("id,title_en,status\nabc123,A Widget,draft\n", encoding="utf-8")
     monkeypatch.chdir(repo)
-    monkeypatch.setattr("parcours.core.entries._git_commit", lambda *a, **k: None)
+    monkeypatch.setattr("parcours.core.entries.git_commit", lambda *a, **k: None)
 
     result = runner.invoke(app, ["add", "widgets"], input="A Widget\n1\ny\ny\n")
 
@@ -67,7 +67,7 @@ def test_add_warns_on_duplicate_and_can_proceed_anyway(tmp_path, monkeypatch):
 def test_add_prefill_flags_are_used_as_wizard_defaults(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     monkeypatch.chdir(repo)
-    monkeypatch.setattr("parcours.core.entries._git_commit", lambda *a, **k: None)
+    monkeypatch.setattr("parcours.core.entries.git_commit", lambda *a, **k: None)
 
     result = runner.invoke(
         app, ["add", "widgets", "--title_en", "Prefilled Widget"], input="\n1\ny\n"

@@ -38,7 +38,7 @@ def _csv_path(data_dir: Path, category_name: str) -> Path:
     return data_dir / f"{category_name}.csv"
 
 
-def _write_all_rows(csv_path: Path, fieldnames: list[str], rows: list[dict]) -> None:
+def write_all_rows(csv_path: Path, fieldnames: list[str], rows: list[dict]) -> None:
     with open(csv_path, "w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
@@ -46,7 +46,7 @@ def _write_all_rows(csv_path: Path, fieldnames: list[str], rows: list[dict]) -> 
             writer.writerow({name: row.get(name, "") for name in fieldnames})
 
 
-def _git_commit(data_dir: Path, filename: str, message: str) -> None:
+def git_commit(data_dir: Path, filename: str, message: str) -> None:
     subprocess.run(["git", "add", filename], cwd=data_dir, check=True, capture_output=True)
 
     status = subprocess.run(
@@ -71,8 +71,8 @@ def add_entry(data_dir: Path, schema: CategorySchema, values: dict) -> dict:
 
     rows = load_category_rows(data_dir, schema.name)
     rows.append(row)
-    _write_all_rows(_csv_path(data_dir, schema.name), schema.field_names(), rows)
-    _git_commit(data_dir, f"{schema.name}.csv", f"Added {schema.name} entry {row_id}")
+    write_all_rows(_csv_path(data_dir, schema.name), schema.field_names(), rows)
+    git_commit(data_dir, f"{schema.name}.csv", f"Added {schema.name} entry {row_id}")
     return row
 
 
@@ -83,8 +83,8 @@ def edit_entry(data_dir: Path, schema: CategorySchema, row_id: str, values: dict
 
     updated_row = {"id": row_id, **values}
     new_rows = [updated_row if row.get("id") == row_id else row for row in rows]
-    _write_all_rows(_csv_path(data_dir, schema.name), schema.field_names(), new_rows)
-    _git_commit(data_dir, f"{schema.name}.csv", f"Edited {schema.name} entry {row_id}")
+    write_all_rows(_csv_path(data_dir, schema.name), schema.field_names(), new_rows)
+    git_commit(data_dir, f"{schema.name}.csv", f"Edited {schema.name} entry {row_id}")
     return updated_row
 
 
@@ -94,5 +94,5 @@ def delete_entry(data_dir: Path, schema: CategorySchema, row_id: str) -> None:
         raise EntryNotFound(f"No {schema.name} entry with id '{row_id}'")
 
     new_rows = [row for row in rows if row.get("id") != row_id]
-    _write_all_rows(_csv_path(data_dir, schema.name), schema.field_names(), new_rows)
-    _git_commit(data_dir, f"{schema.name}.csv", f"Deleted {schema.name} entry {row_id}")
+    write_all_rows(_csv_path(data_dir, schema.name), schema.field_names(), new_rows)
+    git_commit(data_dir, f"{schema.name}.csv", f"Deleted {schema.name} entry {row_id}")

@@ -21,7 +21,7 @@ def _no_commit(monkeypatch):
     def fake_commit(data_dir, filename, message):
         calls.append((data_dir, filename, message))
 
-    monkeypatch.setattr("parcours.core.entries._git_commit", fake_commit)
+    monkeypatch.setattr("parcours.core.entries.git_commit", fake_commit)
     return calls
 
 
