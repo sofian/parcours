@@ -14,7 +14,13 @@ from ..core.lint import ConfigError, run_lint
 from ..core.repo import DataRepoNotFound, find_data_repo
 from ..core.schema import CategorySchema, load_all_schemas
 from ..core.vocab import VocabError, load_vocab
-from .wizard import collect_field_values, confirm_and_check_duplicates, pick_row, search_rows
+from .wizard import (
+    collect_field_values,
+    confirm_and_check_duplicates,
+    pick_row,
+    row_summary,
+    search_rows,
+)
 
 app = typer.Typer()
 
@@ -53,6 +59,31 @@ def lint(category: str = typer.Argument(None, help="Only lint this category")):
 
     error_count = sum(1 for i in issues if i.severity == "error")
     raise typer.Exit(code=1 if error_count else 0)
+
+
+@app.command(name="list")
+def list_command(
+    category: str = typer.Argument(..., help="Category to list"),
+    search: str = typer.Option(None, "--search", help="Only show entries matching this text"),
+):
+    """List entries in a category, optionally filtered by --search text."""
+    try:
+        data_dir = find_data_repo()
+    except DataRepoNotFound as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=2)
+
+    schema = _load_schema_or_exit(data_dir, category)
+    rows = load_category_rows(data_dir, category)
+    if search:
+        rows = search_rows(rows, search)
+
+    if not rows:
+        typer.echo("No entries found.")
+        raise typer.Exit(code=0)
+
+    for row in rows:
+        typer.echo(row_summary(schema, row))
 
 
 def _load_schema_or_exit(data_dir: Path, category: str) -> CategorySchema:

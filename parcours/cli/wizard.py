@@ -138,7 +138,7 @@ def _display_fields(schema: CategorySchema) -> list[str]:
     return names
 
 
-def _row_summary(schema: CategorySchema, row: dict) -> str:
+def row_summary(schema: CategorySchema, row: dict) -> str:
     parts = [f"id={row.get('id', '')}"]
     for name in _display_fields(schema):
         value = row.get(name)
@@ -163,7 +163,7 @@ def pick_row(schema: CategorySchema, matches: list[dict]) -> dict | None:
         return None
 
     for i, row in enumerate(matches, start=1):
-        typer.echo(f"  {i}. {_row_summary(schema, row)}")
+        typer.echo(f"  {i}. {row_summary(schema, row)}")
 
     choice = typer.prompt("Pick a number ([Enter] to cancel)", default="", show_default=False)
     if not choice.strip():

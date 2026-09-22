@@ -1477,7 +1477,13 @@ parco add <category>                       # interactive wizard, one field at a 
 parco add <category> --field value ...     # flags pre-fill wizard defaults, don't replace it
 parco edit <category> --search "<text>"    # substring search, pick from numbered matches
 parco delete <category> --search "<text>"  # confirm once; git history is the undo mechanism
+parco list <category>                      # read-only: every row's summary line
+parco list <category> --search "<text>"    # read-only: filtered to matching rows
 ```
+`list` is purely read-only — no wizard, no confirm, no write — and shares
+`edit`/`delete`'s substring search plus the same generic summary line
+(`id` + `required` + `require_one_of` fields) that their numbered pickers
+already show.
 Wizard behavior:
 - Walks the schema's fields in declared order; `generated` fields (`id`)
   are skipped entirely, assigned automatically (see IDs, under Data
