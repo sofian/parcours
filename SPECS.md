@@ -56,10 +56,17 @@ plus CV-specific fields Zotero doesn't track.
   spreadsheet-app editability.
 - **No cross-references between tables for v1** (explicit decision — no
   foreign keys, no relational joins between e.g. publications and grants).
-- **IDs:** slug-style per category (`pub-2026-004`, `grant-frqsc-2026`),
-  auto-generated on `parco add`. Exists for internal stability (git history,
-  future cross-referencing) — users never need to type or remember them;
-  all interaction is via fuzzy search (`parco edit publication --search "..."`).
+- **IDs:** a bare 6-hex-character random token (e.g. `a3f9c2`), generated
+  by `parco add` via Python's `secrets` module and re-rolled on the
+  (astronomically unlikely) collision against existing ids already in
+  that category's CSV. No category prefix and no year: the category is
+  already established by which CSV the row lives in and is always shown
+  alongside the id in any output (lint issues, error messages), so a
+  prefix would be redundant; a year would misleadingly suggest the id
+  encodes the entry's own date rather than just when it was created.
+  Exists for internal stability (git history, future cross-referencing)
+  — users never need to type or remember them; all interaction is via
+  substring search (`parco edit publications --search "..."`).
 - **Controlled vocabularies:** `vocab.yaml` — one list per constrained
   field (`publication_type`, `publication_status`, `grant_role`,
   `degree_status`, etc. — see the full compiled draft under vocab.yaml,
@@ -1468,20 +1475,43 @@ parco cite --key <citekey> --style <chicago|apa|...>
 ```
 parco add <category>                       # interactive wizard, one field at a time
 parco add <category> --field value ...     # flags pre-fill wizard defaults, don't replace it
-parco edit <category> --search "<text>"    # fuzzy-search, pick from numbered matches
+parco edit <category> --search "<text>"    # substring search, pick from numbered matches
 parco delete <category> --search "<text>"  # confirm once; git history is the undo mechanism
 ```
 Wizard behavior:
-- `[skip]` on optional fields.
+- Walks the schema's fields in declared order; `generated` fields (`id`)
+  are skipped entirely, assigned automatically (see IDs, under Data
+  layer).
+- `[skip]` on optional fields. A `require_one_of` group is asked
+  field-by-field with `[skip]` allowed on each individually, but
+  re-prompts the group if every field in it ends up blank (the schema
+  requires at least one).
 - Numbered choices for any `vocab.yaml`-constrained field (no free typing
   of controlled values).
-- Sensible defaults (e.g. year = current year).
-- **Confirm-before-write screen** showing all entered values.
-- **Duplicate check before final write** (see below) — soft warning,
-  never a hard block; user always retains "these are different, add
-  anyway."
+- Sensible defaults shown inline in the prompt (e.g. a date field hints
+  the current year) — a CLI-layer convenience, not a new schema or
+  handler concept.
+- `--field value` flags pre-fill answers; the wizard still walks every
+  field (skipping ones already answered) rather than bypassing itself.
+- **Confirm-before-write screen** showing every field about to be
+  written, `[y/N]` to proceed.
+- **Duplicate check runs after confirmation, before the actual write**
+  (see below) — soft warning, never a hard block; user always retains
+  "these are different, add anyway."
+- On confirm (and past any duplicate warning), the row is written and
+  the write is auto-committed to the data repo (see Auto-commit, below).
 - Same wizard code path serves both `add` and `edit` (edit pre-fills
-  current values).
+  current values, sourced by search — see below).
+
+### Finding a row to edit or delete (substring search, no display-field config)
+`--search "<text>"` matches case-insensitively as a substring against
+every field's value — no per-category "display field" concept needed.
+Matches are shown as a numbered list; each row's summary line shows its
+`id` plus every field that's either declared `required` or belongs to a
+`require_one_of` group and is non-blank for that row (so a proper-noun-
+only title still shows, without listing every optional field). The user
+picks a number; `edit` re-enters the wizard pre-filled with that row's
+values, `delete` asks one confirmation and removes the row.
 
 ### Duplicate detection (per-category matching, not generic)
 Rules are **declared in each category's schema file** (see each
@@ -1494,6 +1524,17 @@ new record" rather than a true duplicate). Same logic reused
 non-interactively during `parco refresh` and `parco import` (auto-skip
 high-confidence matches, flag ambiguous ones for review rather than
 blocking the whole run).
+
+### Auto-commit (per-write, not the same thing as `sync`)
+Every `add`/`edit`/`delete` that reaches a write commits it to the data
+repo immediately — `git add <category>.csv && git commit -m "..."` —
+because git history *is* the undo mechanism (see Behavioral requirements
+in CLAUDE.md; no soft-delete exists anywhere in this tool). This is a
+plain local commit with no remote interaction, owned by `entries.py`
+itself (not `sync.py`, which is the separate, larger, future piece that
+reconciles remotes and prompts "Sync anyway? [y/N]"). Commit messages
+are generated, not user-authored: `Added <category> entry <id>`,
+`Edited <category> entry <id>`, `Deleted <category> entry <id>`.
 
 ### Refresh (catch up with an external source that updates on its own)
 ```

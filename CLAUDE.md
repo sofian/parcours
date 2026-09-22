@@ -33,7 +33,7 @@ Boundary test: could a web API return this as JSON, or a GUI show it as a dialog
 ## Data model decisions
 
 - One UTF-8 CSV per category (`publications.csv`, `grants.csv`, `artworks.csv`, `students.csv`, …). **No cross-references/foreign keys between tables in v1.**
-- IDs are slugs (`pub-2026-004`, `grant-frqsc-2026`), auto-generated on `add`; users interact via fuzzy search, never type IDs.
+- IDs are bare 6-hex-char random tokens (e.g. `a3f9c2`), auto-generated on `add`; users interact via substring search (`--search`), never type IDs.
 - `vocab.yaml` holds controlled vocabularies, enforced at write time (`add`/`edit` reject invalid values) and re-checked by `parco lint`.
 - Bilingual fields are paired fields (`title_fr` / `title_en`) applied consistently across tables.
 - Publications require a `status` (see `publication_status` in `vocab.yaml`), which decides CV-readiness.
