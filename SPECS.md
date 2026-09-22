@@ -1477,13 +1477,24 @@ parco add <category>                       # interactive wizard, one field at a 
 parco add <category> --field value ...     # flags pre-fill wizard defaults, don't replace it
 parco edit <category> --search "<text>"    # substring search, pick from numbered matches
 parco delete <category> --search "<text>"  # confirm once; git history is the undo mechanism
-parco list <category>                      # read-only: every row's summary line
-parco list <category> --search "<text>"    # read-only: filtered to matching rows
+parco list <category>                             # read-only: every row's summary line
+parco list <category> --search "<text>"           # read-only: filtered to matching rows
+parco list <category> --order-by <field> [--desc] # read-only: sorted by any one field
 ```
 `list` is purely read-only — no wizard, no confirm, no write — and shares
 `edit`/`delete`'s substring search plus the same generic summary line
 (`id` + `required` + `require_one_of` fields) that their numbered pickers
-already show.
+already show; if `--order-by` names a field outside that set, `list`
+shows it too, so the sort criterion is always visible. `--order-by` is
+type-aware — numeric for `type: int`, chronological (via the same ISO
+partial-date parsing used everywhere else) for `type: date`, otherwise a
+case-insensitive string sort — and a blank/unparseable value always sorts
+last regardless of `--desc`, rather than landing arbitrarily first or in
+the middle. This is a simple, generic single-field sort for browsing data
+day to day; it is not the `weight`-refines-date ordering `build`'s
+`views.yaml`/profiles will eventually need (see `views.yaml (draft)`,
+under Profiles) — that's a distinct, more opinionated ordering rule for
+CV *rendering*, not for this ad hoc listing command.
 Wizard behavior:
 - Walks the schema's fields in declared order; `generated` fields (`id`)
   are skipped entirely, assigned automatically (see IDs, under Data

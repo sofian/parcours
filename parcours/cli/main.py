@@ -17,6 +17,7 @@ from ..core.vocab import VocabError, load_vocab
 from .wizard import (
     collect_field_values,
     confirm_and_check_duplicates,
+    order_rows,
     pick_row,
     row_summary,
     search_rows,
@@ -65,8 +66,10 @@ def lint(category: str = typer.Argument(None, help="Only lint this category")):
 def list_command(
     category: str = typer.Argument(..., help="Category to list"),
     search: str = typer.Option(None, "--search", help="Only show entries matching this text"),
+    order_by: str = typer.Option(None, "--order-by", help="Sort by this field"),
+    desc: bool = typer.Option(False, "--desc", help="Sort descending (requires --order-by)"),
 ):
-    """List entries in a category, optionally filtered by --search text."""
+    """List entries in a category, optionally filtered by --search text and sorted by --order-by."""
     try:
         data_dir = find_data_repo()
     except DataRepoNotFound as exc:
@@ -74,16 +77,27 @@ def list_command(
         raise typer.Exit(code=2)
 
     schema = _load_schema_or_exit(data_dir, category)
+
+    if desc and not order_by:
+        typer.echo("--desc requires --order-by")
+        raise typer.Exit(code=2)
+    if order_by and schema.get_field(order_by) is None:
+        typer.echo(f"Unknown field: '{order_by}'")
+        raise typer.Exit(code=2)
+
     rows = load_category_rows(data_dir, category)
     if search:
         rows = search_rows(rows, search)
+    if order_by:
+        rows = order_rows(schema, rows, order_by, descending=desc)
 
     if not rows:
         typer.echo("No entries found.")
         raise typer.Exit(code=0)
 
+    extra_fields = [order_by] if order_by else None
     for row in rows:
-        typer.echo(row_summary(schema, row))
+        typer.echo(row_summary(schema, row, extra_fields=extra_fields))
 
 
 def _load_schema_or_exit(data_dir: Path, category: str) -> CategorySchema:

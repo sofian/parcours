@@ -7,6 +7,7 @@ from datetime import date
 
 import typer
 
+from ..core.dates import InvalidDateError, parse_partial_date
 from ..core.schema import CategorySchema, FieldSpec
 
 
@@ -138,9 +139,14 @@ def _display_fields(schema: CategorySchema) -> list[str]:
     return names
 
 
-def row_summary(schema: CategorySchema, row: dict) -> str:
+def row_summary(schema: CategorySchema, row: dict, extra_fields: list[str] | None = None) -> str:
+    names = _display_fields(schema)
+    for name in extra_fields or []:
+        if name not in names:
+            names = [*names, name]
+
     parts = [f"id={row.get('id', '')}"]
-    for name in _display_fields(schema):
+    for name in names:
         value = row.get(name)
         if value:
             parts.append(f"{name}={value}")
@@ -153,6 +159,37 @@ def search_rows(rows: list[dict], search_text: str) -> list[dict]:
         row for row in rows
         if any(needle in str(value).lower() for value in row.values() if value)
     ]
+
+
+def _sort_key(schema: CategorySchema, field_name: str, row: dict):
+    """Returns None for a blank/unparseable value, so callers can push
+    those to the end regardless of sort direction rather than letting them
+    sort arbitrarily first or in the middle."""
+    value = row.get(field_name)
+    if not value:
+        return None
+
+    field = schema.get_field(field_name)
+    if field and field.type == "date":
+        try:
+            return parse_partial_date(value).start_bound()
+        except InvalidDateError:
+            return None
+    if field and field.type == "int":
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return value.lower()
+
+
+def order_rows(schema: CategorySchema, rows: list[dict], field_name: str, descending: bool = False) -> list[dict]:
+    keyed = [(_sort_key(schema, field_name, row), row) for row in rows]
+    sortable = [(key, row) for key, row in keyed if key is not None]
+    unsortable = [row for key, row in keyed if key is None]
+
+    sortable.sort(key=lambda pair: pair[0], reverse=descending)
+    return [row for _, row in sortable] + unsortable
 
 
 def pick_row(schema: CategorySchema, matches: list[dict]) -> dict | None:
