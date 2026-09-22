@@ -89,6 +89,73 @@ fields:
     assert any(i.field == "citekey" for i in issues)
 
 
+def test_flags_a_glossary_value_with_no_matching_entry_as_a_warning(tmp_path):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "categories" / "widgets.yaml").write_text("""
+name: widgets
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: title_en, required: true}
+  - {name: status, required: true, vocab: widget_status}
+  - {name: location, glossary: location}
+""")
+    (repo / "widgets.csv").write_text(
+        "id,title_en,status,location\nwidget-1,A Widget,draft,Montreal\n"
+    )
+
+    issues = run_lint(repo)
+
+    matches = [i for i in issues if i.field == "location"]
+    assert len(matches) == 1
+    assert matches[0].severity == "warning"
+    assert "Montreal" in matches[0].message
+
+
+def test_glossary_field_with_a_matching_entry_has_no_issue(tmp_path):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "categories" / "widgets.yaml").write_text("""
+name: widgets
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: title_en, required: true}
+  - {name: status, required: true, vocab: widget_status}
+  - {name: location, glossary: location}
+""")
+    (repo / "translations.csv").write_text(
+        "id,category,en,fr\nwidgets,section,Widgets,Widgets\nMontreal,location,Montreal,Montréal\n"
+    )
+    (repo / "widgets.csv").write_text(
+        "id,title_en,status,location\nwidget-1,A Widget,draft,Montreal\n"
+    )
+
+    issues = run_lint(repo)
+
+    assert not any(i.field == "location" for i in issues)
+
+
+def test_glossary_warning_never_counts_toward_error_severity(tmp_path):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "categories" / "widgets.yaml").write_text("""
+name: widgets
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: title_en, required: true}
+  - {name: status, required: true, vocab: widget_status}
+  - {name: location, glossary: location}
+""")
+    (repo / "widgets.csv").write_text(
+        "id,title_en,status,location\nwidget-1,A Widget,draft,Montreal\n"
+    )
+
+    issues = run_lint(repo)
+
+    assert all(i.severity == "warning" for i in issues if i.field == "location")
+    assert not any(i.severity == "error" for i in issues if i.field == "location")
+
+
 def test_unregistered_vocab_name_raises_config_error_not_a_crash(tmp_path):
     repo = _setup_data_repo(tmp_path)
     (repo / "categories" / "widgets.yaml").write_text("""

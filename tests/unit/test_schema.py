@@ -18,6 +18,7 @@ fields:
   - {name: title_fr}
   - {name: status, required: true, vocab: widget_status}
   - {name: start_date, type: date, precision: month, required: true}
+  - {name: location, glossary: location}
 require_one_of:
   - [title_en, title_fr]
 dedup:
@@ -29,7 +30,7 @@ dedup:
     assert schema.name == "widgets"
     assert schema.handler == "generic"
     assert schema.options == {"some_option": "value"}
-    assert schema.field_names() == ["id", "title_en", "title_fr", "status", "start_date"]
+    assert schema.field_names() == ["id", "title_en", "title_fr", "status", "start_date", "location"]
     assert schema.require_one_of == [["title_en", "title_fr"]]
 
     status_field = schema.get_field("status")
@@ -39,6 +40,9 @@ dedup:
     date_field = schema.get_field("start_date")
     assert date_field.type == "date"
     assert date_field.precision == "month"
+
+    location_field = schema.get_field("location")
+    assert location_field.glossary == "location"
 
     assert schema.get_field("nonexistent") is None
 

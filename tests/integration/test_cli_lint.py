@@ -73,3 +73,26 @@ def test_lint_command_accepts_a_category_filter(tmp_path, monkeypatch):
     result = runner.invoke(app, ["lint", "widgets"])
 
     assert result.exit_code == 0
+
+
+def test_lint_command_reports_a_glossary_warning_but_exits_zero(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "categories" / "widgets.yaml").write_text("""
+name: widgets
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: title_en, required: true}
+  - {name: status, required: true, vocab: widget_status}
+  - {name: location, glossary: location}
+""")
+    (repo / "widgets.csv").write_text(
+        "id,title_en,status,location\nwidget-1,A Widget,draft,Montreal\n"
+    )
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["lint"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "WARNING" in result.stdout
+    assert "Montreal" in result.stdout

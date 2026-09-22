@@ -17,6 +17,7 @@ class FieldSpec:
     default: Any = None
     generated: bool = False
     precision: str | None = None
+    glossary: str | None = None
 
 
 @dataclass

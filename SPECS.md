@@ -572,7 +572,7 @@ fields:
   - {name: title_fr}                                                    # usually only one filled
   - {name: event_en}
   - {name: event_fr}                                                    # Conference / Event Name — usually only one filled (e.g. "Colloque ACFAS" has no English name)
-  - {name: location,  required: true}                                   # city + country as one glossary-backed value, e.g. "Berlin, Germany"
+  - {name: location,  required: true, glossary: location}                                   # city + country as one glossary-backed value, e.g. "Berlin, Germany"
   - {name: invited,   type: bool}
   - {name: keynote,   type: bool}
   - {name: date,      type: date, precision: month, required: true}     # at least year+month, like grants.start_date
@@ -842,7 +842,7 @@ fields:
   - {name: title_fr}                                                # usually only one filled
   - {name: event}                                                    # free text — festival/series, e.g. "MUTEK Forum"
   - {name: venue}                                                    # free text — hosting institution, e.g. "National Gallery"
-  - {name: location,     required: true}                             # city + country as one glossary-backed value
+  - {name: location,     required: true, glossary: location}                             # city + country as one glossary-backed value
   - {name: curator}                                                  # free text — credited curator(s)
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}              # blank = single-day event or unknown
@@ -887,7 +887,7 @@ fields:
   - {name: title_fr}
   - {name: event}
   - {name: venue}
-  - {name: location,     required: true}                             # city + country as one glossary-backed value
+  - {name: location,     required: true, glossary: location}                             # city + country as one glossary-backed value
   - {name: curator}                                                  # free text — co-curator(s), if any (your own curatorial role is implicit)
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}
@@ -912,7 +912,7 @@ fields:
   - {name: id,           generated: true}                       # res-2026-004
   - {name: weight,       type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: organization, required: true}                        # free text — e.g. "Hexagram", "LABoral"
-  - {name: location,     required: true}                         # city + country as one glossary-backed value
+  - {name: location,     required: true, glossary: location}                         # city + country as one glossary-backed value
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}           # blank = short/undated residency
 dedup:
@@ -1067,15 +1067,21 @@ Amounts can be converted to a reporting currency, mainly for statistics.
   — e.g. `category: location` rows translate a whole place name in one
   unit (id `the-hague`: en "The Hague, Netherlands", fr "La Haye,
   Pays-Bas"), the same pattern as the user's existing LaTeX `\gtr{}`
-  glossary. Any category's `location` field (see `exhibitions`,
-  `curatorship`, `residencies`, `presentations`) is looked up against
-  these rows when rendering; an unmatched value (an obscure place with
-  no glossary entry) falls back to the literal text as typed — the
-  glossary is an enhancement, never a requirement, so entering an
-  unrecognized place never blocks data entry. This is why the "missing
-  translation" lint rule above doesn't extend to these fields: most
-  places will never have a glossary entry, and that's expected, not an
-  error.
+  glossary. A field declares which glossary it's backed by with
+  `glossary: <category>` (parallel to `vocab: <name>` — see `location` on
+  `exhibitions`, `curatorship`, `residencies`, `presentations`); the
+  value is looked up against `translations.csv` rows of that category
+  when rendering, falling back to the literal text as typed when
+  unmatched (an obscure place with no glossary entry) — the glossary is
+  an enhancement, never a requirement, so an unrecognized value never
+  blocks data entry. This is why the "missing translation" lint rule
+  above doesn't extend to these fields: most places will never have a
+  glossary entry, and that's expected, not an error. `parco lint` does
+  still surface it, at `severity: warning` only (never affects `lint`'s
+  exit code) — a glossary-backed field's value with no matching
+  `translations.csv` entry is worth noticing before you build a
+  French-language CV and it silently shows the English text, but never
+  worth blocking on.
 - **Managing translations:** `translations.csv` has no `categories/*.yaml`
   schema (it's a fixed shape: `id, category, en, fr`), so it gets its own
   small command group rather than reusing `add`/`edit`/`delete`/`list`:
@@ -1628,8 +1634,10 @@ parco lint <category>      # check one table
 parco lint --fix           # only unambiguous fixes (e.g. whitespace) — never guesses vocab/translation values
 ```
 Checks: vocab conformance, `translations.csv` completeness against all profile
-section ids, date sanity, required fields non-blank, and (warning) money
-amounts whose month has no exchange rate in `rates.csv`.
+section ids, date sanity, required fields non-blank, (warning) a
+`glossary:`-backed field's value with no matching `translations.csv`
+entry (see Translations), and (warning) money amounts whose month has
+no exchange rate in `rates.csv`.
 
 **Expected to pass silently almost always** — `add`/`edit` already
 validate at entry time, so lint failures should mainly come from paths
