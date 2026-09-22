@@ -90,3 +90,44 @@ def test_prefill_becomes_the_shown_default(monkeypatch):
 
     assert calls == ["Existing Title"]
     assert values["title_en"] == "Existing Title"
+
+
+def test_search_rows_matches_substring_case_insensitively():
+    rows = [
+        {"id": "abc123", "title_en": "Machine Learning Art"},
+        {"id": "def456", "title_en": "Completely Unrelated"},
+    ]
+    matches = wizard.search_rows(rows, "machine")
+    assert [m["id"] for m in matches] == ["abc123"]
+
+
+def test_search_rows_matches_across_any_field():
+    rows = [
+        {"id": "abc123", "title_en": "A Widget", "status": "draft"},
+        {"id": "def456", "title_en": "B Widget", "status": "published"},
+    ]
+    matches = wizard.search_rows(rows, "published")
+    assert [m["id"] for m in matches] == ["def456"]
+
+
+def test_pick_row_returns_none_for_no_matches(monkeypatch):
+    monkeypatch.setattr(wizard.typer, "echo", lambda *a, **k: None)
+    assert wizard.pick_row(_schema(), []) is None
+
+
+def test_pick_row_returns_the_chosen_row(monkeypatch):
+    rows = [{"id": "abc123", "title_en": "A"}, {"id": "def456", "title_en": "B"}]
+    monkeypatch.setattr(wizard.typer, "echo", lambda *a, **k: None)
+    monkeypatch.setattr(wizard.typer, "prompt", lambda *a, **k: "2")
+
+    picked = wizard.pick_row(_schema(), rows)
+
+    assert picked["id"] == "def456"
+
+
+def test_pick_row_returns_none_when_cancelled(monkeypatch):
+    rows = [{"id": "abc123", "title_en": "A"}]
+    monkeypatch.setattr(wizard.typer, "echo", lambda *a, **k: None)
+    monkeypatch.setattr(wizard.typer, "prompt", lambda *a, **k: "")
+
+    assert wizard.pick_row(_schema(), rows) is None

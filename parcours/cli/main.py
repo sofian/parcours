@@ -7,14 +7,14 @@ from pathlib import Path
 import typer
 
 from ..core.data import load_category_rows
-from ..core.entries import add_entry
+from ..core.entries import add_entry, edit_entry
 from ..core.handlers import load_handler
 from ..core.handlers.base import HandlerContext
 from ..core.lint import ConfigError, run_lint
 from ..core.repo import DataRepoNotFound, find_data_repo
 from ..core.schema import CategorySchema, load_all_schemas
 from ..core.vocab import load_vocab
-from .wizard import collect_field_values, confirm_and_check_duplicates
+from .wizard import collect_field_values, confirm_and_check_duplicates, pick_row, search_rows
 
 app = typer.Typer()
 
@@ -112,6 +112,43 @@ def add(ctx: typer.Context, category: str = typer.Argument(..., help="Category t
 
     row = add_entry(data_dir, schema, values)
     typer.echo(f"Added {category} entry {row['id']}.")
+
+
+@app.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
+def edit(
+    ctx: typer.Context,
+    category: str = typer.Argument(..., help="Category to edit an entry in"),
+    search: str = typer.Option(..., "--search", help="Text to search for"),
+):
+    """Search for an entry and interactively edit it."""
+    try:
+        data_dir = find_data_repo()
+    except DataRepoNotFound as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=2)
+
+    schema = _load_schema_or_exit(data_dir, category)
+    prefill_flags = _parse_prefill_flags(ctx.args)
+    _reject_unknown_fields(schema, prefill_flags)
+
+    existing_rows = load_category_rows(data_dir, category)
+    matches = search_rows(existing_rows, search)
+    row = pick_row(schema, matches)
+    if row is None:
+        typer.echo("Nothing selected.")
+        raise typer.Exit(code=0)
+
+    vocab = load_vocab(data_dir / "vocab.yaml")
+    handler = load_handler(schema, HandlerContext(data_dir=data_dir))
+
+    prefill = {**row, **prefill_flags}
+    values = collect_field_values(schema, vocab, prefill=prefill)
+    if not confirm_and_check_duplicates(handler, values, existing_rows, self_id=row["id"]):
+        typer.echo("Aborted, nothing written.")
+        raise typer.Exit(code=0)
+
+    updated = edit_entry(data_dir, schema, row["id"], values)
+    typer.echo(f"Edited {category} entry {updated['id']}.")
 
 
 if __name__ == "__main__":

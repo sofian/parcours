@@ -122,3 +122,51 @@ def confirm_and_check_duplicates(
             return False
 
     return True
+
+
+def _display_fields(schema: CategorySchema) -> list[str]:
+    names: list[str] = [f.name for f in schema.fields if f.required]
+    for group in schema.require_one_of:
+        for name in group:
+            if name not in names:
+                names.append(name)
+    return names
+
+
+def _row_summary(schema: CategorySchema, row: dict) -> str:
+    parts = [f"id={row.get('id', '')}"]
+    for name in _display_fields(schema):
+        value = row.get(name)
+        if value:
+            parts.append(f"{name}={value}")
+    return ", ".join(parts)
+
+
+def search_rows(rows: list[dict], search_text: str) -> list[dict]:
+    needle = search_text.lower()
+    return [
+        row for row in rows
+        if any(needle in str(value).lower() for value in row.values() if value)
+    ]
+
+
+def pick_row(schema: CategorySchema, matches: list[dict]) -> dict | None:
+    if not matches:
+        typer.echo("No matching entries found.")
+        return None
+
+    for i, row in enumerate(matches, start=1):
+        typer.echo(f"  {i}. {_row_summary(schema, row)}")
+
+    choice = typer.prompt("Pick a number ([Enter] to cancel)", default="", show_default=False)
+    if not choice.strip():
+        return None
+    try:
+        index = int(choice)
+    except ValueError:
+        typer.echo("Not a valid number.")
+        return None
+    if not (1 <= index <= len(matches)):
+        typer.echo("Not a valid number.")
+        return None
+    return matches[index - 1]
