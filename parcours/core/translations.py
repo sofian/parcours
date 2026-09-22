@@ -32,23 +32,29 @@ class TranslationExists(Exception):
 
 
 class TranslationsTable:
+    """`(category, id)` lookups are case-insensitive — a location typed
+    as "Montreal" must match a glossary entry added as "montreal", since
+    a human would never expect capitalization alone to create two
+    different places. The original casing is preserved on `TranslationEntry`
+    for display; only the lookup key is folded."""
+
     def __init__(self, entries: list[TranslationEntry]):
         self._entries = entries
         self._by_key: dict[tuple[str, str], TranslationEntry] = {
-            (e.category, e.id): e for e in entries
+            (e.category.lower(), e.id.lower()): e for e in entries
         }
 
     def all(self) -> list[TranslationEntry]:
         return list(self._entries)
 
     def exists(self, category: str, id_: str) -> bool:
-        return (category, id_) in self._by_key
+        return (category.lower(), id_.lower()) in self._by_key
 
     def get(self, category: str, id_: str) -> TranslationEntry | None:
-        return self._by_key.get((category, id_))
+        return self._by_key.get((category.lower(), id_.lower()))
 
     def lookup(self, category: str, id_: str, lang: str) -> str | None:
-        entry = self._by_key.get((category, id_))
+        entry = self._by_key.get((category.lower(), id_.lower()))
         if entry is None:
             return None
         value = entry.en if lang == "en" else entry.fr
@@ -98,6 +104,10 @@ def _entry_row(entry: TranslationEntry) -> dict:
     return {"id": entry.id, "category": entry.category, "en": entry.en, "fr": entry.fr}
 
 
+def _matches(entry: TranslationEntry, category: str, id_: str) -> bool:
+    return entry.category.lower() == category.lower() and entry.id.lower() == id_.lower()
+
+
 def add_translation(data_dir: Path, category: str, id_: str, en: str, fr: str) -> TranslationEntry:
     table = _load_translations_or_empty(_translations_path(data_dir))
     if table.exists(category, id_):
@@ -112,12 +122,15 @@ def add_translation(data_dir: Path, category: str, id_: str, en: str, fr: str) -
 
 def edit_translation(data_dir: Path, category: str, id_: str, en: str, fr: str) -> TranslationEntry:
     table = _load_translations_or_empty(_translations_path(data_dir))
-    if not table.exists(category, id_):
+    current = table.get(category, id_)
+    if current is None:
         raise TranslationNotFound(f"No translation for category '{category}' id '{id_}'")
 
-    updated = TranslationEntry(id=id_, category=category, en=en, fr=fr)
+    # Preserve the stored category/id casing — editing changes en/fr,
+    # never silently renames the glossary key's casing.
+    updated = TranslationEntry(id=current.id, category=current.category, en=en, fr=fr)
     rows = [
-        _entry_row(updated) if (e.category, e.id) == (category, id_) else _entry_row(e)
+        _entry_row(updated) if _matches(e, category, id_) else _entry_row(e)
         for e in table.all()
     ]
     write_all_rows(_translations_path(data_dir), _FIELDNAMES, rows)
@@ -130,6 +143,6 @@ def delete_translation(data_dir: Path, category: str, id_: str) -> None:
     if not table.exists(category, id_):
         raise TranslationNotFound(f"No translation for category '{category}' id '{id_}'")
 
-    rows = [_entry_row(e) for e in table.all() if (e.category, e.id) != (category, id_)]
+    rows = [_entry_row(e) for e in table.all() if not _matches(e, category, id_)]
     write_all_rows(_translations_path(data_dir), _FIELDNAMES, rows)
     git_commit(data_dir, "translations.csv", f"Deleted translation {category}:{id_}")

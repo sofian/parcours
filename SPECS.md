@@ -1081,7 +1081,12 @@ Amounts can be converted to a reporting currency, mainly for statistics.
   exit code) — a glossary-backed field's value with no matching
   `translations.csv` entry is worth noticing before you build a
   French-language CV and it silently shows the English text, but never
-  worth blocking on.
+  worth blocking on. `(category, id)` matching is case-insensitive
+  throughout (`TranslationsTable`, and `add`/`edit`/`delete translation`)
+  — "Montreal" and "montreal" are the same glossary entry, since a human
+  would never expect capitalization alone to create two different
+  places; the originally-typed casing is preserved for display, and
+  `edit` never silently renames a glossary entry's stored casing.
 - **Managing translations:** `translations.csv` has no `categories/*.yaml`
   schema (it's a fixed shape: `id, category, en, fr`), so it gets its own
   small command group rather than reusing `add`/`edit`/`delete`/`list`:

@@ -167,3 +167,45 @@ def test_delete_translation_raises_for_unknown_pair(tmp_path, monkeypatch):
 
     with pytest.raises(TranslationNotFound):
         delete_translation(tmp_path, "location", "nonexistent")
+
+
+def test_lookup_is_case_insensitive(tmp_path):
+    table = load_translations(_write_translations(tmp_path, [
+        ("montreal", "location", "Montreal", "Montréal"),
+    ]))
+
+    assert table.exists("LOCATION", "Montreal")
+    assert table.get("location", "MONTREAL") is not None
+    assert table.lookup("Location", "montreal", "fr") == "Montréal"
+
+
+def test_add_translation_rejects_a_differently_cased_existing_pair(tmp_path, monkeypatch):
+    _no_commit(monkeypatch)
+    _write_translations(tmp_path, [("montreal", "location", "Montreal", "Montréal")])
+
+    with pytest.raises(TranslationExists):
+        add_translation(tmp_path, "location", "Montreal", "Montreal", "Montréal encore")
+
+
+def test_edit_translation_matches_case_insensitively_and_preserves_stored_casing(tmp_path, monkeypatch):
+    _no_commit(monkeypatch)
+    _write_translations(tmp_path, [("montreal", "location", "Montreal", "")])
+
+    updated = edit_translation(tmp_path, "location", "Montreal", "Montreal", "Montréal")
+
+    assert updated.id == "montreal"
+    table = load_translations(tmp_path / "translations.csv")
+    assert table.lookup("location", "montreal", "fr") == "Montréal"
+    entries = table.all()
+    assert len(entries) == 1
+    assert entries[0].id == "montreal"
+
+
+def test_delete_translation_matches_case_insensitively(tmp_path, monkeypatch):
+    _no_commit(monkeypatch)
+    _write_translations(tmp_path, [("montreal", "location", "Montreal", "Montréal")])
+
+    delete_translation(tmp_path, "location", "MONTREAL")
+
+    table = load_translations(tmp_path / "translations.csv")
+    assert table.all() == []
