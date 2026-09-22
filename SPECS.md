@@ -1491,8 +1491,14 @@ Wizard behavior:
 - Sensible defaults shown inline in the prompt (e.g. a date field hints
   the current year) — a CLI-layer convenience, not a new schema or
   handler concept.
-- `--field value` flags pre-fill answers; the wizard still walks every
-  field (skipping ones already answered) rather than bypassing itself.
+- `--field value` flags pre-fill answers; the wizard still *prompts* for
+  every field (never skipping a prompt outright), showing the flag's
+  value as that field's default so pressing Enter accepts it — flags
+  supply defaults, they don't bypass the wizard.
+- A date field's "current year" hint (above) is a default only when the
+  field is required — an optional date field with no existing value
+  keeps a blank default, so pressing Enter genuinely skips it rather
+  than silently filling in the current year.
 - **Confirm-before-write screen** showing every field about to be
   written, `[y/N]` to proceed.
 - **Duplicate check runs after confirmation, before the actual write**
