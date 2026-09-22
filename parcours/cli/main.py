@@ -1,10 +1,20 @@
+# parcours/cli/main.py
 """The Typer app — thin, owns all prompts/printing (see SPECS.md, "Code
 architecture: modular core + thin interfaces")."""
 
+from pathlib import Path
+
 import typer
 
+from ..core.data import load_category_rows
+from ..core.entries import add_entry
+from ..core.handlers import load_handler
+from ..core.handlers.base import HandlerContext
 from ..core.lint import ConfigError, run_lint
 from ..core.repo import DataRepoNotFound, find_data_repo
+from ..core.schema import CategorySchema, load_all_schemas
+from ..core.vocab import load_vocab
+from .wizard import collect_field_values, confirm_and_check_duplicates
 
 app = typer.Typer()
 
@@ -43,6 +53,65 @@ def lint(category: str = typer.Argument(None, help="Only lint this category")):
 
     error_count = sum(1 for i in issues if i.severity == "error")
     raise typer.Exit(code=1 if error_count else 0)
+
+
+def _load_schema_or_exit(data_dir: Path, category: str) -> CategorySchema:
+    schemas = load_all_schemas(data_dir / "categories")
+    if category not in schemas:
+        typer.echo(f"Unknown category: '{category}'")
+        raise typer.Exit(code=2)
+    return schemas[category]
+
+
+def _parse_prefill_flags(args: list[str]) -> dict[str, str]:
+    prefill: dict[str, str] = {}
+    i = 0
+    while i < len(args):
+        token = args[i]
+        if not token.startswith("--"):
+            raise typer.BadParameter(f"Expected a --field flag, got '{token}'")
+        name = token[2:]
+        if i + 1 >= len(args):
+            raise typer.BadParameter(f"Missing value for --{name}")
+        prefill[name] = args[i + 1]
+        i += 2
+    return prefill
+
+
+def _reject_unknown_fields(schema: CategorySchema, prefill: dict[str, str]) -> None:
+    unknown = [
+        name for name in prefill
+        if schema.get_field(name) is None or schema.get_field(name).generated
+    ]
+    if unknown:
+        typer.echo(f"Unknown or non-writable field(s): {', '.join(unknown)}")
+        raise typer.Exit(code=2)
+
+
+@app.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
+def add(ctx: typer.Context, category: str = typer.Argument(..., help="Category to add an entry to")):
+    """Interactively add a new entry to a category. Extra --field value flags pre-fill the wizard."""
+    try:
+        data_dir = find_data_repo()
+    except DataRepoNotFound as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=2)
+
+    schema = _load_schema_or_exit(data_dir, category)
+    prefill = _parse_prefill_flags(ctx.args)
+    _reject_unknown_fields(schema, prefill)
+
+    vocab = load_vocab(data_dir / "vocab.yaml")
+    handler = load_handler(schema, HandlerContext(data_dir=data_dir))
+    existing_rows = load_category_rows(data_dir, category)
+
+    values = collect_field_values(schema, vocab, prefill=prefill)
+    if not confirm_and_check_duplicates(handler, values, existing_rows):
+        typer.echo("Aborted, nothing written.")
+        raise typer.Exit(code=0)
+
+    row = add_entry(data_dir, schema, values)
+    typer.echo(f"Added {category} entry {row['id']}.")
 
 
 if __name__ == "__main__":

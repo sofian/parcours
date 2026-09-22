@@ -92,3 +92,33 @@ def collect_field_values(
         values[field.name] = _ask_field(field, vocab, prefill.get(field.name))
 
     return values
+
+
+def confirm_and_check_duplicates(
+    handler, values: dict[str, str], existing_rows: list[dict], self_id: str | None = None
+) -> bool:
+    """Show the confirm-before-write screen, then run the category
+    handler's dedup check. Returns True if the write should proceed."""
+    typer.echo("\nReview:")
+    for name, value in values.items():
+        typer.echo(f"  {name}: {value or '(skip)'}")
+
+    if not typer.confirm("Write this entry?"):
+        return False
+
+    candidate = {"id": self_id or "", **values}
+    matches = handler.find_matches(candidate, existing_rows)
+
+    for match in matches:
+        if match.kind == "related":
+            typer.echo(f"Related existing entry {match.existing_row_id}: {match.reason}")
+
+    duplicates = [m for m in matches if m.kind == "duplicate"]
+    if duplicates:
+        typer.echo("\nPossible duplicates found:")
+        for match in duplicates:
+            typer.echo(f"  {match.existing_row_id}: {match.reason}")
+        if not typer.confirm("Add anyway?"):
+            return False
+
+    return True
