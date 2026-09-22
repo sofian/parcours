@@ -1,0 +1,93 @@
+# --- Parcours-specific ---
+
+# Real CV data lives in a separate private repo — never commit it here.
+# Test data belongs in tests/fixtures/ (which stays tracked).
+/data/
+/private/
+/cv_data_temp/
+/*.csv
+/sync.yaml
+
+# Generated CV output (RenderCV, Pandoc)
+/output/
+rendercv_output/
+*.pdf
+*.docx
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+
+# Zotero / Better BibTeX auto-exports (local, machine-specific)
+/*.bib
+/*.json.bib
+zotero-export/
+
+# CCV exports and other imported source files (may contain personal data)
+/imports/
+*.ccv.xml
+
+# DuckDB databases and scratch files
+*.duckdb
+*.duckdb.wal
+*.db
+
+# --- Python ---
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Packaging / build
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+pip-wheel-metadata/
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# Type checkers / linters
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.pyre/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# --- Editors / OS ---
+
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
