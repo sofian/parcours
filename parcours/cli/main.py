@@ -31,14 +31,18 @@ def main():
     """Parcours: a personal, git-tracked academic/artistic CV data system."""
 
 
-@app.command()
-def lint(category: str = typer.Argument(None, help="Only lint this category")):
-    """Check category data against its schema, vocab, and labels."""
+def _find_repo_or_exit() -> Path:
     try:
-        data_dir = find_data_repo()
+        return find_data_repo()
     except DataRepoNotFound as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=2)
+
+
+@app.command()
+def lint(category: str = typer.Argument(None, help="Only lint this category")):
+    """Check category data against its schema, vocab, and labels."""
+    data_dir = _find_repo_or_exit()
 
     try:
         issues = run_lint(data_dir, category_filter=category)
@@ -70,12 +74,7 @@ def list_command(
     desc: bool = typer.Option(False, "--desc", help="Sort descending (requires --order-by)"),
 ):
     """List entries in a category, optionally filtered by --search text and sorted by --order-by."""
-    try:
-        data_dir = find_data_repo()
-    except DataRepoNotFound as exc:
-        typer.echo(str(exc))
-        raise typer.Exit(code=2)
-
+    data_dir = _find_repo_or_exit()
     schema = _load_schema_or_exit(data_dir, category)
 
     if desc and not order_by:
@@ -148,12 +147,7 @@ def _reject_unknown_fields(schema: CategorySchema, prefill: dict[str, str]) -> N
 @app.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
 def add(ctx: typer.Context, category: str = typer.Argument(..., help="Category to add an entry to")):
     """Interactively add a new entry to a category. Extra --field value flags pre-fill the wizard."""
-    try:
-        data_dir = find_data_repo()
-    except DataRepoNotFound as exc:
-        typer.echo(str(exc))
-        raise typer.Exit(code=2)
-
+    data_dir = _find_repo_or_exit()
     schema = _load_schema_or_exit(data_dir, category)
     prefill = _parse_prefill_flags(ctx.args)
     _reject_unknown_fields(schema, prefill)
@@ -181,12 +175,7 @@ def edit(
     search: str = typer.Option(..., "--search", help="Text to search for"),
 ):
     """Search for an entry and interactively edit it."""
-    try:
-        data_dir = find_data_repo()
-    except DataRepoNotFound as exc:
-        typer.echo(str(exc))
-        raise typer.Exit(code=2)
-
+    data_dir = _find_repo_or_exit()
     schema = _load_schema_or_exit(data_dir, category)
     prefill_flags = _parse_prefill_flags(ctx.args)
     _reject_unknown_fields(schema, prefill_flags)
@@ -223,12 +212,7 @@ def delete(
     search: str = typer.Option(..., "--search", help="Text to search for"),
 ):
     """Search for an entry and delete it after one confirmation."""
-    try:
-        data_dir = find_data_repo()
-    except DataRepoNotFound as exc:
-        typer.echo(str(exc))
-        raise typer.Exit(code=2)
-
+    data_dir = _find_repo_or_exit()
     schema = _load_schema_or_exit(data_dir, category)
     existing_rows = load_category_rows(data_dir, category)
     matches = search_rows(existing_rows, search)

@@ -1741,11 +1741,11 @@ up in whichever future plan next touches the area:
 - `--field value` prefill flags require a space (`--title_en "A Widget"`)
   — the more common `--title_en="A Widget"` equals-sign form is rejected
   with a confusing "missing value" error rather than being parsed.
-- `find_data_repo`'s try/except-`DataRepoNotFound` block is duplicated
-  across all four commands (`lint`/`add`/`edit`/`delete`) in `cli/main.py`
-  instead of factored into a shared `_find_repo_or_exit`, matching the
-  existing `_load_schema_or_exit`/`_load_vocab_and_handler_or_exit`
-  naming pattern.
+- ~~`find_data_repo`'s try/except-`DataRepoNotFound` block was duplicated
+  across every command in `cli/main.py`~~ — factored into a shared
+  `_find_repo_or_exit`, matching the existing `_load_schema_or_exit`/
+  `_load_vocab_and_handler_or_exit` naming pattern, when the `list` and
+  `translation` commands were added (resolved).
 - Tests don't isolate `PARCO_DATA_DIR`; since `find_data_repo` checks it
   before any cwd-relative marker, a real value set in the environment
   running the test suite could redirect a test run at a real data repo
