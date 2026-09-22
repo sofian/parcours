@@ -570,7 +570,8 @@ fields:
   - {name: weight,    type: int}                                        # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}                                                    # usually only one filled
-  - {name: event,     required: true}                                   # Conference / Event Name, free text
+  - {name: event_en}
+  - {name: event_fr}                                                    # Conference / Event Name — usually only one filled (e.g. "Colloque ACFAS" has no English name)
   - {name: location,  required: true}                                   # city + country as one glossary-backed value, e.g. "Berlin, Germany"
   - {name: invited,   type: bool}
   - {name: keynote,   type: bool}
@@ -581,6 +582,7 @@ fields:
   - {name: url}
 require_one_of:
   - [title_en, title_fr]
+  - [event_en, event_fr]
 dedup:
   - when: [{fuzzy: [title_en, title_fr]}, {same_year: date}]
     as: duplicate
