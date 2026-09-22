@@ -1329,9 +1329,32 @@ skills-text:                               # expertise / other
 - **DOCX** via **Pandoc**, converting RenderCV's Markdown output with a
   user-editable `reference.docx` for styling — some funding agencies
   require Word, not PDF. Pandoc is an external dependency (CI must
-  install it on all three OSes). Provisional: revisit if a funder needs
-  stricter layout. To verify early: RenderCV's Markdown output is good
-  enough to convert.
+  install it on all three OSes).
+- **Spike result (RenderCV 2.8 → Pandoc 3.11, a representative sample
+  covering all entry types):** viable. Section/entry titles map to real
+  Word `Heading 1`/`Heading 2` styles (restylable via `reference.docx`);
+  bold/italic survive; DOI/URL links become real clickable Word
+  hyperlinks, not plain text; highlight bullets use genuine Word list
+  numbering (`w:numPr`), not literal dashes; numbered lists (patents,
+  talks) renumber correctly even though RenderCV repeats `1.` for every
+  item in the Markdown source; no stray empty paragraphs from the
+  source's blank-line spacing; `OneLineEntry` (the shape `skills` uses)
+  renders as one clean line — bold label, plain details.
+  **One real limitation:** `EducationEntry`/`ExperienceEntry`/
+  `NormalEntry`/`PublicationEntry` put each sub-field (location, date
+  range, thesis/authors/DOI) on its own paragraph rather than composing
+  them onto one compact line (e.g. "Princeton, NJ" and
+  "Sept 2018 – May 2023" are two separate lines, not one joined by a
+  separator) — content and structure are intact, but the DOCX reads
+  more vertically spread out than a typical polished one-page CV.
+  Acceptable for v1 as-is (funders generally need legible, correctly
+  structured content, not a specific visual density); a cheap partial
+  mitigation is a zero-space-after tweak on the `Body Text`/
+  `First Paragraph` styles in `reference.docx`; a fuller fix (`parco`
+  composing its own compact Markdown from view data instead of using
+  RenderCV's literal `.md` file) is a bigger lift and a second render
+  path to maintain — worth it only if a real funder submission is
+  rejected or criticized for the spacing.
 
 ---
 
@@ -1591,9 +1614,10 @@ out `parco`'s commands (see CLI).
 
 ## Open questions to resolve during implementation
 
-1. Whether RenderCV's Markdown output is good enough as the Pandoc input
-   for DOCX (see Output formats) — verify early, since the DOCX path
-   depends on it.
+1. ~~Whether RenderCV's Markdown output is good enough as the Pandoc
+   input for DOCX~~ — resolved by a spike (see Output formats): viable,
+   with one known, acceptable-for-v1 limitation (vertical spacing, not
+   data loss).
 2. The CCV importer (`core/import_ccv.py`, see CCV export structure)
    still needs to be built and tested against a real exported file —
    the structure and category mapping are documented, but the parser
