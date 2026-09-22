@@ -1076,6 +1076,23 @@ Amounts can be converted to a reporting currency, mainly for statistics.
   translation" lint rule above doesn't extend to these fields: most
   places will never have a glossary entry, and that's expected, not an
   error.
+- **Managing translations:** `labels.csv` has no `categories/*.yaml`
+  schema (it's a fixed shape: `id, category, en, fr`), so it gets its own
+  small command group rather than reusing `add`/`edit`/`delete`/`list`:
+  ```
+  parco translation add <category> <id> [--en TEXT] [--fr TEXT]
+  parco translation edit <category> <id> [--en TEXT] [--fr TEXT]
+  parco translation delete <category> <id>
+  parco translation list [--category TEXT] [--search TEXT]
+  ```
+  `(category, id)` is the composite key — `add` rejects a pair that
+  already exists (use `edit` instead); `--en`/`--fr` prompt for the
+  missing side when omitted (pre-filled with the current value on
+  `edit`), so a translation can be entered in one language and completed
+  later without `parco lint` being satisfied in between. Every write
+  auto-commits, same as the category commands, reusing the same generic
+  CSV-write and git-commit helpers (`core/entries.py`) rather than
+  duplicating them.
 
 ## vocab.yaml (draft)
 

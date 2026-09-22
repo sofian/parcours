@@ -10,6 +10,14 @@ from ..core.data import load_category_rows
 from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry
 from ..core.handlers import load_handler
 from ..core.handlers.base import CategoryHandler, HandlerContext
+from ..core.labels import (
+    TranslationExists,
+    TranslationNotFound,
+    add_translation,
+    delete_translation,
+    edit_translation,
+    load_labels,
+)
 from ..core.lint import ConfigError, run_lint
 from ..core.repo import DataRepoNotFound, find_data_repo
 from ..core.schema import CategorySchema, load_all_schemas
@@ -236,6 +244,135 @@ def delete(
         typer.echo(f"Row written, but the commit failed: {exc}")
         raise typer.Exit(code=1)
     typer.echo(f"Deleted {category} entry {row['id']}.")
+
+
+translation_app = typer.Typer(
+    help="Manage labels.csv: UI section titles and content glossaries (e.g. place names)."
+)
+app.add_typer(translation_app, name="translation")
+
+_CATEGORY_HELP = (
+    "The labels.csv category this belongs to (e.g. 'section' or 'location') "
+    "— not a data category like 'publications'."
+)
+
+
+@translation_app.command(name="add")
+def translation_add(
+    category: str = typer.Argument(..., help=_CATEGORY_HELP),
+    entry_id: str = typer.Argument(..., metavar="ID", help="The glossary key / label id"),
+    en: str = typer.Option(None, "--en", help="English text"),
+    fr: str = typer.Option(None, "--fr", help="French text"),
+):
+    """Add a new translation entry to labels.csv."""
+    data_dir = _find_repo_or_exit()
+
+    if en is None:
+        en = typer.prompt("en ([Enter] to skip)", default="", show_default=False)
+    if fr is None:
+        fr = typer.prompt("fr ([Enter] to skip)", default="", show_default=False)
+
+    try:
+        entry = add_translation(data_dir, category, entry_id, en, fr)
+    except TranslationExists as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=2)
+    except CommitFailed as exc:
+        typer.echo(f"Row written, but the commit failed: {exc}")
+        raise typer.Exit(code=1)
+    typer.echo(f"Added translation {entry.category}:{entry.id}.")
+
+
+@translation_app.command(name="edit")
+def translation_edit(
+    category: str = typer.Argument(..., help=_CATEGORY_HELP),
+    entry_id: str = typer.Argument(..., metavar="ID", help="The glossary key / label id"),
+    en: str = typer.Option(None, "--en", help="English text"),
+    fr: str = typer.Option(None, "--fr", help="French text"),
+):
+    """Edit an existing translation entry in labels.csv."""
+    data_dir = _find_repo_or_exit()
+
+    labels_path = data_dir / "labels.csv"
+    current = load_labels(labels_path).get(category, entry_id) if labels_path.is_file() else None
+    if current is None:
+        typer.echo(f"No translation for category '{category}' id '{entry_id}'")
+        raise typer.Exit(code=2)
+
+    if en is None:
+        en = typer.prompt("en", default=current.en, show_default=bool(current.en))
+    if fr is None:
+        fr = typer.prompt("fr", default=current.fr, show_default=bool(current.fr))
+
+    try:
+        entry = edit_translation(data_dir, category, entry_id, en, fr)
+    except TranslationNotFound as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=2)
+    except CommitFailed as exc:
+        typer.echo(f"Row written, but the commit failed: {exc}")
+        raise typer.Exit(code=1)
+    typer.echo(f"Edited translation {entry.category}:{entry.id}.")
+
+
+@translation_app.command(name="delete")
+def translation_delete(
+    category: str = typer.Argument(..., help=_CATEGORY_HELP),
+    entry_id: str = typer.Argument(..., metavar="ID", help="The glossary key / label id"),
+):
+    """Delete a translation entry from labels.csv after one confirmation."""
+    data_dir = _find_repo_or_exit()
+
+    labels_path = data_dir / "labels.csv"
+    exists = labels_path.is_file() and load_labels(labels_path).exists(category, entry_id)
+    if not exists:
+        typer.echo(f"No translation for category '{category}' id '{entry_id}'")
+        raise typer.Exit(code=2)
+
+    if not typer.confirm(
+        f"Delete translation {category}:{entry_id}? "
+        "This cannot be undone via the CLI (git history keeps it)."
+    ):
+        typer.echo("Aborted, nothing deleted.")
+        raise typer.Exit(code=0)
+
+    try:
+        delete_translation(data_dir, category, entry_id)
+    except TranslationNotFound as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=2)
+    except CommitFailed as exc:
+        typer.echo(f"Row written, but the commit failed: {exc}")
+        raise typer.Exit(code=1)
+    typer.echo(f"Deleted translation {category}:{entry_id}.")
+
+
+@translation_app.command(name="list")
+def translation_list(
+    category: str = typer.Option(None, "--category", help="Only show this labels.csv category"),
+    search: str = typer.Option(None, "--search", help="Only show entries matching this text"),
+):
+    """List translation entries, optionally filtered by --category and/or --search."""
+    data_dir = _find_repo_or_exit()
+
+    labels_path = data_dir / "labels.csv"
+    entries = load_labels(labels_path).all() if labels_path.is_file() else []
+
+    if category:
+        entries = [e for e in entries if e.category == category]
+    if search:
+        needle = search.lower()
+        entries = [
+            e for e in entries
+            if needle in e.id.lower() or needle in e.en.lower() or needle in e.fr.lower()
+        ]
+
+    if not entries:
+        typer.echo("No translations found.")
+        raise typer.Exit(code=0)
+
+    for e in entries:
+        typer.echo(f"category={e.category}, id={e.id}, en={e.en or '(blank)'}, fr={e.fr or '(blank)'}")
 
 
 if __name__ == "__main__":

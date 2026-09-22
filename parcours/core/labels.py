@@ -1,10 +1,16 @@
 """Loads `labels.csv`: the flat lookup for UI-facing strings *and* the
 content glossary (e.g. `category: location`) — see SPECS.md, "Labels /
-translations"."""
+translations". Also owns add/edit/delete for translation rows (`parco
+translation ...`), reusing `entries.py`'s generic CSV-write and
+auto-commit helpers rather than duplicating them."""
 
 import csv
 from dataclasses import dataclass
 from pathlib import Path
+
+from .entries import git_commit, write_all_rows
+
+_FIELDNAMES = ["id", "category", "en", "fr"]
 
 
 @dataclass
@@ -15,12 +21,31 @@ class LabelEntry:
     fr: str
 
 
+class TranslationNotFound(Exception):
+    """Raised by edit_translation/delete_translation for a (category, id)
+    pair that doesn't exist in labels.csv."""
+
+
+class TranslationExists(Exception):
+    """Raised by add_translation when the (category, id) pair already
+    exists — use edit_translation to change it instead."""
+
+
 class LabelsTable:
     def __init__(self, entries: list[LabelEntry]):
         self._entries = entries
         self._by_key: dict[tuple[str, str], LabelEntry] = {
             (e.category, e.id): e for e in entries
         }
+
+    def all(self) -> list[LabelEntry]:
+        return list(self._entries)
+
+    def exists(self, category: str, id_: str) -> bool:
+        return (category, id_) in self._by_key
+
+    def get(self, category: str, id_: str) -> LabelEntry | None:
+        return self._by_key.get((category, id_))
 
     def lookup(self, category: str, id_: str, lang: str) -> str | None:
         entry = self._by_key.get((category, id_))
@@ -57,3 +82,54 @@ def load_labels(path: Path) -> LabelsTable:
                 )
             )
     return LabelsTable(entries)
+
+
+def _labels_path(data_dir: Path) -> Path:
+    return data_dir / "labels.csv"
+
+
+def _load_labels_or_empty(path: Path) -> LabelsTable:
+    if not path.is_file():
+        return LabelsTable([])
+    return load_labels(path)
+
+
+def _entry_row(entry: LabelEntry) -> dict:
+    return {"id": entry.id, "category": entry.category, "en": entry.en, "fr": entry.fr}
+
+
+def add_translation(data_dir: Path, category: str, id_: str, en: str, fr: str) -> LabelEntry:
+    table = _load_labels_or_empty(_labels_path(data_dir))
+    if table.exists(category, id_):
+        raise TranslationExists(f"A translation for category '{category}' id '{id_}' already exists")
+
+    new_entry = LabelEntry(id=id_, category=category, en=en, fr=fr)
+    rows = [_entry_row(e) for e in table.all()] + [_entry_row(new_entry)]
+    write_all_rows(_labels_path(data_dir), _FIELDNAMES, rows)
+    git_commit(data_dir, "labels.csv", f"Added translation {category}:{id_}")
+    return new_entry
+
+
+def edit_translation(data_dir: Path, category: str, id_: str, en: str, fr: str) -> LabelEntry:
+    table = _load_labels_or_empty(_labels_path(data_dir))
+    if not table.exists(category, id_):
+        raise TranslationNotFound(f"No translation for category '{category}' id '{id_}'")
+
+    updated = LabelEntry(id=id_, category=category, en=en, fr=fr)
+    rows = [
+        _entry_row(updated) if (e.category, e.id) == (category, id_) else _entry_row(e)
+        for e in table.all()
+    ]
+    write_all_rows(_labels_path(data_dir), _FIELDNAMES, rows)
+    git_commit(data_dir, "labels.csv", f"Edited translation {category}:{id_}")
+    return updated
+
+
+def delete_translation(data_dir: Path, category: str, id_: str) -> None:
+    table = _load_labels_or_empty(_labels_path(data_dir))
+    if not table.exists(category, id_):
+        raise TranslationNotFound(f"No translation for category '{category}' id '{id_}'")
+
+    rows = [_entry_row(e) for e in table.all() if (e.category, e.id) != (category, id_)]
+    write_all_rows(_labels_path(data_dir), _FIELDNAMES, rows)
+    git_commit(data_dir, "labels.csv", f"Deleted translation {category}:{id_}")
