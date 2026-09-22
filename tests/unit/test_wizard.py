@@ -198,3 +198,27 @@ def test_required_vocab_field_with_missing_vocab_list_raises_instead_of_looping(
 
     with pytest.raises(typer.BadParameter):
         wizard.collect_field_values(schema, {})
+
+
+def test_weight_is_always_asked_last_regardless_of_declared_position(monkeypatch):
+    prompted_fields = []
+
+    def fake_prompt(text, default="", show_default=True):
+        prompted_fields.append(text.split(" ")[0].split("(")[0])
+        return ""
+
+    monkeypatch.setattr(wizard.typer, "prompt", fake_prompt)
+    monkeypatch.setattr(wizard.typer, "echo", lambda *a, **k: None)
+
+    schema = CategorySchema(
+        name="widgets",
+        fields=[
+            FieldSpec(name="id", generated=True),
+            FieldSpec(name="weight", type="int"),
+            FieldSpec(name="title_en"),
+            FieldSpec(name="event"),
+        ],
+    )
+    wizard.collect_field_values(schema, {})
+
+    assert prompted_fields == ["title_en", "event", "weight"]

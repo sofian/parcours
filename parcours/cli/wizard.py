@@ -75,7 +75,13 @@ def collect_field_values(
     values: dict[str, str] = {}
     handled_groups: set[tuple[str, ...]] = set()
 
-    for field in schema.fields:
+    # `weight` is a manual ordering hint, filled in last if at all — every
+    # schema conventionally declares it right after `id` for CSV column
+    # layout, which is not the order it makes sense to prompt for it in.
+    ordered_fields = [f for f in schema.fields if f.name != "weight"]
+    ordered_fields += [f for f in schema.fields if f.name == "weight"]
+
+    for field in ordered_fields:
         if field.generated:
             continue
 

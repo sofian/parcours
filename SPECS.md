@@ -1498,7 +1498,11 @@ CV *rendering*, not for this ad hoc listing command.
 Wizard behavior:
 - Walks the schema's fields in declared order; `generated` fields (`id`)
   are skipped entirely, assigned automatically (see IDs, under Data
-  layer).
+  layer). `weight` is the one exception: every schema conventionally
+  declares it right after `id` (for CSV column layout, so it's easy to
+  spot in a spreadsheet), but that's not a sensible prompting order —
+  the wizard always asks about it last, regardless of its declared
+  position.
 - `[skip]` on optional fields. A `require_one_of` group is asked
   field-by-field with `[skip]` allowed on each individually, but
   re-prompts the group if every field in it ends up blank (the schema
