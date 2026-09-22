@@ -7,7 +7,7 @@ from pathlib import Path
 import typer
 
 from ..core.data import load_category_rows
-from ..core.entries import add_entry, edit_entry
+from ..core.entries import add_entry, delete_entry, edit_entry
 from ..core.handlers import load_handler
 from ..core.handlers.base import HandlerContext
 from ..core.lint import ConfigError, run_lint
@@ -149,6 +149,36 @@ def edit(
 
     updated = edit_entry(data_dir, schema, row["id"], values)
     typer.echo(f"Edited {category} entry {updated['id']}.")
+
+
+@app.command()
+def delete(
+    category: str = typer.Argument(..., help="Category to delete an entry from"),
+    search: str = typer.Option(..., "--search", help="Text to search for"),
+):
+    """Search for an entry and delete it after one confirmation."""
+    try:
+        data_dir = find_data_repo()
+    except DataRepoNotFound as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=2)
+
+    schema = _load_schema_or_exit(data_dir, category)
+    existing_rows = load_category_rows(data_dir, category)
+    matches = search_rows(existing_rows, search)
+    row = pick_row(schema, matches)
+    if row is None:
+        typer.echo("Nothing selected.")
+        raise typer.Exit(code=0)
+
+    if not typer.confirm(
+        f"Delete {category} entry {row['id']}? This cannot be undone via the CLI (git history keeps it)."
+    ):
+        typer.echo("Aborted, nothing deleted.")
+        raise typer.Exit(code=0)
+
+    delete_entry(data_dir, schema, row["id"])
+    typer.echo(f"Deleted {category} entry {row['id']}.")
 
 
 if __name__ == "__main__":
