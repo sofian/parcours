@@ -1,3 +1,8 @@
+from datetime import date
+
+import pytest
+import typer
+
 from parcours.cli import wizard
 from parcours.core.schema import CategorySchema, FieldSpec
 
@@ -131,3 +136,65 @@ def test_pick_row_returns_none_when_cancelled(monkeypatch):
     monkeypatch.setattr(wizard.typer, "prompt", lambda *a, **k: "")
 
     assert wizard.pick_row(_schema(), rows) is None
+
+
+def test_optional_date_field_with_no_prefill_defaults_to_blank_on_skip(monkeypatch):
+    calls = []
+
+    def fake_prompt(text, default="", show_default=True):
+        calls.append(default)
+        return default
+
+    monkeypatch.setattr(wizard.typer, "prompt", fake_prompt)
+    monkeypatch.setattr(wizard.typer, "echo", lambda *a, **k: None)
+
+    schema = CategorySchema(
+        name="widgets",
+        fields=[
+            FieldSpec(name="id", generated=True),
+            FieldSpec(name="end_date", type="date", required=False),
+        ],
+    )
+    values = wizard.collect_field_values(schema, {})
+
+    assert calls == [""]
+    assert values["end_date"] == ""
+
+
+def test_required_date_field_with_no_prefill_defaults_to_current_year(monkeypatch):
+    calls = []
+
+    def fake_prompt(text, default="", show_default=True):
+        calls.append(default)
+        return default
+
+    monkeypatch.setattr(wizard.typer, "prompt", fake_prompt)
+    monkeypatch.setattr(wizard.typer, "echo", lambda *a, **k: None)
+
+    schema = CategorySchema(
+        name="widgets",
+        fields=[
+            FieldSpec(name="id", generated=True),
+            FieldSpec(name="start_date", type="date", required=True),
+        ],
+    )
+    values = wizard.collect_field_values(schema, {})
+
+    current_year = str(date.today().year)
+    assert calls == [current_year]
+    assert values["start_date"] == current_year
+
+
+def test_required_vocab_field_with_missing_vocab_list_raises_instead_of_looping(monkeypatch):
+    monkeypatch.setattr(wizard.typer, "echo", lambda *a, **k: None)
+
+    schema = CategorySchema(
+        name="widgets",
+        fields=[
+            FieldSpec(name="id", generated=True),
+            FieldSpec(name="status", vocab="undefined_status", required=True),
+        ],
+    )
+
+    with pytest.raises(typer.BadParameter):
+        wizard.collect_field_values(schema, {})

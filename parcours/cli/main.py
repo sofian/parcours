@@ -7,13 +7,13 @@ from pathlib import Path
 import typer
 
 from ..core.data import load_category_rows
-from ..core.entries import add_entry, delete_entry, edit_entry
+from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry
 from ..core.handlers import load_handler
-from ..core.handlers.base import HandlerContext
+from ..core.handlers.base import CategoryHandler, HandlerContext
 from ..core.lint import ConfigError, run_lint
 from ..core.repo import DataRepoNotFound, find_data_repo
 from ..core.schema import CategorySchema, load_all_schemas
-from ..core.vocab import load_vocab
+from ..core.vocab import VocabError, load_vocab
 from .wizard import collect_field_values, confirm_and_check_duplicates, pick_row, search_rows
 
 app = typer.Typer()
@@ -63,6 +63,18 @@ def _load_schema_or_exit(data_dir: Path, category: str) -> CategorySchema:
     return schemas[category]
 
 
+def _load_vocab_and_handler_or_exit(
+    data_dir: Path, schema: CategorySchema
+) -> tuple[dict, CategoryHandler]:
+    try:
+        vocab = load_vocab(data_dir / "vocab.yaml")
+        handler = load_handler(schema, HandlerContext(data_dir=data_dir))
+    except (VocabError, FileNotFoundError, KeyError) as exc:
+        typer.echo(f"Config error: {exc}")
+        raise typer.Exit(code=2)
+    return vocab, handler
+
+
 def _parse_prefill_flags(args: list[str]) -> dict[str, str]:
     prefill: dict[str, str] = {}
     i = 0
@@ -101,8 +113,7 @@ def add(ctx: typer.Context, category: str = typer.Argument(..., help="Category t
     prefill = _parse_prefill_flags(ctx.args)
     _reject_unknown_fields(schema, prefill)
 
-    vocab = load_vocab(data_dir / "vocab.yaml")
-    handler = load_handler(schema, HandlerContext(data_dir=data_dir))
+    vocab, handler = _load_vocab_and_handler_or_exit(data_dir, schema)
     existing_rows = load_category_rows(data_dir, category)
 
     values = collect_field_values(schema, vocab, prefill=prefill)
@@ -110,7 +121,11 @@ def add(ctx: typer.Context, category: str = typer.Argument(..., help="Category t
         typer.echo("Aborted, nothing written.")
         raise typer.Exit(code=0)
 
-    row = add_entry(data_dir, schema, values)
+    try:
+        row = add_entry(data_dir, schema, values)
+    except CommitFailed as exc:
+        typer.echo(f"Row written, but the commit failed: {exc}")
+        raise typer.Exit(code=1)
     typer.echo(f"Added {category} entry {row['id']}.")
 
 
@@ -133,13 +148,15 @@ def edit(
 
     existing_rows = load_category_rows(data_dir, category)
     matches = search_rows(existing_rows, search)
+    if not matches:
+        typer.echo("No matching entries found.")
+        raise typer.Exit(code=0)
     row = pick_row(schema, matches)
     if row is None:
         typer.echo("Nothing selected.")
         raise typer.Exit(code=0)
 
-    vocab = load_vocab(data_dir / "vocab.yaml")
-    handler = load_handler(schema, HandlerContext(data_dir=data_dir))
+    vocab, handler = _load_vocab_and_handler_or_exit(data_dir, schema)
 
     prefill = {**row, **prefill_flags}
     values = collect_field_values(schema, vocab, prefill=prefill)
@@ -147,7 +164,11 @@ def edit(
         typer.echo("Aborted, nothing written.")
         raise typer.Exit(code=0)
 
-    updated = edit_entry(data_dir, schema, row["id"], values)
+    try:
+        updated = edit_entry(data_dir, schema, row["id"], values)
+    except CommitFailed as exc:
+        typer.echo(f"Row written, but the commit failed: {exc}")
+        raise typer.Exit(code=1)
     typer.echo(f"Edited {category} entry {updated['id']}.")
 
 
@@ -166,6 +187,9 @@ def delete(
     schema = _load_schema_or_exit(data_dir, category)
     existing_rows = load_category_rows(data_dir, category)
     matches = search_rows(existing_rows, search)
+    if not matches:
+        typer.echo("No matching entries found.")
+        raise typer.Exit(code=0)
     row = pick_row(schema, matches)
     if row is None:
         typer.echo("Nothing selected.")
@@ -177,7 +201,11 @@ def delete(
         typer.echo("Aborted, nothing deleted.")
         raise typer.Exit(code=0)
 
-    delete_entry(data_dir, schema, row["id"])
+    try:
+        delete_entry(data_dir, schema, row["id"])
+    except CommitFailed as exc:
+        typer.echo(f"Row written, but the commit failed: {exc}")
+        raise typer.Exit(code=1)
     typer.echo(f"Deleted {category} entry {row['id']}.")
 
 

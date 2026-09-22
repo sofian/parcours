@@ -96,3 +96,14 @@ def test_add_unknown_category_exits_cleanly(tmp_path, monkeypatch):
 
     assert result.exit_code == 2
     assert "Unknown category" in result.stdout
+
+
+def test_add_missing_vocab_file_reports_config_error(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "vocab.yaml").unlink()
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["add", "widgets"])
+
+    assert result.exit_code == 2
+    assert "Config error" in result.stdout

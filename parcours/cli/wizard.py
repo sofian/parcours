@@ -44,7 +44,7 @@ def _ask_vocab_field(field: FieldSpec, choices: list[str], current: str | None) 
 
 def _ask_plain_field(field: FieldSpec, current: str | None) -> str:
     default = current or ""
-    if not current and field.type == "date":
+    if not current and field.type == "date" and field.required:
         default = str(date.today().year)
     prompt_suffix = "" if field.required else " ([Enter] to skip)"
 
@@ -58,7 +58,12 @@ def _ask_plain_field(field: FieldSpec, current: str | None) -> str:
 
 def _ask_field(field: FieldSpec, vocab: dict, current: str | None) -> str:
     if field.vocab:
-        return _ask_vocab_field(field, vocab.get(field.vocab, []), current)
+        choices = vocab.get(field.vocab, [])
+        if not choices:
+            raise typer.BadParameter(
+                f"vocab list '{field.vocab}' for field '{field.name}' is empty or undefined in vocab.yaml"
+            )
+        return _ask_vocab_field(field, choices, current)
     return _ask_plain_field(field, current)
 
 
@@ -152,7 +157,9 @@ def search_rows(rows: list[dict], search_text: str) -> list[dict]:
 
 def pick_row(schema: CategorySchema, matches: list[dict]) -> dict | None:
     if not matches:
-        typer.echo("No matching entries found.")
+        # Defensive fallback: main.py checks `if not matches` itself before
+        # calling pick_row, so this branch shouldn't currently be hit — but
+        # keep it safe (and silent, so no caller can get a double message).
         return None
 
     for i, row in enumerate(matches, start=1):

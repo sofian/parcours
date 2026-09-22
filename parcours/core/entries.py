@@ -19,6 +19,13 @@ class EntryNotFound(Exception):
     that category's CSV."""
 
 
+class CommitFailed(Exception):
+    """Raised when `git commit` fails for a reason other than there being
+    nothing to commit (no repo, missing user.email/user.name, a rejecting
+    pre-commit hook, etc). The row has already been written to the CSV by
+    the time this is raised."""
+
+
 def generate_id(data_dir: Path, category_name: str) -> str:
     existing_ids = {row.get("id") for row in load_category_rows(data_dir, category_name)}
     while True:
@@ -33,7 +40,7 @@ def _csv_path(data_dir: Path, category_name: str) -> Path:
 
 def _write_all_rows(csv_path: Path, fieldnames: list[str], rows: list[dict]) -> None:
     with open(csv_path, "w", encoding="utf-8", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer = csv.DictWriter(fh, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow({name: row.get(name, "") for name in fieldnames})
@@ -41,7 +48,21 @@ def _write_all_rows(csv_path: Path, fieldnames: list[str], rows: list[dict]) -> 
 
 def _git_commit(data_dir: Path, filename: str, message: str) -> None:
     subprocess.run(["git", "add", filename], cwd=data_dir, check=True, capture_output=True)
-    subprocess.run(["git", "commit", "-m", message], cwd=data_dir, check=True, capture_output=True)
+
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--", filename],
+        cwd=data_dir, check=True, capture_output=True,
+    )
+    if not status.stdout.strip():
+        # Nothing changed for this file (e.g. an edit with identical values) —
+        # the row is already correctly on disk, so there's nothing to commit.
+        return
+
+    try:
+        subprocess.run(["git", "commit", "-m", message], cwd=data_dir, check=True, capture_output=True)
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.decode() if exc.stderr else str(exc)
+        raise CommitFailed(f"git commit failed: {stderr}") from exc
 
 
 def add_entry(data_dir: Path, schema: CategorySchema, values: dict) -> dict:

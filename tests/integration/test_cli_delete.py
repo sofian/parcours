@@ -56,3 +56,4 @@ def test_delete_no_matches_exits_cleanly(tmp_path, monkeypatch):
 
     assert result.exit_code == 0
     assert "No matching entries found" in result.stdout
+    assert "Nothing selected" not in result.stdout

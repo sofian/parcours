@@ -115,3 +115,14 @@ def test_delete_entry_raises_for_unknown_id(tmp_path, monkeypatch):
 
     with pytest.raises(EntryNotFound):
         delete_entry(tmp_path, schema, "nonexistent")
+
+
+def test_write_preserves_lf_line_endings(tmp_path, monkeypatch):
+    _no_commit(monkeypatch)
+    schema = _schema()
+    (tmp_path / "widgets.csv").write_bytes(b"id,title_en,status\nabc123,First,draft\n")
+
+    add_entry(tmp_path, schema, {"title_en": "Second", "status": "published"})
+
+    raw = (tmp_path / "widgets.csv").read_bytes()
+    assert b"\r\n" not in raw
