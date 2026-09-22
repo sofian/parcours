@@ -1,6 +1,8 @@
 import json
 
-from parcours.core.lint import run_lint
+import pytest
+
+from parcours.core.lint import ConfigError, run_lint
 
 
 def _setup_data_repo(tmp_path):
@@ -85,3 +87,19 @@ fields:
     issues = run_lint(tmp_path)
 
     assert any(i.field == "citekey" for i in issues)
+
+
+def test_unregistered_vocab_name_raises_config_error_not_a_crash(tmp_path):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "categories" / "widgets.yaml").write_text("""
+name: widgets
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: title_en, required: true}
+  - {name: status, required: true, vocab: nope}
+""")
+    (repo / "widgets.csv").write_text("id,title_en,status\nwidget-1,A Widget,draft\n")
+
+    with pytest.raises(ConfigError, match="nope"):
+        run_lint(repo)

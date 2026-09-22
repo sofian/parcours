@@ -76,6 +76,16 @@ def test_related_outcome_is_preserved(tmp_path):
     assert matches[0].kind == "related"
 
 
+def test_overlap_matcher_with_blank_start_date_does_not_crash(tmp_path):
+    schema = _schema([DedupRule(conditions=[{"overlap": ["start_date", "end_date"]}], outcome="duplicate")])
+    handler = GenericHandler(schema, _context(tmp_path))
+    entry = {"id": "new", "start_date": "", "end_date": ""}
+    existing = [{"id": "old", "start_date": "2020-01", "end_date": "2020-06"}]
+
+    assert handler.find_matches(entry, existing) == []
+    assert handler.find_matches(existing[0], [entry]) == []
+
+
 def test_generic_handler_validate_returns_no_extra_issues(tmp_path):
     schema = _schema([])
     handler = GenericHandler(schema, _context(tmp_path))

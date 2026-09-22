@@ -45,15 +45,15 @@ class LabelsTable:
 
 def load_labels(path: Path) -> LabelsTable:
     entries = []
-    with open(path, "r", encoding="utf-8", newline="") as fh:
+    with open(path, "r", encoding="utf-8-sig", newline="") as fh:
         reader = csv.DictReader(fh)
         for row in reader:
             entries.append(
                 LabelEntry(
                     id=row["id"],
                     category=row["category"],
-                    en=row.get("en", ""),
-                    fr=row.get("fr", ""),
+                    en=row.get("en") or "",
+                    fr=row.get("fr") or "",
                 )
             )
     return LabelsTable(entries)

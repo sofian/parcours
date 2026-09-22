@@ -3,7 +3,7 @@ architecture: modular core + thin interfaces")."""
 
 import typer
 
-from ..core.lint import run_lint
+from ..core.lint import ConfigError, run_lint
 from ..core.repo import DataRepoNotFound, find_data_repo
 
 app = typer.Typer()
@@ -23,7 +23,11 @@ def lint(category: str = typer.Argument(None, help="Only lint this category")):
         typer.echo(str(exc))
         raise typer.Exit(code=2)
 
-    issues = run_lint(data_dir, category_filter=category)
+    try:
+        issues = run_lint(data_dir, category_filter=category)
+    except ConfigError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=2)
 
     if not issues:
         typer.echo("No lint issues found.")

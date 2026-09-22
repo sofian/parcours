@@ -36,6 +36,29 @@ def test_resolve_or_literal_falls_back_to_the_id(tmp_path):
     assert table.resolve_or_literal("location", "some-unlisted-town", "en") == "some-unlisted-town"
 
 
+def test_load_labels_tolerates_utf8_bom(tmp_path):
+    path = tmp_path / "labels.csv"
+    content = "id,category,en,fr\npublications,section,Publications,Publications\n"
+    path.write_text(content, encoding="utf-8-sig")
+
+    table = load_labels(path)
+
+    assert table.lookup("section", "publications", "en") == "Publications"
+
+
+def test_missing_translations_does_not_crash_on_a_ragged_row(tmp_path):
+    path = tmp_path / "labels.csv"
+    # Fewer columns than the header: csv.DictReader fills missing trailing
+    # keys with None (its `restval`), not "".
+    path.write_text("id,category,en,fr\nragged,section,OnlyEnglish\n", encoding="utf-8")
+
+    table = load_labels(path)
+    missing = table.missing_translations()
+
+    assert len(missing) == 1
+    assert missing[0].id == "ragged"
+
+
 def test_missing_translations_finds_blank_sides(tmp_path):
     path = _write_labels(tmp_path, [
         ("complete", "section", "Complete", "Complet"),

@@ -53,6 +53,18 @@ def test_lint_command_fails_clearly_with_no_data_repo(tmp_path, monkeypatch):
     assert "No data repo found" in result.stdout
 
 
+def test_lint_command_exits_2_with_clear_message_on_missing_vocab_file(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "widgets.csv").write_text("id,title_en,status\nwidget-1,A Widget,draft\n")
+    (repo / "vocab.yaml").unlink()
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["lint"])
+
+    assert result.exit_code == 2
+    assert "Config error" in result.stdout
+
+
 def test_lint_command_accepts_a_category_filter(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     (repo / "widgets.csv").write_text("id,title_en,status\nwidget-1,A Widget,draft\n")

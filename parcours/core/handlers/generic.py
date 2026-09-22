@@ -34,9 +34,13 @@ class GenericHandler(CategoryHandler):
             return any(fuzzy_match(entry.get(n, ""), existing_row.get(n, "")) for n in names)
         if "overlap" in cond:
             start_field, end_field = cond["overlap"]
+            entry_start = entry.get(start_field)
+            existing_start = existing_row.get(start_field)
+            if not entry_start or not existing_start:
+                return False
             return ranges_overlap(
-                entry.get(start_field), entry.get(end_field),
-                existing_row.get(start_field), existing_row.get(end_field),
+                entry_start, entry.get(end_field),
+                existing_start, existing_row.get(end_field),
             )
         if "same_year" in cond:
             field_name = cond["same_year"]
