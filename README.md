@@ -11,7 +11,7 @@ Academic and artistic CVs get rebuilt from scratch for every grant, job, and ins
 - **Plain text, git-tracked:** every change is diffable, and git history is the undo mechanism.
 - **Multiple CVs from one dataset:** a long academic CV, a short one, English, French — each defined by a small YAML profile.
 - **Bilingual by design:** every UI-facing string comes from a label table, and a missing translation fails loudly instead of silently falling back.
-- **Reusable:** built for one user, but categories, vocabularies, labels, and profiles are all configuration, so other academics can use it with their own data.
+- **Reusable:** built for one user, but categories, vocabularies, translations, and profiles are all configuration, so other academics can use it with their own data.
 
 ## How it works
 
@@ -69,7 +69,7 @@ Your data lives in a **separate, private repository** (grant amounts and student
 | `parco.yaml` | Marker file: `parco` finds your data by searching upward from the current directory for it (falling back to `~/.config/parco/config.yaml`; `--data-dir` / `PARCO_DATA_DIR` override) |
 | `*.csv` (one per category) | Entries for the nine v1 categories: publications, grants, artworks, students, teaching, service, outreach, presentations, press |
 | `vocab.yaml` | Controlled vocabularies (publication type, grant role, …), enforced on write and by `parco lint` |
-| `labels.csv` | Translations (`id, category, en, fr`) for section titles, field labels, and category values |
+| `translations.csv` | Translations (`id, category, en, fr`) for section titles, field labels, and category values |
 | `views.yaml` | Named views that profiles draw from: table, columns, and RenderCV entry type |
 | `profiles/*.yaml` | One file per CV variant: metadata, theme, and an ordered list of sections |
 | `sync.yaml` | Git remotes to push to |

@@ -19,7 +19,7 @@ dedup:
     as: duplicate
 """)
     (tmp_path / "vocab.yaml").write_text("widget_status: [draft, published]\n")
-    (tmp_path / "labels.csv").write_text("id,category,en,fr\nwidgets,section,Widgets,Widgets\n")
+    (tmp_path / "translations.csv").write_text("id,category,en,fr\nwidgets,section,Widgets,Widgets\n")
     return tmp_path
 
 
@@ -39,14 +39,14 @@ def test_flags_a_missing_required_field(tmp_path):
     assert any(i.field == "title_en" for i in issues)
 
 
-def test_flags_a_missing_labels_translation(tmp_path):
+def test_flags_a_missing_translation(tmp_path):
     repo = _setup_data_repo(tmp_path)
-    (repo / "labels.csv").write_text("id,category,en,fr\nwidgets,section,Widgets,\n")
+    (repo / "translations.csv").write_text("id,category,en,fr\nwidgets,section,Widgets,\n")
     (repo / "widgets.csv").write_text("id,title_en,status\nwidget-1,A Widget,draft\n")
 
     issues = run_lint(repo)
 
-    assert any(i.category == "labels" for i in issues)
+    assert any(i.category == "translations" for i in issues)
 
 
 def test_category_filter_only_checks_that_category(tmp_path):
@@ -63,7 +63,7 @@ fields:
 
     issues = run_lint(repo, category_filter="widgets")
 
-    assert all(i.category in ("widgets", "labels") for i in issues)
+    assert all(i.category in ("widgets", "translations") for i in issues)
     assert any(i.category == "widgets" for i in issues)
 
 
@@ -79,7 +79,7 @@ fields:
   - {name: citekey, required: true}
 """)
     (tmp_path / "vocab.yaml").write_text("{}\n")
-    (tmp_path / "labels.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
     (tmp_path / "zotero").mkdir()
     (tmp_path / "zotero" / "library.json").write_text(json.dumps([]))
     (tmp_path / "publications.csv").write_text("id,citekey\npub-1,nonexistent-key\n")

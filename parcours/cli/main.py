@@ -10,17 +10,17 @@ from ..core.data import load_category_rows
 from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry
 from ..core.handlers import load_handler
 from ..core.handlers.base import CategoryHandler, HandlerContext
-from ..core.labels import (
+from ..core.lint import ConfigError, run_lint
+from ..core.repo import DataRepoNotFound, find_data_repo
+from ..core.schema import CategorySchema, load_all_schemas
+from ..core.translations import (
     TranslationExists,
     TranslationNotFound,
     add_translation,
     delete_translation,
     edit_translation,
-    load_labels,
+    load_translations,
 )
-from ..core.lint import ConfigError, run_lint
-from ..core.repo import DataRepoNotFound, find_data_repo
-from ..core.schema import CategorySchema, load_all_schemas
 from ..core.vocab import VocabError, load_vocab
 from .wizard import (
     collect_field_values,
@@ -49,7 +49,7 @@ def _find_repo_or_exit() -> Path:
 
 @app.command()
 def lint(category: str = typer.Argument(None, help="Only lint this category")):
-    """Check category data against its schema, vocab, and labels."""
+    """Check category data against its schema, vocab, and translations."""
     data_dir = _find_repo_or_exit()
 
     try:
@@ -247,12 +247,12 @@ def delete(
 
 
 translation_app = typer.Typer(
-    help="Manage labels.csv: UI section titles and content glossaries (e.g. place names)."
+    help="Manage translations.csv: UI section titles and content glossaries (e.g. place names)."
 )
 app.add_typer(translation_app, name="translation")
 
 _CATEGORY_HELP = (
-    "The labels.csv category this belongs to (e.g. 'section' or 'location') "
+    "The translations.csv category this belongs to (e.g. 'section' or 'location') "
     "— not a data category like 'publications'."
 )
 
@@ -264,7 +264,7 @@ def translation_add(
     en: str = typer.Option(None, "--en", help="English text"),
     fr: str = typer.Option(None, "--fr", help="French text"),
 ):
-    """Add a new translation entry to labels.csv."""
+    """Add a new translation entry to translations.csv."""
     data_dir = _find_repo_or_exit()
 
     if en is None:
@@ -290,11 +290,11 @@ def translation_edit(
     en: str = typer.Option(None, "--en", help="English text"),
     fr: str = typer.Option(None, "--fr", help="French text"),
 ):
-    """Edit an existing translation entry in labels.csv."""
+    """Edit an existing translation entry in translations.csv."""
     data_dir = _find_repo_or_exit()
 
-    labels_path = data_dir / "labels.csv"
-    current = load_labels(labels_path).get(category, entry_id) if labels_path.is_file() else None
+    translations_path = data_dir / "translations.csv"
+    current = load_translations(translations_path).get(category, entry_id) if translations_path.is_file() else None
     if current is None:
         typer.echo(f"No translation for category '{category}' id '{entry_id}'")
         raise typer.Exit(code=2)
@@ -320,11 +320,11 @@ def translation_delete(
     category: str = typer.Argument(..., help=_CATEGORY_HELP),
     entry_id: str = typer.Argument(..., metavar="ID", help="The glossary key / label id"),
 ):
-    """Delete a translation entry from labels.csv after one confirmation."""
+    """Delete a translation entry from translations.csv after one confirmation."""
     data_dir = _find_repo_or_exit()
 
-    labels_path = data_dir / "labels.csv"
-    exists = labels_path.is_file() and load_labels(labels_path).exists(category, entry_id)
+    translations_path = data_dir / "translations.csv"
+    exists = translations_path.is_file() and load_translations(translations_path).exists(category, entry_id)
     if not exists:
         typer.echo(f"No translation for category '{category}' id '{entry_id}'")
         raise typer.Exit(code=2)
@@ -349,14 +349,14 @@ def translation_delete(
 
 @translation_app.command(name="list")
 def translation_list(
-    category: str = typer.Option(None, "--category", help="Only show this labels.csv category"),
+    category: str = typer.Option(None, "--category", help="Only show this translations.csv category"),
     search: str = typer.Option(None, "--search", help="Only show entries matching this text"),
 ):
     """List translation entries, optionally filtered by --category and/or --search."""
     data_dir = _find_repo_or_exit()
 
-    labels_path = data_dir / "labels.csv"
-    entries = load_labels(labels_path).all() if labels_path.is_file() else []
+    translations_path = data_dir / "translations.csv"
+    entries = load_translations(translations_path).all() if translations_path.is_file() else []
 
     if category:
         entries = [e for e in entries if e.category == category]

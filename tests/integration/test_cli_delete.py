@@ -16,7 +16,7 @@ fields:
   - {name: title_en, required: true}
 """)
     (tmp_path / "vocab.yaml").write_text("{}\n")
-    (tmp_path / "labels.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
     (tmp_path / "widgets.csv").write_text(
         "id,title_en\nabc123,First Widget\ndef456,Second Widget\n", encoding="utf-8"
     )

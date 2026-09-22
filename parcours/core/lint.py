@@ -1,4 +1,4 @@
-"""Ties schema + vocab + labels + handlers + data together into
+"""Ties schema + vocab + translations + handlers + data together into
 `parco lint` (see SPECS.md, "CLI" → "Validation"). Returns structured
 `LintIssue`s — no printing here, per the core/interface split."""
 
@@ -7,15 +7,15 @@ from pathlib import Path
 from .data import load_category_rows
 from .handlers import load_handler
 from .handlers.base import HandlerContext
-from .labels import load_labels
 from .schema import load_all_schemas
+from .translations import load_translations
 from .validation import LintIssue, validate_common
 from .vocab import VocabError, load_vocab
 
 
 class ConfigError(Exception):
     """Raised when `parco lint` can't run because of a data-repo
-    misconfiguration (bad schema, missing vocab/labels file, unknown
+    misconfiguration (bad schema, missing vocab/translations file, unknown
     handler, etc.) rather than a real lint issue with the data itself."""
 
 
@@ -25,12 +25,12 @@ def run_lint(data_dir: Path, category_filter: str | None = None) -> list[LintIss
     try:
         schemas = load_all_schemas(data_dir / "categories")
         vocab = load_vocab(data_dir / "vocab.yaml")
-        labels = load_labels(data_dir / "labels.csv")
+        translations = load_translations(data_dir / "translations.csv")
 
-        for entry in labels.missing_translations():
+        for entry in translations.missing_translations():
             issues.append(LintIssue(
-                "labels", entry.id, entry.category,
-                f"labels.csv id '{entry.id}' (category '{entry.category}') is missing a translation",
+                "translations", entry.id, entry.category,
+                f"translations.csv id '{entry.id}' (category '{entry.category}') is missing a translation",
             ))
 
         for name, schema in schemas.items():

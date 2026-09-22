@@ -17,7 +17,7 @@ fields:
   - {name: status, required: true, vocab: widget_status}
 """)
     (tmp_path / "vocab.yaml").write_text("widget_status: [draft, published]\n")
-    (tmp_path / "labels.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
     (tmp_path / "widgets.csv").write_text(
         "id,title_en,status\nabc123,First Widget,draft\ndef456,Second Widget,published\n",
         encoding="utf-8",
@@ -102,7 +102,7 @@ fields:
   - {name: weight, type: int}
 """)
     (tmp_path / "vocab.yaml").write_text("{}\n")
-    (tmp_path / "labels.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
     (tmp_path / "presentations.csv").write_text(
         "id,title_en,event_date,weight\n"
         "a1,Middle Talk,2022,5\n"

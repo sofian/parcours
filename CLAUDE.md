@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Pre-implementation: the repo contains only `SPECS.md` (the design spec) and `LICENSE`. There is no code, build system, or test suite yet. `SPECS.md` is the source of truth — read it before making architectural decisions, and update it when a decision changes.
 
-**Parcours** is a personal, git-tracked academic/artistic CV data system (CLI command: `parco`). CSV files are the source of truth; DuckDB queries them in place; output goes to RenderCV (PDF/LaTeX/Typst/HTML) or Pandoc (DOCX), with citeproc + CSL for citations. Built for one user but meant to be reusable, so **nothing person-specific may be hardcoded** — categories, vocab, labels, and profiles are all config.
+**Parcours** is a personal, git-tracked academic/artistic CV data system (CLI command: `parco`). CSV files are the source of truth; DuckDB queries them in place; output goes to RenderCV (PDF/LaTeX/Typst/HTML) or Pandoc (DOCX), with citeproc + CSL for citations. Built for one user but meant to be reusable, so **nothing person-specific may be hardcoded** — categories, vocab, translations, and profiles are all config.
 
 ## Planned stack and commands
 
@@ -37,7 +37,7 @@ Boundary test: could a web API return this as JSON, or a GUI show it as a dialog
 - `vocab.yaml` holds controlled vocabularies, enforced at write time (`add`/`edit` reject invalid values) and re-checked by `parco lint`.
 - Bilingual fields are paired fields (`title_fr` / `title_en`) applied consistently across tables.
 - Publications require a `status` (see `publication_status` in `vocab.yaml`), which decides CV-readiness.
-- `labels.csv` (`id, category, en, fr`) holds **all** UI-facing strings. A missing translation must fail loudly (or warn) — never silently fall back to another language.
+- `translations.csv` (`id, category, en, fr`) holds **all** UI-facing strings. A missing translation must fail loudly (or warn) — never silently fall back to another language.
 - Zotero + Better BibTeX auto-export is canonical for bibliographic metadata; the publications CSV stores a citekey plus CV-only fields.
 - All categories are equal — none is special-cased in the core. Each schema names a `handler` module (default `generic`; `publications` for citekey/Zotero/citation behavior, DOI+fuzzy dedup, CSL `type_map`; custom ones by dotted import path, never auto-loaded from the data repo). Handlers live in the core layer (no prompting/printing); a `CategoryHandler` base class (generic defaults) plus `runtime_checkable` capability Protocols (`Citable`, `Importable`) found via `isinstance`. Zotero-citekey resolution is a **shared capability** (any schema with a `citekey` field + Zotero `options`), not exclusive to the `publications` handler — `press` uses just the capability; `review` and `catalog` reuse the full `publications` handler (its `type_map`→`type` derivation is optional, skipped when a schema declares neither).
 - **Design status: complete for v1.** All nineteen category schemas, `vocab.yaml`, `views.yaml`, and `identity.yaml` are drafted in `SPECS.md`, cross-checked against a real CCV export and the user's own LaTeX CV. What's left is implementation, not design — see SPECS.md's "Design status" section.
@@ -48,8 +48,8 @@ Boundary test: could a web API return this as JSON, or a GUI show it as a dialog
   - `software` inverts the usual bilingual pattern: `title` is untranslated, `description` is bilingual.
   - `skills` is one row per skill (not per skill-group) and is the only category with no dates.
 - **Cross-cutting mechanisms** (apply across many schemas, not category-specific):
-  - `require_one_of` (schema-level, alongside `fields`/`dedup`): at least one of a group of fields must be filled, not all — used for `title_en`/`title_fr` pairs (most titles are single-language proper nouns) and `exhibitions`'/`curatorship`'s `event`/`venue`. Distinct from `labels.csv`'s stricter both-required rule, which only applies to the small fixed set of UI-facing strings.
-  - Place names use one `location` field (city+country as a unit, e.g. "Berlin, Germany" — not split, since the city name itself can change between languages, e.g. The Hague/La Haye), backed by a `labels.csv` glossary (`category: location`) with literal-text fallback when unmatched.
+  - `require_one_of` (schema-level, alongside `fields`/`dedup`): at least one of a group of fields must be filled, not all — used for `title_en`/`title_fr` pairs (most titles are single-language proper nouns) and `exhibitions`'/`curatorship`'s `event`/`venue`. Distinct from `translations.csv`'s stricter both-required rule, which only applies to the small fixed set of UI-facing strings.
+  - Place names use one `location` field (city+country as a unit, e.g. "Berlin, Germany" — not split, since the city name itself can change between languages, e.g. The Hague/La Haye), backed by a `translations.csv` glossary (`category: location`) with literal-text fallback when unmatched.
   - `precision` on date fields is a **minimum**, never a ceiling — a field can always hold a more precise date than its declared floor.
   - `weight` (standard optional `int` field, present in every schema right after `id`): a manual ordering hint, higher = appears earlier — refines/overrides date-based `order_by` when dates are missing or imprecise; for `skills` (no dates at all) it's the only ordering mechanism.
   - CCV's "Bilingual" field type has two on-the-wire forms (split `<bilingual>` children, or an unsplit blob directly on `<value>`) — an importer must check both, per a bug caught while drafting `recognitions`.
@@ -61,7 +61,7 @@ Boundary test: could a web API return this as JSON, or a GUI show it as a dialog
 
 ## Profiles
 
-YAML per CV variant/language (`profiles/academic-en.yaml`). Sections reference a named, fixed `source` view defined in `views.yaml` in the data repo (table, fields, RenderCV entry type; the tool ships a starter file) — **never raw SQL in profile files** — with optional simple `filter` (key→value), `order_by`, `limit`, `group_by`, `citation_style`. Section titles come from `labels.csv` keyed by section `id` and `meta.language`, not from the profile. Load YAML with `SafeLoader`.
+YAML per CV variant/language (`profiles/academic-en.yaml`). Sections reference a named, fixed `source` view defined in `views.yaml` in the data repo (table, fields, RenderCV entry type; the tool ships a starter file) — **never raw SQL in profile files** — with optional simple `filter` (key→value), `order_by`, `limit`, `group_by`, `citation_style`. Section titles come from `translations.csv` keyed by section `id` and `meta.language`, not from the profile. Load YAML with `SafeLoader`.
 
 ## Behavioral requirements worth preserving
 
@@ -74,7 +74,7 @@ YAML per CV variant/language (`profiles/academic-en.yaml`). Sections reference a
 
 ## Testing rules
 
-- Tests use temporary fixture CSVs/vocab/labels (`tests/fixtures/`), **never real data**. Core tests touch no git and no filesystem beyond a temp dir; sync tests mock git.
+- Tests use temporary fixture CSVs/vocab/translations (`tests/fixtures/`), **never real data**. Core tests touch no git and no filesystem beyond a temp dir; sync tests mock git.
 - Unit tests target core; integration tests drive the CLI via Typer's `CliRunner`.
 - Include CSV round-trip and line-ending tests (Windows vs Unix).
 

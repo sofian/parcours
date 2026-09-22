@@ -20,7 +20,7 @@ dedup:
     as: duplicate
 """)
     (tmp_path / "vocab.yaml").write_text("widget_status: [draft, published]\n")
-    (tmp_path / "labels.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
     return tmp_path
 
 

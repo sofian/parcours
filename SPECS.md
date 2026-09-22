@@ -5,7 +5,7 @@ daily typing; the project/package identity stays "Parcours").
 
 **Contents:** [Purpose](#purpose) · [Architecture overview](#architecture-overview)
 · [Data layer](#data-layer) · [Category handlers](#category-handlers)
-· [Category schemas (drafts)](#category-schemas-drafts) · [Labels / translations](#labels--translations)
+· [Category schemas (drafts)](#category-schemas-drafts) · [Translations](#translations)
 · [vocab.yaml (draft)](#vocabyaml-draft) · [Identity / personal-info config](#identity--personal-info-config)
 · [Profiles](#profiles) · [views.yaml (draft)](#viewsyaml-draft)
 · [Citation formatting](#citation-formatting) · [Output formats](#output-formats)
@@ -185,8 +185,8 @@ that's often genuinely single-language rather than translated — most
 artwork/exhibition titles are proper nouns given in whichever language
 they were made or shown in, not translated pairs — as well as fields
 like an exhibition's `event`/`venue`, which aren't always both tracked.
-This is **distinct from `labels.csv`'s "missing translation = fail
-loudly" rule** (see Labels / translations below): that rule is about a
+This is **distinct from `translations.csv`'s "missing translation = fail
+loudly" rule** (see Translations below): that rule is about a
 small, finite set of UI-facing strings (section names, vocab value
 labels) that genuinely should exist in both languages, not about
 per-row content fields on category data, where forcing both sides
@@ -601,7 +601,7 @@ dedup:
   where only one language is ever given.
 - **`location` was originally two fields** (a country and a city,
   matching CCV's own split) — collapsed into one after settling how
-  place names get translated (see Labels / translations): a single
+  place names get translated (see Translations): a single
   glossary-backed value covers both parts together as one unit (e.g.
   "Berlin, Germany" / "Berlin, Allemagne"), which also correctly
   handles cities whose name itself changes between languages (e.g. The
@@ -855,7 +855,7 @@ dedup:
 ```
 
 - `location` is one glossary-backed value covering city and country
-  together (see Labels / translations), not separate fields.
+  together (see Translations), not separate fields.
 - Scoped strictly to exhibitions **you exhibited in** — no `role`
   field; a separate `curatorship` category below covers when you were
   the curator instead.
@@ -996,7 +996,7 @@ dedup:
 
 **identity/personal-info config (not a CSV category)**: needed
 regardless of category count — see Identity / personal-info config,
-below Labels / translations, for the confirmed design (name, alias,
+below Translations, for the confirmed design (name, alias,
 address, phone, email, title, with three variants: artist/
 job-application/academic).
 
@@ -1008,7 +1008,7 @@ Amounts can be converted to a reporting currency, mainly for statistics.
   `default` pre-fills the wizard's `currency` field; `report` is the
   currency statistics convert into. Both are configurable.
 - **Rates are reference data, not a category:** a tracked `rates.csv` in
-  the data repo (`month, from, to, rate`), like `labels.csv`. No wizard,
+  the data repo (`month, from, to, rate`), like `translations.csv`. No wizard,
   no dedup.
 - **Source:** the ECB's published historical euro reference-rate file
   (42 currencies against the euro, since 1999). `parco` downloads it,
@@ -1051,19 +1051,19 @@ Amounts can be converted to a reporting currency, mainly for statistics.
   runs after the month ends and ECB publishes (or immediately via
   `parco refresh rates`).
 
-## Labels / translations
+## Translations
 
-- `labels.csv` — flat lookup table for **all** UI-facing strings, not just
+- `translations.csv` — flat lookup table for **all** UI-facing strings, not just
   section titles: section names, field labels, category value labels.
   Fields: `id, category, en, fr` (category distinguishes e.g. `section`
   vs `role` vs `pub-type` so the flat table stays organized).
 - **Missing translation = fail loudly** (or at minimum warn), never
   silently fall back to another language — checked by `parco lint`. This
-  rule applies to `labels.csv`'s own finite set of UI-facing strings; it
+  rule applies to `translations.csv`'s own finite set of UI-facing strings; it
   does **not** apply to per-row content fields on category data (see
   `require_one_of` under Category schemas), where a missing translation
   is often not an oversight at all.
-- **`labels.csv` also serves as a content glossary**, not just UI chrome
+- **`translations.csv` also serves as a content glossary**, not just UI chrome
   — e.g. `category: location` rows translate a whole place name in one
   unit (id `the-hague`: en "The Hague, Netherlands", fr "La Haye,
   Pays-Bas"), the same pattern as the user's existing LaTeX `\gtr{}`
@@ -1076,7 +1076,7 @@ Amounts can be converted to a reporting currency, mainly for statistics.
   translation" lint rule above doesn't extend to these fields: most
   places will never have a glossary entry, and that's expected, not an
   error.
-- **Managing translations:** `labels.csv` has no `categories/*.yaml`
+- **Managing translations:** `translations.csv` has no `categories/*.yaml`
   schema (it's a fixed shape: `id, category, en, fr`), so it gets its own
   small command group rather than reusing `add`/`edit`/`delete`/`list`:
   ```
@@ -1185,7 +1185,7 @@ variants:
   artist:
     email: contact@example.com
     homepage: example.com
-    # no title — falls back to a generic "Curriculum Vitae" heading (from labels.csv), not a fake job title
+    # no title — falls back to a generic "Curriculum Vitae" heading (from translations.csv), not a fake job title
   job-application:
     email: jobs@example.com
     homepage: example.com
@@ -1227,7 +1227,7 @@ actual `identity.yaml`, in the private data repo, not here.)
   profile files), plus optional `filter` (simple key→value, not
   arbitrary SQL), `order_by`, `limit`, `group_by`, `citation_style`.
 - Section `title` is **not** hardcoded per profile — resolved from
-  `labels.csv` via the section's `id`, keyed to `meta.language`.
+  `translations.csv` via the section's `id`, keyed to `meta.language`.
 - **Views are defined in `views.yaml` in the data repo**, not in code.
   Each named view maps to a table, its fields, and a RenderCV entry
   type (see views.yaml (draft), below). The tool ships a starter
@@ -1265,7 +1265,7 @@ type's fields. A field value is either a literal field name (direct
 copy) or a `"{field}"` template string (composed/formatted). A bare
 `{title}` in a template auto-resolves to `title_en`/`title_fr` — or
 just `title` if the field isn't a bilingual pair — based on the
-profile's own language, the same resolution `labels.csv` already uses;
+profile's own language, the same resolution `translations.csv` already uses;
 this is the general rule for every bilingual field, not something each
 view has to spell out.
 
@@ -1319,7 +1319,7 @@ skills-terms:                              # programming / framework / platform 
   group_by: category
   entry_type: OneLineEntry
   fields:
-    label: "{category}"                    # resolved via labels.csv, e.g. "Programming"
+    label: "{category}"                    # resolved via translations.csv, e.g. "Programming"
     details: "{name_en, joined by ', '}"   # GROUP_CONCAT over the group's rows, in row order
 skills-language:
   source: skills
@@ -1431,7 +1431,7 @@ tooling required, just discipline about the boundary from day one.
 - **pytest**, with unit tests against the core layer and integration
   tests against the CLI (using Typer's `CliRunner` to simulate input
   non-interactively).
-- **All tests run against temporary, fixture-based CSVs/vocab/labels**
+- **All tests run against temporary, fixture-based CSVs/vocab/translations**
   — never real data. Core-layer tests never touch git or the real
   filesystem beyond a temp directory; sync/git tests use mocked git
   operations.
@@ -1442,7 +1442,7 @@ tooling required, just discipline about the boundary from day one.
                     # test_vocab.py, test_build.py, test_cite.py
     integration/   # test_cli_add.py, test_sync.py
     fixtures/      # sample_publications.csv, sample_grants.csv,
-                    # vocab.yaml, labels.csv
+                    # vocab.yaml, translations.csv
   ```
 - **Cross-platform CI via GitHub Actions** — matrix build across
   `ubuntu-latest` / `macos-latest` / `windows-latest` and a couple of
@@ -1627,7 +1627,7 @@ parco lint                # check all tables
 parco lint <category>      # check one table
 parco lint --fix           # only unambiguous fixes (e.g. whitespace) — never guesses vocab/translation values
 ```
-Checks: vocab conformance, `labels.csv` completeness against all profile
+Checks: vocab conformance, `translations.csv` completeness against all profile
 section ids, date sanity, required fields non-blank, and (warning) money
 amounts whose month has no exchange rate in `rates.csv`.
 
@@ -1696,7 +1696,7 @@ schemas (see Category schemas), `vocab.yaml` (draft), `views.yaml`
 (draft), and `identity.yaml` (see Identity / personal-info config) are
 all drafted, cross-checked against a real CCV export and the user's own
 LaTeX CV. The foundation layer is implemented (see Code architecture):
-schema/vocab/labels loading, ISO partial dates, common field validation,
+schema/vocab/translations loading, ISO partial dates, common field validation,
 the handler architecture (`GenericHandler`, `PublicationsHandler`),
 DuckDB-backed CSV access, and `parco lint`. The `add`/`edit`/`delete`
 wizard is also implemented (see CLI's "Data entry"): field-by-field
@@ -1733,7 +1733,7 @@ up in whichever future plan next touches the area:
 - `validate_common` only checks date validity for a `type: date` field
   when the field also declares `precision:` — currently harmless since
   every real schema's date fields declare one, but worth tightening.
-- `run_lint`'s labels-completeness check constructs `LintIssue` with the
+- `run_lint`'s translations-completeness check constructs `LintIssue` with the
   label's `category` column in the `field` position, which means
   something different (a CSV column name) at every other call site.
 - No lint check yet for duplicate `id` values within a single category,

@@ -17,7 +17,7 @@ fields:
   - {name: status, required: true, vocab: widget_status}
 """)
     (tmp_path / "vocab.yaml").write_text("widget_status: [draft, published]\n")
-    (tmp_path / "labels.csv").write_text("id,category,en,fr\nwidgets,section,Widgets,Widgets\n")
+    (tmp_path / "translations.csv").write_text("id,category,en,fr\nwidgets,section,Widgets,Widgets\n")
     return tmp_path
 
 
