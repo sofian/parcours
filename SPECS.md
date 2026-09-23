@@ -263,7 +263,7 @@ Category ↔ CCV section mapping found by inspecting a real export:
 |---|---|
 | publications | Contributions → Publications → {Journal Articles, Conference Publications, Books, Book Chapters, Reports, Online Resources, Thesis/Dissertation, Magazine Entries} |
 | grants | Research Funding History (each nests one Funding Sources record for funder/amount/currency) |
-| artworks | Contributions → Artistic Contributions |
+| artworks | Contributions → Artistic Contributions → {Visual Artworks, Audio Recordings} |
 | students | Activities → Supervisory Activities → Student/Postdoctoral Supervision |
 | teaching | Activities → Teaching Activities → Course Development |
 | service | Activities → Assessment and Review Activities (→ Graduate Examination Activities, Research Funding Application Assessment Activities), Community and Volunteer Activities, Memberships, Teaching Activities → Program Development |
@@ -271,15 +271,15 @@ Category ↔ CCV section mapping found by inspecting a real export:
 | presentations | Contributions → Presentations |
 | press | Contributions → Interviews and Media Relations (→ Broadcast Interviews, Text Interviews) |
 | review | *(none — Zotero-only; CCV tracks your own contributions, not third-party reception of them)* |
-| catalog | *(none — Zotero-only, same reasoning as `review`)* |
+| catalog | Contributions → Artistic Contributions → Exhibition Catalogues (Zotero-backed, same as `publications`/`review` — the importer's job here is matching each record to a citekey, not field-mapping; see below) |
 | education | Education → Degrees |
 | positions | Employment → Academic Work Experience, Non-academic Work Experience, Affiliations |
 | recognitions | Recognitions |
-| exhibitions | *(none)* |
+| exhibitions | Contributions → Artistic Contributions → Artistic Exhibitions |
 | curatorship | *(none)* |
 | residencies | *(none)* |
 | software | *(none)* |
-| skills | *(none)* |
+| skills | *(none — "User Profile → Research Specialization Keywords" is a structurally close near-miss, one-row-per-keyword like `skills` itself, but not imported in this first cut; a plausible future enhancement, not a mapping this importer builds) |
 
 `service` and `outreach` were split from a single "service" candidate
 after comparing actual field shapes: Assessment/Review, Community and
@@ -299,6 +299,75 @@ stay merged into one `press` category rather than being split like
 activity (third-party coverage) with a minor field difference
 (`program`, only meaningful for broadcast, is simply left blank for
 text pieces) rather than a distinct shape or purpose.
+
+**"Contributions → Artistic Contributions" is not one homogeneous bucket** — an
+earlier pass mapped the whole thing to `artworks`, but checking real field
+shapes across its four real sub-types (in a reference export: 43 Artistic
+Exhibitions, 9 Visual Artworks, 3 Exhibition Catalogues, 1 Audio
+Recording) showed three genuinely different shapes:
+- **Artistic Exhibitions** (`Title of Work`, `Venue`, `Date of First
+  Performance`, `Contribution Role`) is date-and-venue-shaped, describing
+  a work *exhibited/performed somewhere* — this is `exhibitions`, not
+  `artworks`, and by record count is the single largest chain in a real
+  export, not a marginal case. `exhibitions`' own `location`/`event`/
+  `curator` (required or glossary-backed) have no CCV source at all, so
+  every imported row needs manual completion of those fields.
+- **Visual Artworks** and **Audio Recordings** (`Artwork/Piece Title`,
+  `Publication/Release Date`, `Contribution Role`, `Contributors`) are
+  authorship-shaped and match `artworks` as originally mapped — just a
+  smaller pool than "all Artistic Contributions."
+- **Exhibition Catalogues** (`Catalogue Title`, `Gallery/Publisher`,
+  `Contribution Role`, `Contributors`, `Artists`) is genuinely ambiguous
+  — its `Contribution Role`/`Contributors`/`Artists` fields read as
+  real authorship, which would argue for `artworks`, but it's mapped to
+  `catalog` here (a deliberate choice, not the only defensible one) —
+  treated as a Zotero-backed citable item, the same way `publications`/
+  `review` are, rather than as a directly-authored artwork record.
+
+**Not imported, no clean category fit** (flagged for manual entry
+rather than silently dropped or forced into the wrong bucket):
+Activities → Supervisory Activities → Staff Supervision (pure aggregate
+headcounts, no title/date/name); Personal Information → Address,
+Language Skills; User Profile and its sub-sections (Areas of Research,
+Disciplines Trained In, Fields of Application, Research Disciplines,
+Research Specialization Keywords — all refTable-backed controlled-
+vocabulary lists with no free structure); Most Significant Contributions
+(CCV's own curated-highlights feature, pointing at other records rather
+than being a record type of its own).
+
+**`education`'s `advisor` field**: an earlier pass noted "CCV has no
+equivalent field," which is wrong — CCV has a structured `Education →
+Degrees → Supervisors` sub-record (`Supervisor Name`, `Start Date`,
+`End Date`). The importer can populate `advisor` by joining supervisor
+names (same `"Last, First; Last, First"` convention as `person_list`,
+though `advisor` itself stays plain text) — the sub-record's own dates
+are then dropped, since `advisor` has no date fields to hold them.
+
+**Bilingual wire form**: a real export was checked and found to use
+*exclusively* the unsplit `<value type="Bilingual">` blob form — the
+split `<bilingual><french>/<english>` form (see above) never actually
+occurred. The importer must still handle both, since the split form is
+a real, documented CCV output mode (just not one this particular export
+happened to use) — but the unsplit form is the one to prioritize when
+writing and testing the importer first.
+
+**`grants`' `Funding Sources` sub-record isn't always exactly one per
+grant** — a reference export had 33 Funding Sources for 32 parent
+grant records, meaning at least one grant had two. `grants`' schema has
+no multi-source list field (`funder`/`amount`/`currency` are flat,
+single-valued), so the importer takes the first Funding Sources record
+per grant and flags any grant with more than one in its post-import
+report for manual review, rather than silently dropping the second
+source or guessing how to merge them. `Project Description`/`Research
+Uptake` (both Bilingual, no dedicated field) map to `grants`' existing
+`note_en`/`note_fr` fields.
+
+Several nested reference-table list sub-records across categories
+(Employment/Education's own "Areas of Research"/"Fields of
+Application"/"Research Disciplines", Students' "Project Funding
+Sources"/"Student Country of Citizenship") carry no corresponding
+schema field anywhere and are simply dropped — mentioned here once
+rather than repeated in every affected category's own notes.
 
 ### publications (handler: publications)
 
@@ -492,14 +561,18 @@ dedup:
   Collaborator, Artist collaborator) collapse to those two on import
   (`Auteur`/`Artist`/`Principal investigator` → `author`; `Artist
   collaborator` → `collaborator`).
-- CCV's `Title of Work` is a single field, not bilingual — import fills
-  whichever of `title_en`/`title_fr` matches the export's language and
-  leaves the other blank, which is fine given `require_one_of` above.
+- CCV's `Artwork Title`/`Piece Title` (Visual Artworks/Audio Recordings
+  — see CCV export structure, above, for why `artworks` maps only to
+  these two, not the whole "Artistic Contributions" bucket) is a single
+  field, not bilingual — import fills whichever of `title_en`/`title_fr`
+  matches the export's language and leaves the other blank, which is
+  fine given `require_one_of` above.
 - No separate medium/type field: CCV has none, and the bilingual
   `description` carries whatever detail is needed instead.
-- `Number of Contributors` is dropped — blank in 53 of 56 reference
-  records, and derivable from `co_authors`/`collaborators` anyway.
-- `venue` is dropped — not tracked here.
+- `Number of Contributors` is dropped — derivable from `co_authors`/
+  `collaborators` anyway.
+- No `venue` field here — that concept belongs to `exhibitions`
+  (see CCV export structure, above), not `artworks`.
 - **`co_authors`/`collaborators` are `type: person_list`** (see
   Category schemas (drafts) intro, above, for the field type itself).
   `co_authors` never includes you: your own name comes from
@@ -737,7 +810,7 @@ fields:
   - {name: start_date,        type: date, precision: month, required: true}
   - {name: end_date,          type: date, precision: month}           # blank = ongoing
   - {name: thesis_title}                                              # no translation; blank for degrees without a thesis (e.g. postdoc, bachelor's)
-  - {name: advisor}                                                    # free text — CCV has no equivalent field
+  - {name: advisor}                                                    # free text — CCV's Supervisors sub-record (name+dates) is joined into this one field on import
   - {name: note_en}
   - {name: note_fr}                                                    # e.g. "Completed with honours"
 dedup:

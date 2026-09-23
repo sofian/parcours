@@ -13,7 +13,7 @@ fields:
   - {name: start_date,        type: date, precision: month, required: true}
   - {name: end_date,          type: date, precision: month}           # blank = ongoing
   - {name: thesis_title}                                              # no translation; blank for degrees without a thesis (e.g. postdoc, bachelor's)
-  - {name: advisor}                                                    # free text — CCV has no equivalent field
+  - {name: advisor}                                                    # free text — CCV's Supervisors sub-record (name+dates) is joined into this one field on import
   - {name: note_en}
   - {name: note_fr}                                                    # e.g. "Completed with honours"
 dedup:
