@@ -1,0 +1,27 @@
+publication_status: [submitted, under-review, accepted, in-press, published]
+publication_type: [journal-article, conference-paper, book, book-chapter, report, thesis, magazine-entry, online-resource]
+
+grant_role: [pi, co-pi, collaborator]
+grant_status: [submitted, awarded, declined]
+
+artwork_role: [author, collaborator]
+
+student_role: [principal-supervisor, co-supervisor]
+degree_type: [bachelors, bachelors-honours, masters, doctorate, postdoc]        # shared: students, education
+degree_status: [completed, in-progress, withdrawn, all-but-degree]              # shared: students, education
+
+service_type: [graduate-examination, funding-review, manuscript-review, volunteer, membership, committee, program-development]
+
+outreach_activity_type: [community-engagement, startup-involvement, technology-improvement, business-innovation, industry-consulting]
+outreach_stakeholder: [general-public, private-nonprofit, utility, industry-association, industry-business]
+
+position_type: [academic, non-academic, affiliation]
+position_status: [full-time, part-time]
+
+recognition_type: [citation, distinction, prize]
+recognition_role: [recipient, educator]
+
+software_role: [lead-developer, co-developer, developer, contributor]
+
+skill_category: [expertise, programming, framework, platform, software, spoken-language, other]
+language_level: [native, fluent, intermediate, basic]

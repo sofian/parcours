@@ -1,0 +1,9 @@
+name: review
+handler: publications
+options:
+  bib: zotero/library.bib
+  json: zotero/library.json
+fields:
+  - {name: id,       generated: true}       # review-2026-004
+  - {name: weight,   type: int}             # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: citekey,  required: true}        # must resolve in the export, same rule as publications

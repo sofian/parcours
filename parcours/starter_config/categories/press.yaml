@@ -1,0 +1,25 @@
+name: press
+handler: generic
+options:
+  zotero: {bib: zotero/library.bib, json: zotero/library.json}  # for rows that set citekey
+fields:
+  - {name: id,           generated: true}                    # press-2026-004
+  - {name: weight,       type: int}                          # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: citekey}                                            # optional — set when also a Zotero-catalogued item
+                                                                 # (e.g. a written review); enables `parco cite` on
+                                                                 # this row (see Category handlers: shared Zotero
+                                                                 # capability). Blank for podcast/radio/TV/interview
+                                                                 # appearances, which aren't Zotero items.
+  - {name: author}                                              # free text — who wrote or conducted it
+  - {name: outlet,       required: true}                        # free text — publisher, radio/TV station, network
+  - {name: program}                                              # free text — the specific show/program, if any
+                                                                 # (blank for print/text pieces)
+  - {name: date,         type: date, precision: month, required: true}
+  - {name: description_en}
+  - {name: description_fr}
+  - {name: url}
+dedup:
+  - when: [{exact: citekey}]
+    as: duplicate
+  - when: [{fuzzy: outlet}, {fuzzy: program}, {same_year: date}]
+    as: duplicate

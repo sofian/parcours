@@ -1,0 +1,19 @@
+name: curatorship
+handler: generic
+fields:
+  - {name: id,           generated: true}                          # cur-2026-004
+  - {name: weight,       type: int}                                # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: title_en}
+  - {name: title_fr}
+  - {name: event}
+  - {name: venue}
+  - {name: location,     required: true, glossary: location}                             # city + country as one glossary-backed value
+  - {name: curator}                                                  # free text — co-curator(s), if any (your own curatorial role is implicit)
+  - {name: start_date,   type: date, precision: month, required: true}
+  - {name: end_date,     type: date, precision: month}
+require_one_of:
+  - [title_en, title_fr]
+  - [event, venue]
+dedup:
+  - when: [{fuzzy: [title_en, title_fr]}, {fuzzy: [event, venue]}, {same_year: start_date}]
+    as: duplicate

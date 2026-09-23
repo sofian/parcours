@@ -1,0 +1,20 @@
+name: students
+handler: generic
+fields:
+  - {name: id,                     generated: true}                       # student-2026-004
+  - {name: weight,                 type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: student_name,           required: true}                        # free text
+  - {name: role,                   required: true, vocab: student_role}   # principal-supervisor / co-supervisor
+  - {name: institution}                                                    # free text
+  - {name: degree_type,            required: true, vocab: degree_type}    # bachelors-honours / masters / doctorate / postdoc
+  - {name: degree_status,          required: true, vocab: degree_status}  # completed / in-progress / withdrawn / all-but-degree
+  - {name: supervision_start_date, type: date, precision: month, required: true}
+  - {name: supervision_end_date,   type: date, precision: month}          # blank = ongoing
+  - {name: degree_start_date,      type: date, precision: month}
+  - {name: degree_end_date,        type: date, precision: month}          # actual completion; blank until finished
+  - {name: thesis_title}                                                   # no translation
+  - {name: present_position}                                               # free text — outcome tracking
+  - {name: present_organization}
+dedup:
+  - when: [{exact: student_name}]
+    as: related

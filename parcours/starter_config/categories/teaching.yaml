@@ -1,0 +1,15 @@
+name: teaching
+handler: generic
+fields:
+  - {name: id,           generated: true}                # teaching-2026-004
+  - {name: weight,       type: int}                      # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: course_label, required: true}                 # e.g. EDM1600, COM1001 — CCV has no equivalent, filled in manually
+  - {name: title_en}
+  - {name: title_fr}
+  - {name: role}                                          # free text, e.g. Professor
+  - {name: organization, required: true}                  # resolved from CCV's refTable (see CCV export structure)
+  - {name: department}
+  - {name: date,         type: date, precision: month, required: true}  # term/year of this specific offering
+dedup:
+  - when: [{exact: course_label}, {exact: organization}, {same_year: date}]
+    as: duplicate

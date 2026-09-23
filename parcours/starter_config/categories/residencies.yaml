@@ -1,0 +1,12 @@
+name: residencies
+handler: generic
+fields:
+  - {name: id,           generated: true}                       # res-2026-004
+  - {name: weight,       type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: organization, required: true}                        # free text — e.g. "Hexagram", "LABoral"
+  - {name: location,     required: true, glossary: location}                         # city + country as one glossary-backed value
+  - {name: start_date,   type: date, precision: month, required: true}
+  - {name: end_date,     type: date, precision: month}           # blank = short/undated residency
+dedup:
+  - when: [{exact: organization}, {overlap: [start_date, end_date]}]
+    as: duplicate

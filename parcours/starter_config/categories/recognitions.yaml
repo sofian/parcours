@@ -1,0 +1,18 @@
+name: recognitions
+handler: generic
+fields:
+  - {name: id,               generated: true}                          # award-2026-004
+  - {name: weight,           type: int}                                # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: recognition_type, required: true, vocab: recognition_type}   # citation / distinction / prize
+  - {name: name,             required: true}                            # free text
+  - {name: organization,     required: true}                            # free text — refTable or "Other Organization" fallback, same pattern as positions/education
+  - {name: role,             vocab: recognition_role, default: recipient}  # recipient / educator — for an award given to a student you supervised
+  - {name: date,             type: date, precision: month, required: true}
+  - {name: end_date,         type: date, precision: month}              # blank for one-time citations; set for fellowship-like awards with a disbursement period
+  - {name: amount,           type: number}
+  - {name: currency,         default: $currency.default}
+  - {name: description_en}
+  - {name: description_fr}
+dedup:
+  - when: [{exact: organization}, {fuzzy: name}, {same_year: date}]
+    as: duplicate

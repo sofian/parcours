@@ -1,0 +1,20 @@
+name: service
+handler: generic
+fields:
+  - {name: id,           generated: true}                       # svc-2026-004
+  - {name: weight,       type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: type,         required: true, vocab: service_type}   # graduate-examination / funding-review / manuscript-review / volunteer / membership / committee / program-development
+  - {name: role,         required: true}                        # free text — CCV's own Role field is a controlled list for some
+                                                                  # service types and free text for others, so a merged vocab
+                                                                  # wouldn't correspond to any single real list
+  - {name: organization, required: true}                        # free text — no vocab, too many distinct values
+  - {name: start_date,   type: date, precision: month, required: true}
+  - {name: end_date,     type: date, precision: month}          # blank = ongoing
+  - {name: detail}                                               # student name (graduate-examination) / committee name
+                                                                  # (funding-review) / which committee, e.g. "Hiring
+                                                                  # Committee" (committee) / program title + description
+                                                                  # (program-development) / activity description
+                                                                  # (volunteer, membership) — meaning depends on `type`
+dedup:
+  - when: [{fuzzy: organization}, {fuzzy: role}, {overlap: [start_date, end_date]}]
+    as: duplicate

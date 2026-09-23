@@ -1,0 +1,20 @@
+name: publications
+handler: publications
+options:
+  bib: zotero/library.bib        # Better BibTeX auto-exports; absolute or
+  json: zotero/library.json      # relative to the data repo
+  type_map:                      # CSL type -> CV type; lint flags unmapped types
+    article-journal: journal-article
+    paper-conference: conference-paper
+    chapter: book-chapter
+    book: book
+fields:
+  - {name: id,       generated: true}                       # pub-2026-004
+  - {name: weight,   type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: citekey,  required: true}                        # must resolve in the export
+  - {name: status,   required: true, vocab: publication_status}
+  - {name: refereed, type: bool}
+  - {name: invited,  type: bool}
+  - {name: featured, type: bool}                            # "selected publications"
+  - {name: note_en,  type: text}                            # e.g. "Best paper award"
+  - {name: note_fr,  type: text}

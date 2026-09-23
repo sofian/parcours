@@ -1,0 +1,21 @@
+name: grants
+handler: generic
+fields:
+  - {name: id,           generated: true}                   # grant-frqsc-2026
+  - {name: weight,       type: int}                         # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: title_en,     required: true}
+  - {name: title_fr,     required: true}
+  - {name: funder,       required: true}                    # free text
+  - {name: program}
+  - {name: role,         required: true, vocab: grant_role}     # PI / co-PI / collaborator
+  - {name: status,       required: true, vocab: grant_status}   # submitted / awarded / declined
+  - {name: start_date,   type: date, precision: month, required: true}
+  - {name: end_date,     type: date, precision: month}      # blank = ongoing
+  - {name: amount,       type: number}
+  - {name: currency,     default: $currency.default}         # from parco.yaml, e.g. CAD
+  - {name: co_investigators}
+  - {name: note_en}
+  - {name: note_fr}
+dedup:
+  - when: [{exact: funder}, {overlap: [start_date, end_date]}, {fuzzy: [title_en, title_fr]}]
+    as: duplicate

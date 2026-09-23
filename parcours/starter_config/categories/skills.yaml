@@ -1,0 +1,14 @@
+name: skills
+handler: generic
+fields:
+  - {name: id,        generated: true}                        # skill-2026-004
+  - {name: weight,    type: int}                              # optional; higher = appears earlier — the ordering mechanism here, since skills have no dates at all
+  - {name: category,  required: true, vocab: skill_category}   # expertise / programming / framework / platform / software / spoken-language / other
+  - {name: name_en}                                             # untranslated technical terms just go here, name_fr left blank
+  - {name: name_fr}
+  - {name: level,     vocab: language_level}                    # native / fluent / intermediate / basic — spoken-language only
+require_one_of:
+  - [name_en, name_fr]
+dedup:
+  - when: [{exact: category}, {fuzzy: [name_en, name_fr]}]
+    as: duplicate

@@ -1,0 +1,21 @@
+name: education
+handler: generic
+fields:
+  - {name: id,                generated: true}                       # edu-2026-004
+  - {name: weight,            type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: degree_type,       required: true, vocab: degree_type}     # bachelors / bachelors-honours / masters / doctorate / postdoc — shared vocab with students
+  - {name: degree_name_en,    required: true}
+  - {name: degree_name_fr,    required: true}                         # e.g. "Ph. D. Humanities" / "Ph. D. Sciences humaines"
+  - {name: specialization_en}
+  - {name: specialization_fr}                                         # e.g. "Fine Arts" / "Beaux-arts"
+  - {name: organization,      required: true}                         # resolved from CCV's refTable
+  - {name: degree_status,     required: true, vocab: degree_status}   # completed / in-progress / withdrawn / all-but-degree — shared vocab with students
+  - {name: start_date,        type: date, precision: month, required: true}
+  - {name: end_date,          type: date, precision: month}           # blank = ongoing
+  - {name: thesis_title}                                              # no translation; blank for degrees without a thesis (e.g. postdoc, bachelor's)
+  - {name: advisor}                                                    # free text — CCV has no equivalent field
+  - {name: note_en}
+  - {name: note_fr}                                                    # e.g. "Completed with honours"
+dedup:
+  - when: [{exact: organization}, {exact: degree_type}, {same_year: start_date}]
+    as: duplicate

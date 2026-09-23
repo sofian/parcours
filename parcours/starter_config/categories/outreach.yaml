@@ -1,0 +1,17 @@
+name: outreach
+handler: generic
+fields:
+  - {name: id,                 generated: true}                              # outreach-2026-004
+  - {name: weight,             type: int}                                    # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: activity_type,      required: true, vocab: outreach_activity_type} # community-engagement / consulting-for-industry / ...
+  - {name: target_stakeholder, vocab: outreach_stakeholder}                   # general-public / industry / ...
+  - {name: organization,       required: true}                               # free text — "Group/Organization/Business Serviced"
+  - {name: role}                                                              # free text
+  - {name: start_date,         type: date, precision: month, required: true}
+  - {name: end_date,           type: date, precision: month}                 # blank = ongoing
+  - {name: description_en}
+  - {name: description_fr}                                                   # free-form; unused in the reference export, kept for reuse
+  - {name: url}                                                              # References / Citations / Web Sites
+dedup:
+  - when: [{fuzzy: organization}, {overlap: [start_date, end_date]}]
+    as: duplicate

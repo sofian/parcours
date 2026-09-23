@@ -1,0 +1,19 @@
+name: exhibitions
+handler: generic
+fields:
+  - {name: id,           generated: true}                          # exh-2026-004
+  - {name: weight,       type: int}                                # optional; higher = appears earlier, refines/overrides date-based ordering
+  - {name: title_en}
+  - {name: title_fr}                                                # usually only one filled
+  - {name: event}                                                    # free text — festival/series, e.g. "MUTEK Forum"
+  - {name: venue}                                                    # free text — hosting institution, e.g. "National Gallery"
+  - {name: location,     required: true, glossary: location}                             # city + country as one glossary-backed value
+  - {name: curator}                                                  # free text — credited curator(s)
+  - {name: start_date,   type: date, precision: month, required: true}
+  - {name: end_date,     type: date, precision: month}              # blank = single-day event or unknown
+require_one_of:
+  - [title_en, title_fr]
+  - [event, venue]
+dedup:
+  - when: [{fuzzy: [title_en, title_fr]}, {fuzzy: [event, venue]}, {same_year: start_date}]
+    as: duplicate
