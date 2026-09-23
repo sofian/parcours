@@ -18,10 +18,15 @@ def _schema():
 def _no_commit(monkeypatch):
     calls = []
 
-    def fake_commit(data_dir, filename, message):
-        calls.append((data_dir, filename, message))
+    def fake_commit(data_dir, filename, message, was_already_dirty):
+        calls.append((data_dir, filename, message, was_already_dirty))
 
     monkeypatch.setattr("parcours.core.entries.git_commit", fake_commit)
+    # These tests exercise add/edit/delete_entry behavior against a plain
+    # tmp_path that is never a real git repo, so the real is_file_dirty
+    # (which shells out to `git status`) would fail with "not a git
+    # repository". Stub it to report clean, matching these tests' intent.
+    monkeypatch.setattr("parcours.core.entries.is_file_dirty", lambda data_dir, filename: False)
     return calls
 
 
@@ -52,7 +57,7 @@ def test_add_entry_creates_csv_with_header_and_generated_id(tmp_path, monkeypatc
     content = (tmp_path / "widgets.csv").read_text(encoding="utf-8")
     assert content.splitlines()[0] == "id,title_en,status"
     assert row["id"] in content
-    assert calls == [(tmp_path, "widgets.csv", f"Added widgets entry {row['id']}")]
+    assert calls == [(tmp_path, "widgets.csv", f"Added widgets entry {row['id']}", False)]
 
 
 def test_add_entry_appends_to_existing_csv(tmp_path, monkeypatch):
@@ -81,7 +86,7 @@ def test_edit_entry_updates_matching_row_and_keeps_others(tmp_path, monkeypatch)
     lines = (tmp_path / "widgets.csv").read_text(encoding="utf-8").splitlines()
     assert "First (revised)" in lines[1]
     assert "Second" in lines[2]
-    assert calls == [(tmp_path, "widgets.csv", "Edited widgets entry abc123")]
+    assert calls == [(tmp_path, "widgets.csv", "Edited widgets entry abc123", False)]
 
 
 def test_edit_entry_raises_for_unknown_id(tmp_path, monkeypatch):
@@ -105,7 +110,7 @@ def test_delete_entry_removes_matching_row(tmp_path, monkeypatch):
     lines = (tmp_path / "widgets.csv").read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
     assert "Second" in lines[1]
-    assert calls == [(tmp_path, "widgets.csv", "Deleted widgets entry abc123")]
+    assert calls == [(tmp_path, "widgets.csv", "Deleted widgets entry abc123", False)]
 
 
 def test_delete_entry_raises_for_unknown_id(tmp_path, monkeypatch):
@@ -129,7 +134,7 @@ def test_write_preserves_lf_line_endings(tmp_path, monkeypatch):
 
 
 import subprocess
-from parcours.core.entries import git_commit
+from parcours.core.entries import git_commit, is_file_dirty
 
 
 def _init_git_repo(path):
@@ -138,39 +143,87 @@ def _init_git_repo(path):
     subprocess.run(["git", "config", "user.name", "Test"], cwd=path, check=True, capture_output=True)
 
 
-def test_git_commit_commits_when_file_was_clean(tmp_path):
+def test_git_commit_commits_when_not_already_dirty(tmp_path):
     _init_git_repo(tmp_path)
     (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
     subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "commit", "-m", "Initial"], cwd=tmp_path, check=True, capture_output=True)
 
-    # File starts clean. We write identical content (no-op), then stage it,
-    # to verify git_commit correctly detects no staged changes and returns False.
-    # The alternate test below (test_git_commit_skips_when_file_already_dirty)
-    # tests the case where the file is dirty before git_commit is called.
-    (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
-    committed = git_commit(tmp_path, "widgets.csv", "No-op edit")
+    (tmp_path / "widgets.csv").write_text("id,title_en\nabc123,First\n", encoding="utf-8")
+    committed = git_commit(tmp_path, "widgets.csv", "Added widgets entry abc123", was_already_dirty=False)
 
-    assert committed is False
+    assert committed is True
     log = subprocess.run(["git", "log", "--oneline"], cwd=tmp_path, check=True, capture_output=True, text=True)
-    assert "No-op edit" not in log.stdout
+    assert "Added widgets entry abc123" in log.stdout
 
 
-def test_git_commit_skips_when_file_already_dirty(tmp_path):
+def test_git_commit_skips_when_told_already_dirty(tmp_path):
     _init_git_repo(tmp_path)
     (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
     subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "commit", "-m", "Initial"], cwd=tmp_path, check=True, capture_output=True)
 
-    # Simulate a hand-edit: the file now differs from HEAD, but nothing
-    # was staged for it.
-    (tmp_path / "widgets.csv").write_text("id,title_en\nzzz999,Pending\n", encoding="utf-8")
-
-    (tmp_path / "widgets.csv").write_text("id,title_en\nzzz999,Pending\nabc123,A\n", encoding="utf-8")
-    committed = git_commit(tmp_path, "widgets.csv", "Added widgets entry abc123")
+    (tmp_path / "widgets.csv").write_text("id,title_en\nabc123,First\n", encoding="utf-8")
+    committed = git_commit(tmp_path, "widgets.csv", "Added widgets entry abc123", was_already_dirty=True)
 
     assert committed is False
     log = subprocess.run(["git", "log", "--oneline"], cwd=tmp_path, check=True, capture_output=True, text=True)
     assert "Added widgets entry abc123" not in log.stdout
     # The write itself still happened — nothing was rolled back.
     assert "abc123" in (tmp_path / "widgets.csv").read_text(encoding="utf-8")
+
+
+def test_git_commit_returns_false_on_true_noop_edit(tmp_path):
+    _init_git_repo(tmp_path)
+    (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=tmp_path, check=True, capture_output=True)
+
+    # Identical content — nothing actually changed.
+    (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
+    committed = git_commit(tmp_path, "widgets.csv", "No-op edit", was_already_dirty=False)
+
+    assert committed is False
+    log = subprocess.run(["git", "log", "--oneline"], cwd=tmp_path, check=True, capture_output=True, text=True)
+    assert "No-op edit" not in log.stdout
+
+
+def test_is_file_dirty_false_on_clean_tracked_file(tmp_path):
+    _init_git_repo(tmp_path)
+    (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=tmp_path, check=True, capture_output=True)
+
+    assert is_file_dirty(tmp_path, "widgets.csv") is False
+
+
+def test_is_file_dirty_true_on_unstaged_hand_edit(tmp_path):
+    _init_git_repo(tmp_path)
+    (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=tmp_path, check=True, capture_output=True)
+
+    (tmp_path / "widgets.csv").write_text("id,title_en\nzzz999,Pending\n", encoding="utf-8")
+
+    assert is_file_dirty(tmp_path, "widgets.csv") is True
+
+
+def test_is_file_dirty_true_on_staged_change(tmp_path):
+    _init_git_repo(tmp_path)
+    (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=tmp_path, check=True, capture_output=True)
+
+    (tmp_path / "widgets.csv").write_text("id,title_en\nzzz999,Pending\n", encoding="utf-8")
+    subprocess.run(["git", "add", "widgets.csv"], cwd=tmp_path, check=True, capture_output=True)
+
+    assert is_file_dirty(tmp_path, "widgets.csv") is True
+
+
+def test_is_file_dirty_false_on_untracked_file(tmp_path):
+    _init_git_repo(tmp_path)
+    subprocess.run(["git", "commit", "--allow-empty", "-m", "Initial"], cwd=tmp_path, check=True, capture_output=True)
+
+    (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
+
+    assert is_file_dirty(tmp_path, "widgets.csv") is False

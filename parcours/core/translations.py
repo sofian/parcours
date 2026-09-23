@@ -8,7 +8,7 @@ import csv
 from dataclasses import dataclass
 from pathlib import Path
 
-from .entries import git_commit, write_all_rows
+from .entries import git_commit, is_file_dirty, write_all_rows
 
 _FIELDNAMES = ["id", "category", "en", "fr"]
 
@@ -115,8 +115,9 @@ def add_translation(data_dir: Path, category: str, id_: str, en: str, fr: str) -
 
     new_entry = TranslationEntry(id=id_, category=category, en=en, fr=fr)
     rows = [_entry_row(e) for e in table.all()] + [_entry_row(new_entry)]
+    was_already_dirty = is_file_dirty(data_dir, "translations.csv")
     write_all_rows(_translations_path(data_dir), _FIELDNAMES, rows)
-    git_commit(data_dir, "translations.csv", f"Added translation {category}:{id_}")
+    git_commit(data_dir, "translations.csv", f"Added translation {category}:{id_}", was_already_dirty)
     return new_entry
 
 
@@ -133,8 +134,9 @@ def edit_translation(data_dir: Path, category: str, id_: str, en: str, fr: str) 
         _entry_row(updated) if _matches(e, category, id_) else _entry_row(e)
         for e in table.all()
     ]
+    was_already_dirty = is_file_dirty(data_dir, "translations.csv")
     write_all_rows(_translations_path(data_dir), _FIELDNAMES, rows)
-    git_commit(data_dir, "translations.csv", f"Edited translation {category}:{id_}")
+    git_commit(data_dir, "translations.csv", f"Edited translation {category}:{id_}", was_already_dirty)
     return updated
 
 
@@ -144,5 +146,6 @@ def delete_translation(data_dir: Path, category: str, id_: str) -> None:
         raise TranslationNotFound(f"No translation for category '{category}' id '{id_}'")
 
     rows = [_entry_row(e) for e in table.all() if not _matches(e, category, id_)]
+    was_already_dirty = is_file_dirty(data_dir, "translations.csv")
     write_all_rows(_translations_path(data_dir), _FIELDNAMES, rows)
-    git_commit(data_dir, "translations.csv", f"Deleted translation {category}:{id_}")
+    git_commit(data_dir, "translations.csv", f"Deleted translation {category}:{id_}", was_already_dirty)

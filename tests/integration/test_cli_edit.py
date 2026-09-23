@@ -29,6 +29,7 @@ def test_edit_finds_by_search_and_updates(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     monkeypatch.chdir(repo)
     monkeypatch.setattr("parcours.core.entries.git_commit", lambda *a, **k: None)
+    monkeypatch.setattr("parcours.core.entries.is_file_dirty", lambda *a, **k: False)
 
     result = runner.invoke(
         app, ["edit", "widgets", "--search", "First"], input="1\nFirst Widget (revised)\n2\ny\n"
@@ -45,6 +46,7 @@ def test_edit_prefills_wizard_with_existing_values(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     monkeypatch.chdir(repo)
     monkeypatch.setattr("parcours.core.entries.git_commit", lambda *a, **k: None)
+    monkeypatch.setattr("parcours.core.entries.is_file_dirty", lambda *a, **k: False)
 
     result = runner.invoke(
         app, ["edit", "widgets", "--search", "First"], input="1\n\n\ny\n"

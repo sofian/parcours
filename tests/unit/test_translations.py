@@ -13,10 +13,16 @@ from parcours.core.translations import (
 def _no_commit(monkeypatch):
     calls = []
 
-    def fake_commit(data_dir, filename, message):
-        calls.append((data_dir, filename, message))
+    def fake_commit(data_dir, filename, message, was_already_dirty):
+        calls.append((data_dir, filename, message, was_already_dirty))
 
     monkeypatch.setattr("parcours.core.translations.git_commit", fake_commit)
+    # These tests exercise add/edit/delete_translation behavior against a
+    # plain tmp_path that is never a real git repo, so the real
+    # is_file_dirty (which shells out to `git status`) would fail with
+    # "not a git repository". Stub it to report clean, matching these
+    # tests' intent.
+    monkeypatch.setattr("parcours.core.translations.is_file_dirty", lambda data_dir, filename: False)
     return calls
 
 
@@ -100,7 +106,7 @@ def test_add_translation_creates_translations_csv_with_header_and_row(tmp_path, 
     content = (tmp_path / "translations.csv").read_text(encoding="utf-8")
     assert content.splitlines()[0] == "id,category,en,fr"
     assert "montreal,location,Montreal,Montréal" in content
-    assert calls == [(tmp_path, "translations.csv", "Added translation location:montreal")]
+    assert calls == [(tmp_path, "translations.csv", "Added translation location:montreal", False)]
 
 
 def test_add_translation_appends_to_existing_translations_csv(tmp_path, monkeypatch):
@@ -135,7 +141,7 @@ def test_edit_translation_updates_matching_pair_and_keeps_others(tmp_path, monke
     table = load_translations(tmp_path / "translations.csv")
     assert table.lookup("section", "publications", "en") == "Publications"
     assert table.lookup("location", "montreal", "fr") == "Montréal"
-    assert calls == [(tmp_path, "translations.csv", "Edited translation location:montreal")]
+    assert calls == [(tmp_path, "translations.csv", "Edited translation location:montreal", False)]
 
 
 def test_edit_translation_raises_for_unknown_pair(tmp_path, monkeypatch):
@@ -158,7 +164,7 @@ def test_delete_translation_removes_matching_pair(tmp_path, monkeypatch):
     table = load_translations(tmp_path / "translations.csv")
     assert table.lookup("section", "publications", "en") == "Publications"
     assert not table.exists("location", "montreal")
-    assert calls == [(tmp_path, "translations.csv", "Deleted translation location:montreal")]
+    assert calls == [(tmp_path, "translations.csv", "Deleted translation location:montreal", False)]
 
 
 def test_delete_translation_raises_for_unknown_pair(tmp_path, monkeypatch):

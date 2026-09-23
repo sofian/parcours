@@ -46,22 +46,29 @@ def write_all_rows(csv_path: Path, fieldnames: list[str], rows: list[dict]) -> N
             writer.writerow({name: row.get(name, "") for name in fieldnames})
 
 
-def git_commit(data_dir: Path, filename: str, message: str) -> bool:
-    """Commits `filename`'s current content, unless it already had
-    uncommitted changes *before* this write (e.g. a pending `parco
-    import` review, or a hand-edit) — in that case the write still
-    happened, but committing now would silently fold every other
-    pending change in that file into a message that only names this
-    one row. Returns whether it actually committed."""
-    status_before = subprocess.run(
+def is_file_dirty(data_dir: Path, filename: str) -> bool:
+    """True if `filename` already had uncommitted changes relative to
+    HEAD (staged or unstaged) *before* whatever write is about to
+    happen. Callers MUST call this before `write_all_rows` — once the
+    write has landed on disk, git can no longer distinguish "dirty
+    before this write" from "dirty because of this write" for an
+    already-tracked file. A brand-new, never-tracked file does not
+    count as dirty (there's nothing pre-existing to protect against
+    folding together)."""
+    status = subprocess.run(
         ["git", "status", "--porcelain", "--", filename],
         cwd=data_dir, check=True, capture_output=True,
     )
-    # Check if file has uncommitted changes. Untracked files (??) are
-    # considered clean for this purpose. Only modifications/deletions of
-    # tracked files indicate pre-existing uncommitted work.
-    was_already_dirty = bool(status_before.stdout) and not status_before.stdout.startswith(b'??')
+    return bool(status.stdout) and not status.stdout.startswith(b"??")
 
+
+def git_commit(data_dir: Path, filename: str, message: str, was_already_dirty: bool) -> bool:
+    """Commits `filename`'s current content, unless `was_already_dirty`
+    (computed by the caller via `is_file_dirty`, BEFORE writing) — in
+    that case the write still happened, but committing now would
+    silently fold every other pending change in that file into a
+    message that only names this one row. Returns whether it actually
+    committed."""
     subprocess.run(["git", "add", filename], cwd=data_dir, check=True, capture_output=True)
 
     status_after = subprocess.run(
@@ -87,11 +94,13 @@ def git_commit(data_dir: Path, filename: str, message: str) -> bool:
 def add_entry(data_dir: Path, schema: CategorySchema, values: dict) -> dict:
     row_id = generate_id(data_dir, schema.name)
     row = {"id": row_id, **values}
+    filename = f"{schema.name}.csv"
 
     rows = load_category_rows(data_dir, schema.name)
     rows.append(row)
+    was_already_dirty = is_file_dirty(data_dir, filename)
     write_all_rows(_csv_path(data_dir, schema.name), schema.field_names(), rows)
-    git_commit(data_dir, f"{schema.name}.csv", f"Added {schema.name} entry {row_id}")
+    git_commit(data_dir, filename, f"Added {schema.name} entry {row_id}", was_already_dirty)
     return row
 
 
@@ -100,10 +109,12 @@ def edit_entry(data_dir: Path, schema: CategorySchema, row_id: str, values: dict
     if not any(row.get("id") == row_id for row in rows):
         raise EntryNotFound(f"No {schema.name} entry with id '{row_id}'")
 
+    filename = f"{schema.name}.csv"
     updated_row = {"id": row_id, **values}
     new_rows = [updated_row if row.get("id") == row_id else row for row in rows]
+    was_already_dirty = is_file_dirty(data_dir, filename)
     write_all_rows(_csv_path(data_dir, schema.name), schema.field_names(), new_rows)
-    git_commit(data_dir, f"{schema.name}.csv", f"Edited {schema.name} entry {row_id}")
+    git_commit(data_dir, filename, f"Edited {schema.name} entry {row_id}", was_already_dirty)
     return updated_row
 
 
@@ -112,6 +123,8 @@ def delete_entry(data_dir: Path, schema: CategorySchema, row_id: str) -> None:
     if not any(row.get("id") == row_id for row in rows):
         raise EntryNotFound(f"No {schema.name} entry with id '{row_id}'")
 
+    filename = f"{schema.name}.csv"
     new_rows = [row for row in rows if row.get("id") != row_id]
+    was_already_dirty = is_file_dirty(data_dir, filename)
     write_all_rows(_csv_path(data_dir, schema.name), schema.field_names(), new_rows)
-    git_commit(data_dir, f"{schema.name}.csv", f"Deleted {schema.name} entry {row_id}")
+    git_commit(data_dir, filename, f"Deleted {schema.name} entry {row_id}", was_already_dirty)
