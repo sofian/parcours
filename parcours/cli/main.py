@@ -414,6 +414,18 @@ def _prompt_required(label: str) -> str:
         typer.echo(f"'{label}' is required.")
 
 
+def _prompt_variant_name() -> str:
+    while True:
+        value = typer.prompt("Identity variant name", default="academic").strip()
+        if not value:
+            typer.echo("Identity variant name is required.")
+            continue
+        if "/" in value or "\\" in value:
+            typer.echo("Identity variant name can't contain '/' or '\\'.")
+            continue
+        return value
+
+
 @app.command()
 def init(
     path: Path = typer.Argument(None, help="Where to scaffold the new data repo (defaults to the current directory)"),
@@ -427,7 +439,7 @@ def init(
 
     first_name = _prompt_required("First name")
     last_name = _prompt_required("Last name")
-    variant_name = typer.prompt("Identity variant name", default="academic")
+    variant_name = _prompt_variant_name()
 
     typer.echo("Which language(s) do you want profiles for?")
     typer.echo("  1. English")
@@ -449,7 +461,10 @@ def init(
     title_en = _prompt_required("Headline/title (English)") if "en" in languages else ""
     title_fr = _prompt_required("Headline/title (French)") if "fr" in languages else ""
     email = _prompt_required("Email")
-    phone = typer.prompt("Phone ([Enter] to skip)", default="", show_default=False)
+    phone = typer.prompt(
+        "Phone, international format e.g. +1 514 987 3000 ([Enter] to skip)",
+        default="", show_default=False,
+    )
     homepage = typer.prompt("Homepage ([Enter] to skip)", default="", show_default=False)
     currency = _prompt_required("Currency (e.g. CAD)")
 

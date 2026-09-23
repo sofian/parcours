@@ -74,6 +74,45 @@ def test_init_refuses_before_prompting_if_repo_already_exists(tmp_path, monkeypa
     assert "already exists" in result.stdout
 
 
+def test_init_phone_prompt_hints_international_format(tmp_path, monkeypatch):
+    _git_env(monkeypatch)
+    target = tmp_path / "my-cv"
+
+    result = runner.invoke(
+        app,
+        ["init", str(target)],
+        input="Jane\nDoe\n\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\ny\n",
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "+1 514 987 3000" in result.stdout
+    assert "international format" in result.stdout
+
+
+def test_init_rejects_variant_name_with_path_separator(tmp_path, monkeypatch):
+    _git_env(monkeypatch)
+    target = tmp_path / "my-cv"
+
+    # first, last, variant(rejected: contains '/'), variant(retry, valid),
+    # language choice(1=en), title_en, email, phone(skip), homepage(skip),
+    # currency, confirm
+    result = runner.invoke(
+        app,
+        ["init", str(target)],
+        input="Jane\nDoe\n../../pwned\nacademic\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\ny\n",
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "can't contain" in result.stdout
+    assert (target / "parco.yaml").is_file()
+    assert (target / "profiles" / "academic-en.yaml").is_file()
+
+    # nothing should have been written outside the target repo
+    assert not list(tmp_path.parent.glob("*pwned*"))
+    assert not list(tmp_path.glob("*pwned*"))
+    assert not any(tmp_path.rglob("*pwned*"))
+
+
 def test_init_defaults_to_the_current_directory(tmp_path, monkeypatch):
     _git_env(monkeypatch)
     monkeypatch.chdir(tmp_path)
