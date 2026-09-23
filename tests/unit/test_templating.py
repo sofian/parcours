@@ -22,6 +22,22 @@ def test_resolve_field_returns_none_when_nothing_matches():
     assert resolve_field(row, "title", "en") is None
 
 
+def test_resolve_field_falls_back_when_the_primary_language_key_is_entirely_absent():
+    row = {"title_fr": "Titre francais"}
+    assert resolve_field(row, "title", "en") == "Titre francais"
+
+
+def test_resolve_field_falls_back_when_the_other_language_key_is_entirely_absent():
+    row = {"title_en": "English Title"}
+    assert resolve_field(row, "title", "fr") == "English Title"
+
+
+def test_resolve_template_compound_string_stringifies_a_list_value():
+    row = {"zotero_authors": ["Jane Doe", "John Smith"]}
+    result = resolve_template("Authors: {zotero_authors}", row, "en")
+    assert result == "Authors: ['Jane Doe', 'John Smith']"
+
+
 def test_resolve_template_with_no_braces_is_a_direct_field_copy():
     row = {"start_date": "2020-01", "weight": "5"}
     assert resolve_template("start_date", row, "en") == "2020-01"

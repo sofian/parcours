@@ -12,15 +12,18 @@ def resolve_field(row: dict, field_name: str, language: str):
     """Returns the raw resolved value (any type) for one field name,
     auto-resolving a bilingual pair (`<field>_en`/`<field>_fr`) by
     language — falling back to the other language if the profile's own
-    is blank, so a value is never dropped just from a language mismatch
-    — or to a plain (non-suffixed) field if no bilingual pair exists."""
+    is blank or entirely absent, so a value is never dropped just from
+    a language mismatch — or to a plain (non-suffixed) field if no
+    bilingual pair exists."""
     primary_key = f"{field_name}_{language}"
-    if primary_key in row:
+    other_language = "fr" if language == "en" else "en"
+    other_key = f"{field_name}_{other_language}"
+
+    if primary_key in row or other_key in row:
         value = row.get(primary_key)
         if value:
             return value
-        other_language = "fr" if language == "en" else "en"
-        other_value = row.get(f"{field_name}_{other_language}")
+        other_value = row.get(other_key)
         if other_value:
             return other_value
         return value
