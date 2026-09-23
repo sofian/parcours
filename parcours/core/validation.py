@@ -5,6 +5,7 @@ validation beyond required/vocab checks" (SPECS.md, "Category handlers")."""
 from dataclasses import dataclass
 
 from .dates import InvalidDateError, meets_precision_floor
+from .names import InvalidPersonListError, parse_person_list
 from .schema import CategorySchema
 from .vocab import is_valid_value
 
@@ -57,6 +58,14 @@ def validate_common(schema: CategorySchema, entry: dict, vocab: dict) -> list[Li
             except InvalidDateError:
                 issues.append(LintIssue(
                     schema.name, row_id, f.name, f"'{f.name}' is not a valid date: '{value}'",
+                ))
+
+        if f.type == "person_list":
+            try:
+                parse_person_list(value)
+            except InvalidPersonListError as exc:
+                issues.append(LintIssue(
+                    schema.name, row_id, f.name, f"'{f.name}' is not a valid person list: {exc}",
                 ))
 
     for group in schema.require_one_of:

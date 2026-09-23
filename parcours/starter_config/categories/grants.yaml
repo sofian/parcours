@@ -13,7 +13,7 @@ fields:
   - {name: end_date,     type: date, precision: month}      # blank = ongoing
   - {name: amount,       type: number}
   - {name: currency,     default: $currency.default}         # from parco.yaml, e.g. CAD
-  - {name: co_investigators}
+  - {name: co_investigators, type: person_list}
   - {name: note_en}
   - {name: note_fr}
 dedup:

@@ -11,6 +11,7 @@ def _schema(**overrides):
             FieldSpec(name="title_fr"),
             FieldSpec(name="status", required=True, vocab="widget_status"),
             FieldSpec(name="start_date", type="date", precision="month", required=True),
+            FieldSpec(name="co_authors", type="person_list"),
         ],
         require_one_of=[["title_en", "title_fr"]],
     )
@@ -66,6 +67,23 @@ def test_flags_unparseable_date():
     entry = {"id": "widget-1", "title_en": "A Widget", "status": "draft", "start_date": "not-a-date"}
     issues = validate_common(_schema(), entry, VOCAB)
     assert any(i.field == "start_date" for i in issues)
+
+
+def test_passes_a_valid_person_list():
+    entry = {
+        "id": "widget-1", "title_en": "A Widget", "status": "draft",
+        "start_date": "2024-09", "co_authors": "Gagné, Rosalie D.; Montenegro, Etienne",
+    }
+    assert validate_common(_schema(), entry, VOCAB) == []
+
+
+def test_flags_a_malformed_person_list():
+    entry = {
+        "id": "widget-1", "title_en": "A Widget", "status": "draft",
+        "start_date": "2024-09", "co_authors": "Rosalie Gagné",  # missing the comma
+    }
+    issues = validate_common(_schema(), entry, VOCAB)
+    assert any(i.field == "co_authors" for i in issues)
 
 
 def test_generated_fields_are_never_flagged_as_missing():

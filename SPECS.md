@@ -160,16 +160,30 @@ Handler options (e.g. export paths) live in the schema's `options:` block.
 
 One file per category at `categories/<name>.yaml` in the data repo.
 Field keys: `name`, `type` (`string` default, `int`, `number`, `bool`,
-`text`, `date`), `required`, `vocab`, `default`, `generated`,
-`precision` (`date` fields only). `date` fields always hold ISO
-partial dates (`2024`, `2024-09`, `2024-09-30`) — `precision` sets the
-**minimum** acceptable granularity (`year`, `month`, or `day`), never a
-maximum: a field declared `precision: year` still accepts a full
-`2024-09-30` if you happen to know it, it just doesn't require one. The
-wizard asks for a date at the field's minimum granularity and offers to
-go more precise (year → month → day) rather than demanding a fixed
-format, since real recall is uneven — some dates you'll remember to the
-day, most only to the year.
+`text`, `date`, `person_list`), `required`, `vocab`, `default`,
+`generated`, `precision` (`date` fields only). `date` fields always
+hold ISO partial dates (`2024`, `2024-09`, `2024-09-30`) — `precision`
+sets the **minimum** acceptable granularity (`year`, `month`, or
+`day`), never a maximum: a field declared `precision: year` still
+accepts a full `2024-09-30` if you happen to know it, it just doesn't
+require one. The wizard asks for a date at the field's minimum
+granularity and offers to go more precise (year → month → day) rather
+than demanding a fixed format, since real recall is uneven — some
+dates you'll remember to the day, most only to the year.
+
+`person_list` fields always hold `"Last, First; Last, First"` —
+semicolon-separated people, each `Last, First` (`core/names.py`'s
+`parse_person_list`, mirroring `core/dates.py`'s pattern for `date`
+exactly: `parco lint` flags a malformed entry, but the wizard doesn't
+validate at entry time, same as dates). It exists so a future
+citation-formatting step can sort people by last name and join them
+correctly (e.g. "and" for co-authors, "in collaboration with" for
+named collaborators) instead of just displaying whatever string was
+typed — that joining/sorting logic isn't built yet, only the typed,
+validated field shape is. Used by `artworks.co_authors`/
+`.collaborators`, `grants.co_investigators`, and
+`presentations.co_presenters` — apply it to any other free-text
+"list of names" field the same way.
 
 **Dedup rules** (used by the `generic` handler): each rule is a list of
 conditions that must all hold, plus an outcome (`duplicate` or
@@ -348,7 +362,7 @@ fields:
   - {name: end_date,     type: date, precision: month}      # blank = ongoing
   - {name: amount,       type: number}
   - {name: currency,     default: $currency.default}         # from parco.yaml, e.g. CAD
-  - {name: co_investigators}
+  - {name: co_investigators, type: person_list}
   - {name: note_en}
   - {name: note_fr}
 dedup:
@@ -458,8 +472,8 @@ fields:
   - {name: date,           type: date, precision: year, required: true}  # production year
   - {name: description_en}
   - {name: description_fr}                                       # CCV's "Description / Contribution Value"
-  - {name: co_authors}                                           # other primary authors (not you) — "Last, First; Last, First"
-  - {name: collaborators}                                        # named collaborators, credited separately from primary authorship — same "Last, First; Last, First" format
+  - {name: co_authors,     type: person_list}                    # other primary authors (not you) — "Last, First; Last, First"
+  - {name: collaborators,  type: person_list}                    # named collaborators, credited separately from primary authorship — same format
   - {name: url}
 require_one_of:
   - [title_en, title_fr]
@@ -485,20 +499,16 @@ dedup:
 - `Number of Contributors` is dropped — blank in 53 of 56 reference
   records, and derivable from `co_authors`/`collaborators` anyway.
 - `venue` is dropped — not tracked here.
-- **`co_authors`/`collaborators` name format**: `"Last, First; Last, First"`
-  — semicolon-separated, each person `Last, First` — chosen specifically
-  so a future citation-formatting step can parse last names out and sort
-  by them, not just display the string as typed. `co_authors` never
-  includes you: your own name comes from `identity.yaml` and gets
-  combined with `co_authors` and alphabetized by last name together
-  when a work is cited (e.g. "Audry, Sofian" + "Gagné, Rosalie D." →
-  "Sofian Audry and Rosalie D. Gagné, ..."), so you never retype your
-  own name on every artwork. `collaborators` uses the same format and
-  is cited separately (e.g. "... in collaboration with Etienne
-  Montenegro"). Neither field is validated at write time yet (free
-  text, like grants' `co_investigators`) — the format is a convention
-  enforced by documentation and by whatever future `build`/`cite` code
-  consumes it, not by `parco lint`.
+- **`co_authors`/`collaborators` are `type: person_list`** (see
+  Category schemas (drafts) intro, above, for the field type itself).
+  `co_authors` never includes you: your own name comes from
+  `identity.yaml` and gets combined with `co_authors` and alphabetized
+  by last name together when a work is cited (e.g. "Audry, Sofian" +
+  "Gagné, Rosalie D." → "Sofian Audry and Rosalie D. Gagné, ..."), so
+  you never retype your own name on every artwork. `collaborators` is
+  cited separately (e.g. "... in collaboration with Etienne
+  Montenegro"). The name-sorting/joining logic itself isn't built yet —
+  `parco lint` validates the *shape*, not the eventual citation output.
 - `date` is the **production year**, not a performance/exhibition date —
   `precision: year` (a floor, not a ceiling, per Category schemas above:
   a more precise date is still fine if known, just not required).
@@ -593,7 +603,7 @@ fields:
   - {name: date,      type: date, precision: month, required: true}     # at least year+month, like grants.start_date
   - {name: description_en}
   - {name: description_fr}
-  - {name: co_presenters}                                                # free text names list
+  - {name: co_presenters,   type: person_list}                            # "Last, First; Last, First"
   - {name: url}
 require_one_of:
   - [title_en, title_fr]
