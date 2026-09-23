@@ -2042,7 +2042,7 @@ non-interactively during `parco refresh` and `parco import` (auto-skip
 high-confidence matches, flag ambiguous ones for review rather than
 blocking the whole run).
 
-### Auto-commit (per-write, not the same thing as `sync`)
+### Auto-commit (per-write, not the same thing as `sync`) — conditional on a clean file
 Every `add`/`edit`/`delete` that reaches a write commits it to the data
 repo immediately — `git add <category>.csv && git commit -m "..."` —
 because git history *is* the undo mechanism (see Behavioral requirements
@@ -2052,6 +2052,32 @@ itself (not `sync.py`, which is the separate, larger, future piece that
 reconciles remotes and prompts "Sync anyway? [y/N]"). Commit messages
 are generated, not user-authored: `Added <category> entry <id>`,
 `Edited <category> entry <id>`, `Deleted <category> entry <id>`.
+
+**Exception — the target file was already dirty before this write**
+(e.g. `parco import` left uncommitted rows pending review, or the user
+hand-edited a CSV): `git_commit` checks `git status --porcelain --
+<file>` *before* the row is rewritten. If the file was already dirty,
+the write still happens but the auto-commit is skipped — committing
+now would silently fold every other pending change in that file into a
+commit message that only mentions the one row just touched. Instead it
+reports that the file has other uncommitted changes and points at
+`parco commit`. If the file was clean beforehand, behavior is unchanged
+from above. This is the only conditional in the auto-commit path; a
+clean repo behaves exactly as before this was added.
+
+### Commit (manually finalize pending changes — hand-edits, or after `parco import`)
+```
+parco commit                    # stage + commit everything currently uncommitted in the data repo
+parco commit -m "<message>"     # same, with a custom commit message
+```
+A thin wrapper: `git add -A && git commit -m "<message>"` scoped to the
+data repo. With no `-m`, the message is generated from the changed
+filenames (e.g. `"Updated education.csv, grants.csv"`). This is the
+general-purpose "make it official" step for anything that was written
+without an immediate auto-commit: a hand-edit to a CSV made outside
+`parco` entirely, or (the main case) finishing a review pass after
+`parco import` — see Import below. It does nothing (no commit, no
+error) if the working tree is already clean.
 
 ### Refresh (catch up with an external source that updates on its own)
 ```
@@ -2082,15 +2108,56 @@ parco refresh all                             # run every refreshable source
 
 ### Import (one-time/periodic bulk-seed from a file you provide)
 ```
-parco import ccv --file <export.xml> --dry-run
+parco import ccv --file <export.xml> [--dry-run]
 ```
-- Dedup via the same per-category matcher rules as `refresh` and the
-  wizard (insert new, update changed, skip identical).
-- CCV XML importer is a planned one-time/periodic bulk-seed tool. The
-  export structure and category mapping are documented (see CCV export
-  structure, under Category schemas), from a real exported file; the
-  per-field mapping is finalized alongside each remaining category's
-  schema.
+CCV XML importer, seeding data from a one-time file you provide (see
+CCV export structure, under Category schemas, for the real export's
+structure and the category mapping table, both verified against an
+actual export). Always runs the same full parse → map → dedup pipeline;
+`--dry-run` only controls whether anything is written at the end.
+
+**Flow:**
+1. Parse the export, map every record it recognizes to a category row,
+   and run it through that category's dedup rules (same per-category
+   matcher rules as `refresh` and the wizard — see Duplicate detection).
+2. Print a per-category report: counts imported, records flagged for
+   manual review (with why), and records skipped for having no category
+   mapping at all.
+3. `--dry-run` stops here — exit 0, nothing written, repo untouched.
+4. Otherwise, a confirm prompt: `Write N entries across M categories to
+   your working tree? [y/N]`. Declining writes nothing.
+5. On confirm: writes every non-flagged row to its category's CSV —
+   **uncommitted**. This is the one deliberate exception to "every write
+   auto-commits" (see Auto-commit) — a bulk import needs a real review
+   window before it's locked into git history, and git's own working
+   tree (diff, checkout, reset) is a better review mechanism than
+   anything `parco` could build on top of it. The report ends with
+   next steps: check `parco lint`, fix rows with `parco edit <category>
+   --search ...` or by hand, then `parco commit` (see Commit) when
+   satisfied — or `git checkout -- .` to discard the import entirely.
+
+**What gets flagged for manual review** (imported nowhere, listed in
+the report instead): genuine dedup ambiguity — a `duplicate` or
+`related` match against an existing row — and, for `publications`/
+`catalog` specifically, no confident Zotero match (fuzzy title/DOI
+against your Zotero library, reusing `core/matching.py::fuzzy_match`;
+a confident match writes the row with that citekey, no match flags it
+as "needs a Zotero citekey"). A record that's merely missing a
+required field still gets imported blank — that's exactly what `parco
+lint` exists to catch afterward, not something import should block on.
+
+**What gets silently skipped** (counted and reported, never imported
+as one of the categories): any record whose CCV section doesn't map to
+a category at all.
+
+**Known per-category handling, already settled:**
+- `grants`: a record with multiple Funding Sources takes the first as
+  the row's value and flags the rest in the report (no multi-value
+  field, no cross-references — see Out of scope for v1).
+- `catalog` (Exhibition Catalogues) reuses the full `publications`
+  handler, including its Zotero-citekey resolution — CCV never
+  supplies a citekey for these records, so every one goes through the
+  same fuzzy-match-or-flag path as `publications`.
 
 ### Validation
 ```
@@ -2123,6 +2190,9 @@ parco sync --non-interactive   # never wait for input; proceeds automatically pa
   to match it: **missing remote → add automatically** (no prompt);
   **mismatched URL → warn and confirm**; **extra remote not in config →
   leave alone**. Additive, never silently destructive.
+- "Commit pending changes" reuses the same stage-and-commit mechanism as
+  `parco commit` (see Commit) — so a pending `parco import` review is
+  swept up by `sync` too, not just by running `parco commit` by hand.
 - **`parco sync` is gated by `parco lint`:** if lint fails, show the problems
   and prompt "Sync anyway? [y/N]" — interactive by default, since lint
   failures should be rare enough that this is a meaningful checkpoint,
@@ -2212,7 +2282,22 @@ publications`; the shared `Citable` capability that would let it
 qualify without the full `publications` handler is declared but
 unimplemented) — `artworks`' `person_list`-based citation (see Category
 schemas: `artworks`) is a separate, clean, deliberate follow-up. What
-remains to design is `sync` and `refresh`/`import` — see CLI.
+remains to design is `sync` — see CLI.
+
+`import`'s design (and a small commit-mechanics change it needed) is
+now complete too — see CLI's "Auto-commit", "Commit", and "Import":
+`add`/`edit`/`delete` only auto-commit when their target file was clean
+beforehand, skipping the commit (not the write) when it wasn't; a new
+`parco commit [-m MESSAGE]` stages and commits whatever's pending, for
+hand-edits or to finalize a review; and `parco import ccv [--dry-run]`
+always runs the full parse → map → dedup pipeline and prints a report,
+writing everything **uncommitted** on confirmation rather than
+committing immediately — the one deliberate exception to the
+auto-commit rule, since a bulk import needs a real review window
+before it's locked into git history. Records get flagged for manual
+review (not auto-imported) only for genuine dedup ambiguity or, for
+`publications`/`catalog`, no confident Zotero fuzzy-match; records with
+no category mapping at all are skipped and reported, never imported.
 
 `query`/`stats`/`list --format citation`'s implementation is now
 complete too: `query` is a SELECT-only passthrough (validated with
