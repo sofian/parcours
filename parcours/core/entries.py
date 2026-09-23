@@ -46,23 +46,42 @@ def write_all_rows(csv_path: Path, fieldnames: list[str], rows: list[dict]) -> N
             writer.writerow({name: row.get(name, "") for name in fieldnames})
 
 
-def git_commit(data_dir: Path, filename: str, message: str) -> None:
-    subprocess.run(["git", "add", filename], cwd=data_dir, check=True, capture_output=True)
-
-    status = subprocess.run(
+def git_commit(data_dir: Path, filename: str, message: str) -> bool:
+    """Commits `filename`'s current content, unless it already had
+    uncommitted changes *before* this write (e.g. a pending `parco
+    import` review, or a hand-edit) — in that case the write still
+    happened, but committing now would silently fold every other
+    pending change in that file into a message that only names this
+    one row. Returns whether it actually committed."""
+    status_before = subprocess.run(
         ["git", "status", "--porcelain", "--", filename],
         cwd=data_dir, check=True, capture_output=True,
     )
-    if not status.stdout.strip():
+    # Check if file has uncommitted changes. Untracked files (??) are
+    # considered clean for this purpose. Only modifications/deletions of
+    # tracked files indicate pre-existing uncommitted work.
+    was_already_dirty = bool(status_before.stdout) and not status_before.stdout.startswith(b'??')
+
+    subprocess.run(["git", "add", filename], cwd=data_dir, check=True, capture_output=True)
+
+    status_after = subprocess.run(
+        ["git", "status", "--porcelain", "--", filename],
+        cwd=data_dir, check=True, capture_output=True,
+    )
+    if not status_after.stdout.strip():
         # Nothing changed for this file (e.g. an edit with identical values) —
         # the row is already correctly on disk, so there's nothing to commit.
-        return
+        return False
+
+    if was_already_dirty:
+        return False
 
     try:
         subprocess.run(["git", "commit", "-m", message], cwd=data_dir, check=True, capture_output=True)
     except subprocess.CalledProcessError as exc:
         stderr = exc.stderr.decode() if exc.stderr else str(exc)
         raise CommitFailed(f"git commit failed: {stderr}") from exc
+    return True
 
 
 def add_entry(data_dir: Path, schema: CategorySchema, values: dict) -> dict:

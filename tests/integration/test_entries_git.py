@@ -8,6 +8,10 @@ def _init_git_repo(path):
     subprocess.run(["git", "init"], cwd=path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=path, check=True, capture_output=True)
     subprocess.run(["git", "config", "user.name", "Test"], cwd=path, check=True, capture_output=True)
+    # Create an initial commit so git log and status work properly
+    (path / ".gitkeep").touch()
+    subprocess.run(["git", "add", ".gitkeep"], cwd=path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=path, check=True, capture_output=True)
 
 
 def _commit_count(path):

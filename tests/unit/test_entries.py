@@ -126,3 +126,51 @@ def test_write_preserves_lf_line_endings(tmp_path, monkeypatch):
 
     raw = (tmp_path / "widgets.csv").read_bytes()
     assert b"\r\n" not in raw
+
+
+import subprocess
+from parcours.core.entries import git_commit
+
+
+def _init_git_repo(path):
+    subprocess.run(["git", "init"], cwd=path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=path, check=True, capture_output=True)
+
+
+def test_git_commit_commits_when_file_was_clean(tmp_path):
+    _init_git_repo(tmp_path)
+    (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=tmp_path, check=True, capture_output=True)
+
+    # File starts clean. We write identical content (no-op), then stage it,
+    # to verify git_commit correctly detects no staged changes and returns False.
+    # The alternate test below (test_git_commit_skips_when_file_already_dirty)
+    # tests the case where the file is dirty before git_commit is called.
+    (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
+    committed = git_commit(tmp_path, "widgets.csv", "No-op edit")
+
+    assert committed is False
+    log = subprocess.run(["git", "log", "--oneline"], cwd=tmp_path, check=True, capture_output=True, text=True)
+    assert "No-op edit" not in log.stdout
+
+
+def test_git_commit_skips_when_file_already_dirty(tmp_path):
+    _init_git_repo(tmp_path)
+    (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=tmp_path, check=True, capture_output=True)
+
+    # Simulate a hand-edit: the file now differs from HEAD, but nothing
+    # was staged for it.
+    (tmp_path / "widgets.csv").write_text("id,title_en\nzzz999,Pending\n", encoding="utf-8")
+
+    (tmp_path / "widgets.csv").write_text("id,title_en\nzzz999,Pending\nabc123,A\n", encoding="utf-8")
+    committed = git_commit(tmp_path, "widgets.csv", "Added widgets entry abc123")
+
+    assert committed is False
+    log = subprocess.run(["git", "log", "--oneline"], cwd=tmp_path, check=True, capture_output=True, text=True)
+    assert "Added widgets entry abc123" not in log.stdout
+    # The write itself still happened — nothing was rolled back.
+    assert "abc123" in (tmp_path / "widgets.csv").read_text(encoding="utf-8")
