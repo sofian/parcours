@@ -22,3 +22,55 @@ def load_category_rows(data_dir: Path, category_name: str) -> list[dict]:
         return [dict(zip(columns, row)) for row in result.fetchall()]
     finally:
         connection.close()
+
+
+def query_category_rows(
+    data_dir: Path,
+    category_name: str,
+    filters: dict[str, list[str]] | None = None,
+    order_by: str | None = None,
+    limit: int | None = None,
+) -> list[dict]:
+    csv_path = data_dir / f"{category_name}.csv"
+    if not csv_path.is_file():
+        return []
+
+    query = "SELECT * FROM read_csv_auto(?, ALL_VARCHAR=TRUE)"
+    params: list = [str(csv_path)]
+
+    if filters:
+        clauses = []
+        for field_name, allowed_values in filters.items():
+            placeholders = ", ".join("?" for _ in allowed_values)
+            clauses.append(f'"{field_name}" IN ({placeholders})')
+            params.extend(allowed_values)
+        query += " WHERE " + " AND ".join(clauses)
+
+    if order_by:
+        parts = order_by.split()
+        field_name = parts[0]
+        direction_str = parts[1] if len(parts) > 1 else ""
+        direction = direction_str.upper() if direction_str else "ASC"
+        if direction not in ("ASC", "DESC"):
+            raise ValueError(
+                f"Invalid order_by direction '{direction_str}' for category '{category_name}' "
+                "(expected 'asc' or 'desc')"
+            )
+        query += f' ORDER BY "{field_name}" {direction}'
+
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
+
+    connection = duckdb.connect(database=":memory:")
+    try:
+        try:
+            result = connection.execute(query, params)
+        except duckdb.BinderException as exc:
+            raise ValueError(
+                f"Invalid filter/order_by field for category '{category_name}': {exc}"
+            ) from exc
+        columns = [description[0] for description in result.description]
+        return [dict(zip(columns, row)) for row in result.fetchall()]
+    finally:
+        connection.close()
