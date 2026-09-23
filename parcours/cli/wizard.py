@@ -25,9 +25,15 @@ def _ask_vocab_field(field: FieldSpec, choices: list[str], current: str | None) 
     if not field.required:
         typer.echo("  0. [skip]")
 
+    # `current` (edit's existing value, or add's --field prefill) wins
+    # over the schema's own static `default:` when both are present. A
+    # `$`-prefixed default (e.g. `$currency.default`) is a template
+    # placeholder resolved elsewhere, not a literal vocab choice — skip
+    # it here rather than offering it as a nonsense numbered option.
+    preselected = current or (field.default if isinstance(field.default, str) and not field.default.startswith("$") else None)
     default_number = None
-    if current and current in choices:
-        default_number = choices.index(current) + 1
+    if preselected and preselected in choices:
+        default_number = choices.index(preselected) + 1
 
     while True:
         answer = typer.prompt("Choice", default=default_number, show_default=default_number is not None)

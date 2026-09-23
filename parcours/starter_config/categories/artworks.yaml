@@ -5,7 +5,7 @@ fields:
   - {name: weight,         type: int}                           # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}                                             # usually only one filled — see require_one_of
-  - {name: role,           required: true, vocab: artwork_role}  # author / collaborator
+  - {name: role,           required: true, vocab: artwork_role, default: author}  # author / collaborator
   - {name: date,           type: date, precision: year, required: true}  # production year
   - {name: description_en}
   - {name: description_fr}                                       # CCV's "Description / Contribution Value"

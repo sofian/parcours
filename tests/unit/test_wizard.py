@@ -48,6 +48,58 @@ def test_vocab_field_picks_by_number(monkeypatch):
     assert values["status"] == "published"
 
 
+def test_vocab_field_preselects_the_schemas_declared_default_when_no_prefill(monkeypatch):
+    calls = []
+
+    def _fake_prompt(*args, **kwargs):
+        calls.append(kwargs)
+        return kwargs.get("default")  # simulate pressing Enter to accept the default
+
+    monkeypatch.setattr(wizard.typer, "prompt", _fake_prompt)
+    monkeypatch.setattr(wizard.typer, "echo", lambda *a, **k: None)
+
+    schema = CategorySchema(
+        name="artworks",
+        fields=[
+            FieldSpec(name="id", generated=True),
+            FieldSpec(name="role", vocab="artwork_role", required=True, default="author"),
+        ],
+    )
+
+    values = wizard.collect_field_values(schema, {"artwork_role": ["author", "collaborator"]})
+
+    assert values["role"] == "author"
+    assert calls[0]["default"] == 1  # "author" is choice #1
+
+
+def test_vocab_field_prefill_wins_over_the_schemas_declared_default(monkeypatch):
+    calls = []
+
+    def _fake_prompt(*args, **kwargs):
+        calls.append(kwargs)
+        return kwargs.get("default")  # simulate pressing Enter to accept the shown default
+
+    monkeypatch.setattr(wizard.typer, "prompt", _fake_prompt)
+    monkeypatch.setattr(wizard.typer, "echo", lambda *a, **k: None)
+
+    schema = CategorySchema(
+        name="artworks",
+        fields=[
+            FieldSpec(name="id", generated=True),
+            FieldSpec(name="role", vocab="artwork_role", required=True, default="author"),
+        ],
+    )
+
+    # existing row's value is "collaborator" (e.g. via `edit`) — this must
+    # win over the schema's own static "author" default.
+    values = wizard.collect_field_values(
+        schema, {"artwork_role": ["author", "collaborator"]}, prefill={"role": "collaborator"}
+    )
+
+    assert values["role"] == "collaborator"
+    assert calls[0]["default"] == 2  # "collaborator" is choice #2, not the schema default's #1
+
+
 def test_optional_vocab_field_can_be_skipped(monkeypatch):
     schema = CategorySchema(
         name="widgets",
