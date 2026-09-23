@@ -112,12 +112,8 @@ def _write_identity_yaml(path: Path, answers: InitAnswers) -> None:
 
 
 def _section_order_by(schema: CategorySchema) -> str | None:
-    field_names = schema.field_names()
-    if "start_date" in field_names:
-        return "start_date desc"
-    if "date" in field_names:
-        return "date desc"
-    return None
+    date_field = schema.default_date_field()
+    return f"{date_field} desc" if date_field else None
 
 
 def _build_sections(path: Path) -> list[dict]:

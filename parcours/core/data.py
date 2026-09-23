@@ -30,6 +30,7 @@ def query_category_rows(
     filters: dict[str, list[str]] | None = None,
     order_by: str | None = None,
     limit: int | None = None,
+    date_range: tuple[str, str | None, str | None] | None = None,
 ) -> list[dict]:
     csv_path = data_dir / f"{category_name}.csv"
     if not csv_path.is_file():
@@ -37,9 +38,9 @@ def query_category_rows(
 
     query = "SELECT * FROM read_csv_auto(?, ALL_VARCHAR=TRUE)"
     params: list = [str(csv_path)]
+    clauses: list[str] = []
 
     if filters:
-        clauses = []
         for field_name, allowed_values in filters.items():
             # A profile's `filter` is "simple key→value" — a scalar would
             # otherwise be iterated character-by-character below.
@@ -48,6 +49,17 @@ def query_category_rows(
             placeholders = ", ".join("?" for _ in allowed_values)
             clauses.append(f'"{field_name}" IN ({placeholders})')
             params.extend(allowed_values)
+
+    if date_range:
+        date_field, after, before = date_range
+        if after is not None:
+            clauses.append(f'"{date_field}" >= ?')
+            params.append(after)
+        if before is not None:
+            clauses.append(f'"{date_field}" <= ?')
+            params.append(before)
+
+    if clauses:
         query += " WHERE " + " AND ".join(clauses)
 
     if order_by:

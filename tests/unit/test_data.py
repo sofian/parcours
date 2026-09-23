@@ -118,3 +118,49 @@ def test_query_unknown_filter_field_raises_clear_error(tmp_path):
 
     with pytest.raises(ValueError, match="widgets"):
         query_category_rows(tmp_path, "widgets", filters={"nonexistent_field": ["x"]})
+
+
+def test_query_date_range_after_only(tmp_path):
+    (tmp_path / "widgets.csv").write_text(
+        "id,title_en,start_date\nw1,A,2020\nw2,B,2021\nw3,C,2022\n", encoding="utf-8"
+    )
+
+    rows = query_category_rows(tmp_path, "widgets", date_range=("start_date", "2021", None))
+
+    assert sorted(r["id"] for r in rows) == ["w2", "w3"]
+
+
+def test_query_date_range_before_only(tmp_path):
+    (tmp_path / "widgets.csv").write_text(
+        "id,title_en,start_date\nw1,A,2020\nw2,B,2021\nw3,C,2022\n", encoding="utf-8"
+    )
+
+    rows = query_category_rows(tmp_path, "widgets", date_range=("start_date", None, "2021"))
+
+    assert sorted(r["id"] for r in rows) == ["w1", "w2"]
+
+
+def test_query_date_range_both_bounds(tmp_path):
+    (tmp_path / "widgets.csv").write_text(
+        "id,title_en,start_date\nw1,A,2020\nw2,B,2021\nw3,C,2022\n", encoding="utf-8"
+    )
+
+    rows = query_category_rows(tmp_path, "widgets", date_range=("start_date", "2021", "2021"))
+
+    assert [r["id"] for r in rows] == ["w2"]
+
+
+def test_query_date_range_combines_with_filters(tmp_path):
+    (tmp_path / "widgets.csv").write_text(
+        "id,title_en,status,start_date\n"
+        "w1,A,draft,2020\nw2,B,published,2021\nw3,C,published,2022\n",
+        encoding="utf-8",
+    )
+
+    rows = query_category_rows(
+        tmp_path, "widgets",
+        filters={"status": ["published"]},
+        date_range=("start_date", "2021", None),
+    )
+
+    assert sorted(r["id"] for r in rows) == ["w2", "w3"]

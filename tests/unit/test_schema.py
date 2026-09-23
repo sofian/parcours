@@ -1,4 +1,4 @@
-from parcours.core.schema import load_category_schema, load_all_schemas
+from parcours.core.schema import CategorySchema, FieldSpec, load_category_schema, load_all_schemas
 
 
 def _write(path, text):
@@ -74,3 +74,21 @@ def test_load_all_schemas_keys_by_category_name(tmp_path):
 
     assert set(schemas.keys()) == {"widgets", "gadgets"}
     assert schemas["widgets"].name == "widgets"
+
+
+def test_default_date_field_prefers_start_date_over_date():
+    schema = CategorySchema(
+        name="grants",
+        fields=[FieldSpec(name="start_date", type="date"), FieldSpec(name="date", type="date")],
+    )
+    assert schema.default_date_field() == "start_date"
+
+
+def test_default_date_field_falls_back_to_plain_date():
+    schema = CategorySchema(name="artworks", fields=[FieldSpec(name="date", type="date")])
+    assert schema.default_date_field() == "date"
+
+
+def test_default_date_field_none_when_neither_present():
+    schema = CategorySchema(name="publications", fields=[FieldSpec(name="citekey")])
+    assert schema.default_date_field() is None

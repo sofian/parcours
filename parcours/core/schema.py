@@ -44,6 +44,19 @@ class CategorySchema:
                 return f
         return None
 
+    def default_date_field(self) -> str | None:
+        """The field `--by year`/`--after`/`--before` treat as this
+        category's one designated date — `start_date` if present (a
+        range's beginning), else plain `date` (a single point in time),
+        else None. The same convention `core/init.py`'s generated
+        `order_by` already uses."""
+        field_names = self.field_names()
+        if "start_date" in field_names:
+            return "start_date"
+        if "date" in field_names:
+            return "date"
+        return None
+
 
 def load_category_schema(path: Path) -> CategorySchema:
     with open(path, "r", encoding="utf-8") as fh:
