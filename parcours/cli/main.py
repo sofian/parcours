@@ -86,13 +86,19 @@ def lint(category: str = typer.Argument(None, help="Only lint this category")):
 
 @app.command(name="list")
 def list_command(
-    category: str = typer.Argument(..., help="Category to list"),
+    category: str = typer.Argument(None, help="Category to list (omit to see available categories)"),
     search: str = typer.Option(None, "--search", help="Only show entries matching this text"),
     order_by: str = typer.Option(None, "--order-by", help="Sort by this field"),
     desc: bool = typer.Option(False, "--desc", help="Sort descending (requires --order-by)"),
 ):
     """List entries in a category, optionally filtered by --search text and sorted by --order-by."""
     data_dir = _find_repo_or_exit()
+
+    if category is None:
+        typer.echo("Available categories:")
+        _print_available_categories(data_dir)
+        raise typer.Exit(code=0)
+
     schema = _load_schema_or_exit(data_dir, category)
 
     if desc and not order_by:
@@ -117,12 +123,35 @@ def list_command(
         typer.echo(row_summary(schema, row, extra_fields=extra_fields))
 
 
+def _available_categories(data_dir: Path) -> list[str]:
+    return sorted(load_all_schemas(data_dir / "categories").keys())
+
+
+def _print_available_categories(data_dir: Path) -> None:
+    for name in _available_categories(data_dir):
+        typer.echo(f"  {name}")
+
+
 def _load_schema_or_exit(data_dir: Path, category: str) -> CategorySchema:
     schemas = load_all_schemas(data_dir / "categories")
     if category not in schemas:
-        typer.echo(f"Unknown category: '{category}'")
+        typer.echo(f"Unknown category: '{category}'.")
+        typer.echo("Available categories:")
+        _print_available_categories(data_dir)
         raise typer.Exit(code=2)
     return schemas[category]
+
+
+def _require_category_or_exit(data_dir: Path, category: str | None) -> CategorySchema:
+    """For commands where a category is mandatory (add/edit/delete) —
+    omitting it is a real error, not a request to see what's available
+    (that's `list`'s job)."""
+    if category is None:
+        typer.echo("A category is required for this command.")
+        typer.echo("Available categories:")
+        _print_available_categories(data_dir)
+        raise typer.Exit(code=2)
+    return _load_schema_or_exit(data_dir, category)
 
 
 def _load_vocab_and_handler_or_exit(
@@ -163,10 +192,10 @@ def _reject_unknown_fields(schema: CategorySchema, prefill: dict[str, str]) -> N
 
 
 @app.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
-def add(ctx: typer.Context, category: str = typer.Argument(..., help="Category to add an entry to")):
+def add(ctx: typer.Context, category: str = typer.Argument(None, help="Category to add an entry to")):
     """Interactively add a new entry to a category. Extra --field value flags pre-fill the wizard."""
     data_dir = _find_repo_or_exit()
-    schema = _load_schema_or_exit(data_dir, category)
+    schema = _require_category_or_exit(data_dir, category)
     prefill = _parse_prefill_flags(ctx.args)
     _reject_unknown_fields(schema, prefill)
 
@@ -189,12 +218,12 @@ def add(ctx: typer.Context, category: str = typer.Argument(..., help="Category t
 @app.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
 def edit(
     ctx: typer.Context,
-    category: str = typer.Argument(..., help="Category to edit an entry in"),
+    category: str = typer.Argument(None, help="Category to edit an entry in"),
     search: str = typer.Option(..., "--search", help="Text to search for"),
 ):
     """Search for an entry and interactively edit it."""
     data_dir = _find_repo_or_exit()
-    schema = _load_schema_or_exit(data_dir, category)
+    schema = _require_category_or_exit(data_dir, category)
     prefill_flags = _parse_prefill_flags(ctx.args)
     _reject_unknown_fields(schema, prefill_flags)
 
@@ -226,12 +255,12 @@ def edit(
 
 @app.command()
 def delete(
-    category: str = typer.Argument(..., help="Category to delete an entry from"),
+    category: str = typer.Argument(None, help="Category to delete an entry from"),
     search: str = typer.Option(..., "--search", help="Text to search for"),
 ):
     """Search for an entry and delete it after one confirmation."""
     data_dir = _find_repo_or_exit()
-    schema = _load_schema_or_exit(data_dir, category)
+    schema = _require_category_or_exit(data_dir, category)
     existing_rows = load_category_rows(data_dir, category)
     matches = search_rows(existing_rows, search)
     if not matches:

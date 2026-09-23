@@ -96,6 +96,19 @@ def test_add_unknown_category_exits_cleanly(tmp_path, monkeypatch):
 
     assert result.exit_code == 2
     assert "Unknown category" in result.stdout
+    assert "widgets" in result.stdout
+
+
+def test_add_with_no_category_shows_a_real_error_and_the_available_categories(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["add"])
+
+    assert result.exit_code == 2
+    assert "required" in result.stdout.lower()
+    assert "Available categories" in result.stdout
+    assert "widgets" in result.stdout
 
 
 def test_add_missing_vocab_file_reports_config_error(tmp_path, monkeypatch):

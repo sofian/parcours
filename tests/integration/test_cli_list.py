@@ -76,6 +76,20 @@ def test_list_unknown_category_exits_cleanly(tmp_path, monkeypatch):
 
     assert result.exit_code == 2
     assert "Unknown category" in result.stdout
+    assert "widgets" in result.stdout
+
+
+def test_list_with_no_category_shows_available_categories_not_an_error(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["list"])
+
+    assert result.exit_code == 0
+    assert "Available categories" in result.stdout
+    assert "widgets" in result.stdout
+    assert "Unknown category" not in result.stdout
+    assert "required" not in result.stdout.lower()
 
 
 def test_list_is_read_only_and_does_not_write_or_commit(tmp_path, monkeypatch):

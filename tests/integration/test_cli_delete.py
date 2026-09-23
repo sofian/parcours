@@ -48,6 +48,18 @@ def test_delete_aborts_when_confirm_declined(tmp_path, monkeypatch):
     assert "First Widget" in content
 
 
+def test_delete_with_no_category_shows_a_real_error_and_the_available_categories(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["delete", "--search", "First"])
+
+    assert result.exit_code == 2
+    assert "required" in result.stdout.lower()
+    assert "Available categories" in result.stdout
+    assert "widgets" in result.stdout
+
+
 def test_delete_no_matches_exits_cleanly(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     monkeypatch.chdir(repo)
