@@ -1784,23 +1784,65 @@ schema/handler awareness to resolve a citekey against.
 
 ### Stats
 ```
-parco stats --type <category> --by <field>
+parco stats <category> --by <field> [filtering options — see Filtering, below]
 ```
-Count-only: `SELECT <field>, COUNT(*) ... GROUP BY <field> ORDER BY
-<field>` against the named category. `<field>` is validated against
-the category's real schema fields, the same way `list --order-by`
-already validates — an unknown field is a clean error, not a DuckDB
-traceback. One special case: `--by year` is recognized whenever the
-category has a `date` or `start_date` field, grouping by the year
-extracted via `core/dates.py`'s existing `parse_partial_date` rather
-than the raw string value (so `2024-03` and `2024-09` count as the same
-group) — this is the flagship use case (`publications` per year) and
-worth a small special-case rather than making everyone write
-`parco query` by hand for it. **No dollar-amount aggregation in this
-first cut** — summing `grants.amount` across mixed currencies would be
-silently misleading with no `rates.csv` conversion in place yet (see
-Currency conversion); `stats` waits for that to exist as its own piece
-of work rather than guessing or warning its way around it.
+Positional `<category>`, matching `list`/`add`/`edit`/`delete` (not a
+`--type` flag). Count-only: `SELECT <field>, COUNT(*) ... GROUP BY
+<field> ORDER BY <field>` against the named category, applied *after*
+whichever filtering options are given — `--by` aggregates whatever
+subset of rows survives the filters, not the whole table (e.g. `parco
+stats publications --by year --filter status=published` counts only
+published publications, per year). `<field>` is validated against the
+category's real schema fields, the same way `list --order-by` already
+validates — an unknown field is a clean error, not a DuckDB traceback.
+One special case: `--by year` is recognized whenever the category has
+a `date` or `start_date` field, grouping by the year extracted via
+`core/dates.py`'s existing `parse_partial_date` rather than the raw
+string value (so `2024-03` and `2024-09` count as the same group) —
+this is the flagship use case (`publications` per year) and worth a
+small special-case rather than making everyone write `parco query` by
+hand for it. **No dollar-amount aggregation in this first cut** —
+summing `grants.amount` across mixed currencies would be silently
+misleading with no `rates.csv` conversion in place yet (see Currency
+conversion); `stats` waits for that to exist as its own piece of work
+rather than guessing or warning its way around it.
+
+### Filtering (shared by `list` and `stats`)
+```
+--search "<text>"          # free-text substring across every field
+--filter <field>=<value>   # exact match; repeatable — same field ORs its values, different fields AND together
+--after <date>             # inclusive lower bound on the category's date field
+--before <date>            # inclusive upper bound on the category's date field
+```
+`list` and `stats` take the same filtering options — `list` is really
+just a query that happens to print rows instead of aggregating them,
+so a second, differently-shaped filtering vocabulary for `stats` would
+be pure duplication.
+
+- **`--search`** is unchanged from `list`'s existing behavior: a
+  case-insensitive Python-level substring scan across every field's
+  value (`wizard.py`'s existing `search_rows`), applied after the
+  DB-level filters below.
+- **`--filter <field>=<value>`** is exact-match, DB-level, via
+  `core/data.py`'s existing `query_category_rows(filters=...)` — the
+  same mechanism `build` already uses for a profile section's own
+  `filter:` key. Repeating `--filter` for the *same* field ORs its
+  values (`--filter status=published --filter status=in-press` →
+  `status IN ('published', 'in-press')`); different fields AND
+  together — matching `views.yaml`'s existing `filter: {field: [...]}`
+  shape exactly, since a CLI flag here is just a more ad-hoc way to
+  write the same thing a profile section already writes declaratively.
+- **`--after`/`--before`** are new: `query_category_rows` currently
+  only supports exact-match `IN (...)`, not range comparison, so this
+  needs a real (small) addition — a `>=`/`<=` clause against whichever
+  field is the category's designated date field, using the same
+  `date`/`start_date` auto-detection `stats --by year` and `init`'s
+  generated `order_by` already use (worth consolidating into one
+  shared `CategorySchema.default_date_field()` helper rather than
+  re-implementing the same two-line check a third time). A category
+  with neither field name rejects `--after`/`--before` with a clear
+  error ("no date field to filter on"), the same way an unknown
+  `--order-by` field already does.
 
 ### Data entry (wizard-first, not flag-required)
 ```
@@ -1809,9 +1851,9 @@ parco add <category> --field value ...     # flags pre-fill wizard defaults, don
 parco edit <category> --search "<text>"    # substring search, pick from numbered matches
 parco delete <category> --search "<text>"  # confirm once; git history is the undo mechanism
 parco list <category>                             # read-only: every row's summary line
-parco list <category> --search "<text>"           # read-only: filtered to matching rows
 parco list <category> --order-by <field> [--desc] # read-only: sorted by any one field
 parco list <category> --format citation [--style apa|chicago-author-date|mla|<path.csl>]
+parco list <category> [filtering options — see Filtering, above: --search/--filter/--after/--before]
 ```
 `list` is purely read-only — no wizard, no confirm, no write — and shares
 `edit`/`delete`'s substring search plus the same generic summary line
@@ -1829,9 +1871,10 @@ under Profiles) — that's a distinct, more opinionated ordering rule for
 CV *rendering*, not for this ad hoc listing command.
 
 **`--format citation`** (see Citation formatting, below, for the engine
-and style details) composes with `--search`/`--order-by` rather than
-replacing them — it changes how each matched row prints, not which
-rows match. Only valid for a citekey-capable category (any schema with
+and style details) composes with `--search`/`--filter`/`--after`/
+`--before`/`--order-by` rather than replacing them — it changes how
+each matched row prints, not which rows match. Only valid for a
+citekey-capable category (any schema with
 a `citekey` field resolvable against the Zotero/Better BibTeX export —
 `publications`, `review`, `catalog`, `press`); any other category
 exits cleanly with an error naming which categories *do* support it,
@@ -2049,11 +2092,16 @@ PDF path — hence treating `rendercv` as an external CLI dependency, not
 a Python import), not assumed from memory.
 
 `query`/`stats`/citation formatting's design is now complete too — see
-CLI's "Query", "Stats", and "Data entry" (`--format citation`), and
-"Citation formatting": `query` is a SELECT-only DuckDB passthrough with
-`table`/`csv`/`json` output; `stats` is count-only with a `--by year`
-special case, dollar aggregation deferred to whenever currency
-conversion exists; there's no standalone `parco cite` — citation
+CLI's "Query", "Stats", "Filtering", and "Data entry" (`--format
+citation`), and "Citation formatting": `query` is a SELECT-only DuckDB
+passthrough with `table`/`csv`/`json` output; `stats` takes a
+positional `<category>` (not `--type`, matching `list`/`add`/`edit`/
+`delete`) and is count-only with a `--by year` special case, dollar
+aggregation deferred to whenever currency conversion exists; `list` and
+`stats` share one filtering vocabulary (`--search`/`--filter
+field=value`/`--after`/`--before`) rather than each inventing their
+own, since `list` is really just a query that prints rows instead of
+aggregating them; there's no standalone `parco cite` — citation
 formatting is `parco list --format citation`, using citeproc-py against
 three bundled CSL styles, Markdown-style italic/bold output, and
 Zotero-backed categories only (`publications`/`review`/`catalog`/
