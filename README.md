@@ -23,7 +23,7 @@ CSV files (source of truth, git-tracked)
         │
         ├──► RenderCV (YAML) ──► PDF / Typst / HTML         (parco build)
         ├──► Pandoc          ──► DOCX                        (parco build --format docx, planned)
-        ├──► citeproc + CSL  ──► formatted citations         (parco cite, planned)
+        ├──► citeproc + CSL  ──► formatted citations         (parco list --format citation, planned)
         ├──► SQL result tables ──► stats / ad-hoc queries    (parco stats / parco query, planned)
         └──► (future) MCP-DuckDB server ──► read-only chatbot
 ```
@@ -62,7 +62,7 @@ parco translation list
 ```bash
 parco query "SELECT year, count(*) FROM publications GROUP BY year"
 parco stats --type publications --by year
-parco cite --key audry2024 --style apa
+parco list publications --format citation --style apa
 parco refresh zotero --collection "CV"
 parco refresh rates
 parco import ccv --file export.xml --dry-run

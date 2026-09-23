@@ -37,7 +37,7 @@ CSV files (source of truth, git-tracked)
         │
         ├──► RenderCV (YAML) ──► PDF/Typst/HTML         (parco build)
         ├──► Pandoc            ──► DOCX                  (parco build --format docx)
-        ├──► citeproc + CSL    ──► formatted citations   (parco cite)
+        ├──► citeproc + CSL    ──► formatted citations   (parco list --format citation)
         ├──► SQL result tables ──► stats / ad-hoc queries (parco stats / parco query)
         └──► (future) MCP-DuckDB server ──► chatbot querying (read-only)
 ```
@@ -107,10 +107,10 @@ schema may also name a custom handler by dotted import path
   matching itself), defaults for the wizard, and the mapping to
   view/RenderCV entry fields.
 - **Optional capabilities:** a handler may expose extra operations.
-  `parco cite` and `parco refresh zotero` operate on whichever
-  categories' handlers provide the capability, rather than naming
-  `publications` in the core. Importers/refreshers likewise name their
-  target category in config.
+  `parco list --format citation` and `parco refresh zotero` operate on
+  whichever categories' handlers provide the capability, rather than
+  naming `publications` in the core. Importers/refreshers likewise name
+  their target category in config.
 - **Zotero-citekey resolution is a shared capability, not exclusive to
   `publications`.** Any category whose schema declares a `citekey`
   field plus Zotero `options` (bib/json paths) gets it resolved against
@@ -140,7 +140,8 @@ schema may also name a custom handler by dotted import path
 
 A base class whose defaults are the generic behavior, plus separate
 `runtime_checkable` Protocols for optional capabilities, discovered with
-`isinstance` (so `parco cite` finds any handler that is `Citable`):
+`isinstance` (so `parco list --format citation` finds any handler that
+is `Citable`):
 
 ```python
 class CategoryHandler:                        # generic behavior by default
@@ -650,9 +651,9 @@ fields:
   - {name: id,           generated: true}                    # press-2026-004
   - {name: weight,       type: int}                          # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: citekey}                                            # optional — set when also a Zotero-catalogued item
-                                                                 # (e.g. a written review); enables `parco cite` on
-                                                                 # this row (see Category handlers: shared Zotero
-                                                                 # capability). Blank for podcast/radio/TV/interview
+                                                                 # (e.g. a written review); enables citation
+                                                                 # formatting on this row (see Category handlers:
+                                                                 # shared Zotero capability). Blank for podcast/radio/TV/interview
                                                                  # appearances, which aren't Zotero items.
   - {name: author}                                              # free text — who wrote or conducted it
   - {name: outlet,       required: true}                        # free text — publisher, radio/TV station, network
@@ -1456,14 +1457,47 @@ skills-text:                               # expertise / other
 
 ## Citation formatting
 
-- Standard stack: **CSL** (style definitions) + **citeproc** (rendering
-  engine, e.g. citeproc-py or Pandoc).
+- Standard stack: **CSL** (style definitions) + **citeproc-py**
+  (rendering engine) — chosen over Pandoc's built-in citeproc because
+  the job here is formatting *one citation at a time* from CSL-JSON,
+  which citeproc-py does directly; Pandoc's citeproc operates on whole
+  documents, so it would mean constructing a throwaway markdown
+  document per citation and parsing the result back out. A normal pip
+  dependency, like PyYAML/DuckDB — not an external CLI subprocess the
+  way `rendercv`/Pandoc are.
 - **Zotero + Better BibTeX auto-export** keeps a `.bib`/CSL-JSON file
   continuously in sync on disk — no manual export step required.
-- Publications CSV stores a citekey (linking to the Zotero/BBT record)
+  Publications CSV stores a citekey (linking to the Zotero/BBT record)
   plus fields Zotero doesn't track (CV-relevant flags). Grant
   association is deferred along with cross-references generally (see
   Explicitly deferred / out of scope for v1).
+- **No standalone `parco cite` command.** Citation formatting surfaces
+  entirely through `parco list <category> --format citation` (see
+  CLI's "Data entry"), reusing `list`'s existing search/filter/sort
+  rather than a parallel `--key`-based lookup mechanism — since the
+  only sensible use case for citing something is citing an entry
+  already tracked in your CV data, `list`'s search *is* the lookup.
+  Zotero-backed categories only for v1 (`publications`/`review`/
+  `catalog`/`press`); `artworks` (which would need a synthesized CSL
+  item from `co_authors`/`collaborators`/`identity.yaml` rather than a
+  real Zotero record) is a clean, deliberate follow-up, not built here.
+- **Bundled CSL styles**: `apa`, `chicago-author-date`, `mla` ship
+  inside `starter_config/` (or a sibling `csl_styles/` — same "bundled,
+  survives a pip install" requirement as `starter_config/`'s other
+  content, see CLI's "Init"), so the common case needs no network
+  access. `--style path/to/custom.csl` for anything else. Default style
+  comes from `parco.yaml`'s `citation_style` key (e.g.
+  `citation_style: apa`); `--style` overrides per-invocation; `apa` is
+  the fallback if neither is set.
+- **Terminal output uses Markdown-style markup** for italics/bold
+  (`*Journal Name*`, not HTML tags or ANSI escape codes) — readable
+  directly in a terminal, and pasteable into Markdown docs, GitHub, and
+  most web forms/chat apps without garbling, unlike ANSI codes (which
+  often leave literal escape sequences when pasted into a plain-text
+  context) or raw HTML (unreadable as terminal text). citeproc-py's
+  exact formatter mechanism for this (a built-in option vs. a small
+  custom formatter) gets confirmed against the real installed package
+  during implementation, not assumed here.
 
 ## Output formats
 
@@ -1645,7 +1679,7 @@ for:
   bundled starter config, not wizard-generated (these are broad,
   reusable defaults, not personal to any one user)
 - `views.yaml` — copied verbatim from the already-built
-  `starter_config/views.yaml` (see Build / query)
+  `starter_config/views.yaml` (see Build)
 - `identity.yaml` — generated from the wizard's name/variant answers
 - `profiles/`: one language chosen → a single flat
   `profiles/academic-<lang>.yaml`; both chosen → a
@@ -1664,12 +1698,9 @@ vocab.yaml (draft) sections, the same way `starter_config/views.yaml`
 already was — no new schema design, just getting the already-agreed
 shapes into real files `init` can copy.
 
-### Build / query
+### Build
 ```
 parco build --profile <name> [--format pdf|typst|html] [--force] [--output-dir <dir>]
-parco query "<SQL>"
-parco stats --type <category> --by <dimension>
-parco cite --key <citekey> --style <chicago|apa|...>
 ```
 No `--lang` flag — a profile's own `meta.language` (and its filename,
 by convention, e.g. `academic-en.yaml`) is the one source of truth for
@@ -1727,11 +1758,49 @@ the pipeline above works for one category, the rest are config, not
 new code or new risk) — `skills`' `group_by` aggregation is the one
 category deferred. Also deferred: `docx` (rejected with a clear
 "not yet supported" message pending the Pandoc integration this
-already has a working spike for — see Output formats), citeproc-styled
-`citation_style` (ignored for now — RenderCV's own `PublicationEntry`
-layout doesn't need it; `citation_style` only matters for the separate
-`parco cite` command), and currency conversion (`grants.amount` renders
-as-is; no `rates.csv` fetching exists yet in any form).
+already has a working spike for — see Output formats), a profile
+section's `citation_style` key (accepted in the YAML but never read —
+RenderCV's own `PublicationEntry` layout doesn't need it; citation
+formatting lives entirely in `parco list --format citation`, see
+Citation formatting, unrelated to how `build` assembles a CV), and
+currency conversion (`grants.amount` renders as-is; no `rates.csv`
+fetching exists yet in any form).
+
+### Query
+```
+parco query "<SQL>" [--format table|csv|json]
+```
+Runs directly against the CSVs via DuckDB (`ALL_VARCHAR`), the same
+read path `list`/`lint` already use — no import step, no separate
+database. **SELECT-only**: anything else (`INSERT`/`UPDATE`/`DELETE`/
+`DROP`/`COPY`/...) is rejected with a clear error before it runs. Data
+mutation stays exclusively through `add`/`edit`/`delete`, which
+auto-commit to git — an ad-hoc write via `query` would touch a CSV with
+no git-history undo path, since DuckDB has no idea `sync`/auto-commit
+exist. `--format` defaults to a human-readable table; `csv`/`json` for
+piping into something else. No citation-formatting support here (see
+Citation formatting, under `list`) — a raw `SELECT` result carries no
+schema/handler awareness to resolve a citekey against.
+
+### Stats
+```
+parco stats --type <category> --by <field>
+```
+Count-only: `SELECT <field>, COUNT(*) ... GROUP BY <field> ORDER BY
+<field>` against the named category. `<field>` is validated against
+the category's real schema fields, the same way `list --order-by`
+already validates — an unknown field is a clean error, not a DuckDB
+traceback. One special case: `--by year` is recognized whenever the
+category has a `date` or `start_date` field, grouping by the year
+extracted via `core/dates.py`'s existing `parse_partial_date` rather
+than the raw string value (so `2024-03` and `2024-09` count as the same
+group) — this is the flagship use case (`publications` per year) and
+worth a small special-case rather than making everyone write
+`parco query` by hand for it. **No dollar-amount aggregation in this
+first cut** — summing `grants.amount` across mixed currencies would be
+silently misleading with no `rates.csv` conversion in place yet (see
+Currency conversion); `stats` waits for that to exist as its own piece
+of work rather than guessing or warning its way around it.
 
 ### Data entry (wizard-first, not flag-required)
 ```
@@ -1742,6 +1811,7 @@ parco delete <category> --search "<text>"  # confirm once; git history is the un
 parco list <category>                             # read-only: every row's summary line
 parco list <category> --search "<text>"           # read-only: filtered to matching rows
 parco list <category> --order-by <field> [--desc] # read-only: sorted by any one field
+parco list <category> --format citation [--style apa|chicago-author-date|mla|<path.csl>]
 ```
 `list` is purely read-only — no wizard, no confirm, no write — and shares
 `edit`/`delete`'s substring search plus the same generic summary line
@@ -1757,6 +1827,20 @@ day to day; it is not the `weight`-refines-date ordering `build`'s
 `views.yaml`/profiles will eventually need (see `views.yaml (draft)`,
 under Profiles) — that's a distinct, more opinionated ordering rule for
 CV *rendering*, not for this ad hoc listing command.
+
+**`--format citation`** (see Citation formatting, below, for the engine
+and style details) composes with `--search`/`--order-by` rather than
+replacing them — it changes how each matched row prints, not which
+rows match. Only valid for a citekey-capable category (any schema with
+a `citekey` field resolvable against the Zotero/Better BibTeX export —
+`publications`, `review`, `catalog`, `press`); any other category
+exits cleanly with an error naming which categories *do* support it,
+rather than a confusing empty/garbled attempt. A row whose citekey
+doesn't resolve in Zotero prints a clear inline note in its place
+(`[citekey 'xyz' not found in Zotero]`) instead of blocking the rest of
+the listing — matches this codebase's general "never let one bad row
+stop the others" posture (e.g. `build`'s Zotero merge leaves fields
+blank rather than crashing).
 Wizard behavior:
 - Walks the schema's fields in declared order; `generated` fields (`id`)
   are skipped entirely, assigned automatically (see IDs, under Data
@@ -1953,17 +2037,29 @@ auto-commit (`core/entries.py`). `parco list --order-by`/`--desc` and
 are implemented too, along with a `glossary: <category>` field marker
 and its warning-level `parco lint` check.
 
-`build`'s design (first cut) is now complete — see CLI's "Build /
-query": profile loading with `extends`, `meta.output` templating,
-lint-gating with `--force`, the full pipeline from DuckDB query through
+`build`'s design (first cut) is now complete — see CLI's "Build":
+profile loading with `extends`, `meta.output` templating, lint-gating
+with `--force`, the full pipeline from DuckDB query through
 `{field}`/`glossary:` resolution to `rendercv render` invocation, and
 its deferred-scope boundary (skills aggregation, `docx`, citation
 styles, currency conversion). Verified against the real installed
 RenderCV 2.8 package (`Cv`/`Section`/entry-type field shapes, and that
 `rendercv render`'s CLI needs an extra `rendercv_fonts` package for its
 PDF path — hence treating `rendercv` as an external CLI dependency, not
-a Python import), not assumed from memory. What remains to design is
-`query`/`stats`/`cite`, plus `sync` and `refresh`/`import` — see CLI.
+a Python import), not assumed from memory.
+
+`query`/`stats`/citation formatting's design is now complete too — see
+CLI's "Query", "Stats", and "Data entry" (`--format citation`), and
+"Citation formatting": `query` is a SELECT-only DuckDB passthrough with
+`table`/`csv`/`json` output; `stats` is count-only with a `--by year`
+special case, dollar aggregation deferred to whenever currency
+conversion exists; there's no standalone `parco cite` — citation
+formatting is `parco list --format citation`, using citeproc-py against
+three bundled CSL styles, Markdown-style italic/bold output, and
+Zotero-backed categories only (`publications`/`review`/`catalog`/
+`press`) — `artworks`' `person_list`-based citation (see Category
+schemas: `artworks`) is a clean, deliberate follow-up. What remains to
+design is `sync` and `refresh`/`import` — see CLI.
 
 ## Known limitations / follow-up from prior plans' final reviews
 
