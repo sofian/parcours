@@ -11,6 +11,7 @@ import typer
 
 from ..core.build import BuildError, run_build
 from ..core.citations import UnknownCitationStyle, render_citations, resolve_style
+from ..core.commit import commit_pending
 from ..core.data import (
     NotASelectQuery,
     format_table,
@@ -94,6 +95,25 @@ def lint(category: str = typer.Argument(None, help="Only lint this category")):
 
     error_count = sum(1 for i in issues if i.severity == "error")
     raise typer.Exit(code=1 if error_count else 0)
+
+
+@app.command()
+def commit(
+    message: str = typer.Option(None, "-m", "--message", help="Commit message (auto-generated from changed files if omitted)"),
+):
+    """Stage and commit whatever's currently pending in the data repo — for hand-edits, or to finalize a `parco import` review."""
+    data_dir = _find_repo_or_exit()
+
+    try:
+        result = commit_pending(data_dir, message=message)
+    except CommitFailed as exc:
+        typer.echo(f"Commit failed: {exc}")
+        raise typer.Exit(code=1)
+
+    if not result.committed:
+        typer.echo("Nothing to commit.")
+        return
+    typer.echo(f"Committed: {', '.join(result.files)}")
 
 
 def _print_csv(columns: list[str], rows: list[dict]) -> None:
