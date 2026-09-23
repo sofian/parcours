@@ -1477,10 +1477,22 @@ skills-text:                               # expertise / other
   rather than a parallel `--key`-based lookup mechanism — since the
   only sensible use case for citing something is citing an entry
   already tracked in your CV data, `list`'s search *is* the lookup.
-  Zotero-backed categories only for v1 (`publications`/`review`/
-  `catalog`/`press`); `artworks` (which would need a synthesized CSL
-  item from `co_authors`/`collaborators`/`identity.yaml` rather than a
-  real Zotero record) is a clean, deliberate follow-up, not built here.
+  Zotero-backed categories only for v1, gated on `isinstance(handler,
+  PublicationsHandler)` — concretely `publications`/`review`/`catalog`
+  (all three declare `handler: publications`). **`press` does NOT
+  qualify**, despite having an optional `citekey` field: it declares
+  `handler: generic`, and only `PublicationsHandler` implements
+  citekey resolution today — the `Citable` protocol (see Category
+  handlers) that was meant to let `press` share this capability without
+  the full `publications` handler is declared but not implemented by
+  anything yet. The category list this surfaces to a user is derived
+  dynamically from which loaded handlers actually support resolution,
+  never a hardcoded name list, so `press` (or any future category) picks
+  this up automatically the moment that capability gets built, with no
+  doc/code drift to fix later. `artworks` (which would need a
+  synthesized CSL item from `co_authors`/`collaborators`/
+  `identity.yaml` rather than a real Zotero record) is a separate,
+  clean, deliberate follow-up, not built here either.
 - **Bundled CSL styles**: `apa`, `chicago-author-date`, `mla` ship
   inside `starter_config/` (or a sibling `csl_styles/` — same "bundled,
   survives a pip install" requirement as `starter_config/`'s other
@@ -1874,11 +1886,14 @@ CV *rendering*, not for this ad hoc listing command.
 and style details) composes with `--search`/`--filter`/`--after`/
 `--before`/`--order-by` rather than replacing them — it changes how
 each matched row prints, not which rows match. Only valid for a
-citekey-capable category (any schema with
-a `citekey` field resolvable against the Zotero/Better BibTeX export —
-`publications`, `review`, `catalog`, `press`); any other category
-exits cleanly with an error naming which categories *do* support it,
-rather than a confusing empty/garbled attempt. A row whose citekey
+category whose loaded handler actually implements citekey resolution
+(`isinstance(handler, PublicationsHandler)` today — concretely
+`publications`/`review`/`catalog`; **not** `press`, despite its
+optional `citekey` field, since it declares `handler: generic` — see
+Citation formatting); any other category exits cleanly with an error
+naming which categories *do* support it, derived dynamically rather
+than hardcoded, rather than a confusing empty/garbled attempt. A row
+whose citekey
 doesn't resolve in Zotero prints a clear inline note in its place
 (`[citekey 'xyz' not found in Zotero]`) instead of blocking the rest of
 the listing — matches this codebase's general "never let one bad row
@@ -2103,11 +2118,15 @@ field=value`/`--after`/`--before`) rather than each inventing their
 own, since `list` is really just a query that prints rows instead of
 aggregating them; there's no standalone `parco cite` — citation
 formatting is `parco list --format citation`, using citeproc-py against
-three bundled CSL styles, Markdown-style italic/bold output, and
-Zotero-backed categories only (`publications`/`review`/`catalog`/
-`press`) — `artworks`' `person_list`-based citation (see Category
-schemas: `artworks`) is a clean, deliberate follow-up. What remains to
-design is `sync` and `refresh`/`import` — see CLI.
+three bundled CSL styles, Markdown-style italic/bold output, and only
+categories whose handler actually resolves a citekey today
+(`publications`/`review`/`catalog` — **not** `press`, which has an
+optional `citekey` field but `handler: generic`, not `handler:
+publications`; the shared `Citable` capability that would let it
+qualify without the full `publications` handler is declared but
+unimplemented) — `artworks`' `person_list`-based citation (see Category
+schemas: `artworks`) is a separate, clean, deliberate follow-up. What
+remains to design is `sync` and `refresh`/`import` — see CLI.
 
 ## Known limitations / follow-up from prior plans' final reviews
 
