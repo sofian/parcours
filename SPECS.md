@@ -1611,8 +1611,11 @@ for:
 - `parco.yaml` (the repo marker + `currency` config)
 - all 19 categories, always, regardless of which you'll actually use:
   an empty (header-only) CSV plus a `categories/<name>.yaml` schema for
-  each — an unused category costs nothing, and `lint`/`build` already
-  skip categories with no rows
+  each — an unused category costs nothing: `lint` has nothing to flag
+  on an empty category, though `build` currently still emits an
+  (empty) section heading for it rather than omitting it; that's a
+  cosmetic gap in `build`'s own section-assembly step, tracked as a
+  follow-up, not something `init` needs to work around
 - `vocab.yaml`, `translations.csv` — copied verbatim from the tool's
   bundled starter config, not wizard-generated (these are broad,
   reusable defaults, not personal to any one user)
