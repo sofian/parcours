@@ -264,6 +264,37 @@ def test_run_select_query_tolerates_one_harmless_trailing_semicolon(tmp_path):
     assert rows == [{"id": "w1"}]
 
 
+def test_run_select_query_rejects_a_with_prefixed_delete(tmp_path):
+    # A real, verified bypass of a naive "first word is select/with, no
+    # semicolon" check: DuckDB accepts "WITH x AS (...) DELETE ..." as a
+    # single, semicolon-free statement whose real type is DELETE, not
+    # SELECT. It happens to mutate nothing today only because categories
+    # are DuckDB VIEWs, not base tables (DuckDB itself refuses a DELETE
+    # against a view) — an incidental protection, not something the
+    # SELECT-only check itself was verifying before this test existed.
+    csv_path = tmp_path / "widgets.csv"
+    csv_path.write_text("id,status\nw1,draft\n", encoding="utf-8")
+    before = csv_path.read_bytes()
+
+    with pytest.raises(NotASelectQuery):
+        run_select_query(
+            tmp_path,
+            "WITH x AS (SELECT 1) DELETE FROM widgets WHERE id = 'w1'",
+        )
+
+    assert csv_path.read_bytes() == before
+
+
+def test_run_select_query_accepts_a_semicolon_inside_a_string_literal(tmp_path):
+    # The old semicolon-counting check would have falsely rejected this
+    # single, legitimate statement.
+    (tmp_path / "widgets.csv").write_text("id,status\nw1,draft\n", encoding="utf-8")
+
+    columns, rows = run_select_query(tmp_path, "SELECT 'a;b' AS x")
+
+    assert rows == [{"x": "a;b"}]
+
+
 def test_format_table_aligns_columns():
     text = format_table(["id", "name"], [{"id": "w1", "name": "First"}, {"id": "w2", "name": "B"}])
 
