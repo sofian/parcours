@@ -113,6 +113,28 @@ def test_init_rejects_variant_name_with_path_separator(tmp_path, monkeypatch):
     assert not any(tmp_path.rglob("*pwned*"))
 
 
+def test_init_refuses_before_prompting_if_git_identity_is_missing(tmp_path, monkeypatch):
+    target = tmp_path / "my-cv"
+
+    def _raise_identity_missing():
+        from parcours.core.init import GitIdentityMissing
+        raise GitIdentityMissing(
+            'Git author identity isn\'t configured, so the final commit would fail. Run:\n'
+            '  git config --global user.email "you@example.com"\n'
+            '  git config --global user.name "Your Name"\n'
+            "then try again.\n"
+        )
+
+    monkeypatch.setattr("parcours.cli.main.check_git_identity_configured", _raise_identity_missing)
+
+    # No input supplied at all — proves the refusal happens before any prompt is reached.
+    result = runner.invoke(app, ["init", str(target)])
+
+    assert result.exit_code == 1
+    assert "git config --global" in result.stdout
+    assert not target.exists()
+
+
 def test_init_defaults_to_the_current_directory(tmp_path, monkeypatch):
     _git_env(monkeypatch)
     monkeypatch.chdir(tmp_path)

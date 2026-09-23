@@ -27,6 +27,31 @@ class GitInitFailed(Exception):
     scaffolding a new repo."""
 
 
+class GitIdentityMissing(Exception):
+    """Raised when git can't resolve an author identity (no
+    user.name/user.email configured, and auto-detection fails).
+    Checked before any file is written, so a doomed `git commit` at the
+    very end never leaves a half-scaffolded, uncommitted repo behind."""
+
+
+def check_git_identity_configured() -> None:
+    """Raises GitIdentityMissing if `git commit` would fail for lack of
+    an author identity — the same resolution `git commit` itself uses
+    (env vars, then local/global/system config, then auto-detection),
+    checked via `git var` so this never diverges from what a real
+    commit would actually do."""
+    try:
+        subprocess.run(["git", "var", "GIT_AUTHOR_IDENT"], check=True, capture_output=True)
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+        raise GitIdentityMissing(
+            "Git author identity isn't configured, so the final commit would fail. Run:\n"
+            '  git config --global user.email "you@example.com"\n'
+            '  git config --global user.name "Your Name"\n'
+            f"then try again.\n\n{stderr}"
+        ) from exc
+
+
 @dataclass
 class InitAnswers:
     first_name: str
@@ -163,10 +188,14 @@ def _git_init_and_commit(path: Path) -> None:
 def scaffold_repo(path: Path, answers: InitAnswers) -> None:
     """Scaffolds a brand-new parco data repo at `path` and commits it.
     Raises RepoAlreadyExists (writing nothing) if `path/parco.yaml`
-    already exists, or GitInitFailed if the final git init/commit fails."""
+    already exists, GitIdentityMissing (writing nothing) if git can't
+    resolve an author identity, or GitInitFailed if the final git
+    init/commit fails for some other reason."""
     path = Path(path)
     if (path / "parco.yaml").is_file():
         raise RepoAlreadyExists(f"A parco data repo already exists at {path}")
+
+    check_git_identity_configured()
 
     path.mkdir(parents=True, exist_ok=True)
     starter_dir = _starter_config_dir()

@@ -11,7 +11,14 @@ from ..core.data import load_category_rows
 from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry
 from ..core.handlers import load_handler
 from ..core.handlers.base import CategoryHandler, HandlerContext
-from ..core.init import GitInitFailed, InitAnswers, RepoAlreadyExists, scaffold_repo
+from ..core.init import (
+    GitIdentityMissing,
+    GitInitFailed,
+    InitAnswers,
+    RepoAlreadyExists,
+    check_git_identity_configured,
+    scaffold_repo,
+)
 from ..core.lint import ConfigError, run_lint
 from ..core.profiles import load_profile
 from ..core.repo import DataRepoNotFound, find_data_repo
@@ -437,6 +444,12 @@ def init(
         typer.echo(f"A parco data repo already exists at {target}.")
         raise typer.Exit(code=1)
 
+    try:
+        check_git_identity_configured()
+    except GitIdentityMissing as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+
     first_name = _prompt_required("First name")
     last_name = _prompt_required("Last name")
     variant_name = _prompt_variant_name()
@@ -501,6 +514,9 @@ def init(
     try:
         scaffold_repo(target, answers)
     except RepoAlreadyExists as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+    except GitIdentityMissing as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=1)
     except GitInitFailed as exc:

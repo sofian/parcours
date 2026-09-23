@@ -3,7 +3,14 @@ import subprocess
 import pytest
 import yaml
 
-from parcours.core.init import GitInitFailed, InitAnswers, RepoAlreadyExists, scaffold_repo
+from parcours.core.init import (
+    GitIdentityMissing,
+    GitInitFailed,
+    InitAnswers,
+    RepoAlreadyExists,
+    check_git_identity_configured,
+    scaffold_repo,
+)
 from parcours.core.schema import load_all_schemas
 
 
@@ -145,7 +152,9 @@ def test_scaffold_repo_creates_a_real_git_repo_with_one_commit(tmp_path, monkeyp
 
 
 def test_scaffold_repo_wraps_git_failure(tmp_path, monkeypatch):
-    def _fail(*args, **kwargs):
+    def _fail(cmd, *args, **kwargs):
+        if cmd[:2] == ["git", "var"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout=b"", stderr=b"")
         raise subprocess.CalledProcessError(1, "git", stderr=b"fatal: unable to auto-detect email address")
 
     monkeypatch.setattr("parcours.core.init.subprocess.run", _fail)
@@ -153,3 +162,40 @@ def test_scaffold_repo_wraps_git_failure(tmp_path, monkeypatch):
 
     with pytest.raises(GitInitFailed):
         scaffold_repo(repo, _answers())
+
+
+def test_check_git_identity_configured_passes_when_identity_is_set(monkeypatch):
+    _set_git_env(monkeypatch)
+    check_git_identity_configured()  # must not raise
+
+
+def test_check_git_identity_configured_raises_when_git_cannot_resolve_identity(monkeypatch):
+    def _fail(*args, **kwargs):
+        raise subprocess.CalledProcessError(
+            128, ["git", "var", "GIT_AUTHOR_IDENT"],
+            stderr=b"fatal: unable to auto-detect email address",
+        )
+
+    monkeypatch.setattr("parcours.core.init.subprocess.run", _fail)
+
+    with pytest.raises(GitIdentityMissing, match="git config --global"):
+        check_git_identity_configured()
+
+
+def test_scaffold_repo_raises_git_identity_missing_and_writes_nothing(tmp_path, monkeypatch):
+    def _fail_identity_check(cmd, *args, **kwargs):
+        if cmd[:2] == ["git", "var"]:
+            raise subprocess.CalledProcessError(
+                128, cmd, stderr=b"fatal: unable to auto-detect email address",
+            )
+        raise AssertionError(f"unexpected subprocess call after identity check should have stopped everything: {cmd}")
+
+    monkeypatch.setattr("parcours.core.init.subprocess.run", _fail_identity_check)
+    repo = tmp_path / "my-cv"
+
+    with pytest.raises(GitIdentityMissing):
+        scaffold_repo(repo, _answers())
+
+    assert not (repo / "parco.yaml").exists()
+    assert not (repo / "identity.yaml").exists()
+    assert not (repo / "categories").exists()
