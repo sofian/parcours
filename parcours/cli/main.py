@@ -6,11 +6,13 @@ from pathlib import Path
 
 import typer
 
+from ..core.build import BuildError, run_build
 from ..core.data import load_category_rows
 from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry
 from ..core.handlers import load_handler
 from ..core.handlers.base import CategoryHandler, HandlerContext
 from ..core.lint import ConfigError, run_lint
+from ..core.profiles import load_profile
 from ..core.repo import DataRepoNotFound, find_data_repo
 from ..core.schema import CategorySchema, load_all_schemas
 from ..core.translations import (
@@ -373,6 +375,34 @@ def translation_list(
 
     for e in entries:
         typer.echo(f"category={e.category}, id={e.id}, en={e.en or '(blank)'}, fr={e.fr or '(blank)'}")
+
+
+@app.command()
+def build(
+    profile: str = typer.Option(..., "--profile", help="Profile name (profiles/<name>.yaml, no extension)"),
+    fmt: str = typer.Option(None, "--format", help="Output format: pdf, typst, or html (defaults to the profile's own meta.format)"),
+    force: bool = typer.Option(False, "--force", help="Build even if parco lint reports errors"),
+    output_dir: Path = typer.Option(None, "--output-dir", help="Where to write the rendered file (defaults to <data repo>/build)"),
+):
+    """Render a CV from a profile via RenderCV."""
+    data_dir = _find_repo_or_exit()
+
+    try:
+        loaded_profile = load_profile(data_dir / "profiles", profile)
+    except FileNotFoundError:
+        typer.echo(f"Unknown profile: '{profile}'")
+        raise typer.Exit(code=2)
+
+    resolved_format = fmt or loaded_profile.meta.get("format", "pdf")
+    resolved_output_dir = output_dir or (data_dir / "build")
+
+    try:
+        output_path = run_build(data_dir, loaded_profile, resolved_format, resolved_output_dir, force=force)
+    except BuildError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Built {output_path}")
 
 
 if __name__ == "__main__":

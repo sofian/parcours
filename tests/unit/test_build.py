@@ -196,3 +196,83 @@ def test_build_leaves_zotero_fields_absent_for_an_unresolved_citekey(tmp_path, m
     assert len(entries) == 1
     assert "title" not in entries[0]
     assert "authors" not in entries[0]
+
+
+import pytest
+
+from parcours.core.build import BuildError, run_build
+
+
+def test_run_build_refuses_when_a_referenced_category_has_a_lint_error(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "vocab.yaml").write_text("{}\n")
+    (repo / "views.yaml").write_text("")
+    # A grant missing its required `funder` — a real lint error.
+    (repo / "grants.csv").write_text(
+        "id,title_en,title_fr,funder,role,start_date,end_date,amount,currency,co_investigators\n"
+        "g1,Big Grant,Grande subvention,,PI,2020-01,2022-01,,,\n"
+    )
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},
+        sections=[{"id": "grants", "source": "grants"}],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {"grants": _grants_view()})
+
+    with pytest.raises(BuildError, match="grants"):
+        run_build(repo, profile, "pdf", tmp_path / "out", force=False)
+
+
+def test_run_build_force_skips_the_lint_gate(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "vocab.yaml").write_text("{}\n")
+    (repo / "views.yaml").write_text("")
+    (repo / "grants.csv").write_text(
+        "id,title_en,title_fr,funder,role,start_date,end_date,amount,currency,co_investigators\n"
+        "g1,Big Grant,Grande subvention,,PI,2020-01,2022-01,,,\n"
+    )
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov", "output": "cv-test"},
+        sections=[{"id": "grants", "source": "grants"}],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {"grants": _grants_view()})
+    monkeypatch.setattr("parcours.core.build.subprocess.run", lambda *a, **k: None)
+
+    output_dir = tmp_path / "out"
+    result = run_build(repo, profile, "pdf", output_dir, force=True)
+
+    assert result == output_dir / "cv-test.pdf"
+
+
+def test_run_build_rejects_unsupported_format(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "vocab.yaml").write_text("{}\n")
+    (repo / "views.yaml").write_text("")
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov", "output": "cv-test"},
+        sections=[],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {})
+
+    with pytest.raises(BuildError, match="docx"):
+        run_build(repo, profile, "docx", tmp_path / "out", force=True)
+
+
+def test_run_build_wraps_a_rendercv_failure(tmp_path, monkeypatch):
+    import subprocess
+
+    repo = _setup_data_repo(tmp_path)
+    (repo / "vocab.yaml").write_text("{}\n")
+    (repo / "views.yaml").write_text("")
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov", "output": "cv-test"},
+        sections=[],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {})
+
+    def _fail(*args, **kwargs):
+        raise subprocess.CalledProcessError(1, "rendercv", stderr="bad theme")
+
+    monkeypatch.setattr("parcours.core.build.subprocess.run", _fail)
+
+    with pytest.raises(BuildError, match="bad theme"):
+        run_build(repo, profile, "pdf", tmp_path / "out", force=True)

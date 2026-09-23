@@ -3,13 +3,18 @@ data (see SPECS.md, "Build / query" and "views.yaml (draft)"). Core
 layer: no prompting, no subprocess here — see the CLI `build` command
 for lint-gating and the `rendercv` invocation."""
 
+import subprocess
+import tempfile
 from pathlib import Path
+
+import yaml
 
 from .data import query_category_rows
 from .handlers import load_handler
 from .handlers.base import HandlerContext
 from .handlers.publications import PublicationsHandler
 from .identity import load_identity, resolve_identity
+from .lint import run_lint
 from .profiles import Profile
 from .schema import load_all_schemas
 from .templating import resolve_template
@@ -112,3 +117,69 @@ def build_rendercv_data(data_dir: Path, profile: Profile) -> dict:
         "cv": cv,
         "design": {"theme": profile.meta["theme"]},
     }
+
+
+class BuildError(Exception):
+    """Raised when `parco build` can't run — a lint error on a
+    referenced category (unless `force`), or a failed `rendercv render`
+    invocation."""
+
+
+_FORMAT_EXTENSIONS = {"pdf": "pdf", "typst": "typ", "html": "html"}
+_FORMAT_PATH_FLAGS = {"pdf": "--pdf-path", "typst": "--typst-path", "html": "--html-path"}
+
+
+def run_build(
+    data_dir: Path,
+    profile: Profile,
+    fmt: str,
+    output_dir: Path,
+    force: bool = False,
+) -> Path:
+    if fmt not in _FORMAT_EXTENSIONS:
+        raise BuildError(f"Format '{fmt}' is not yet supported (docx needs the Pandoc integration)")
+
+    if not force:
+        category_names = {section["source"] for section in profile.sections}
+        for category_name in category_names:
+            issues = run_lint(data_dir, category_filter=category_name)
+            error_issues = [issue for issue in issues if issue.severity == "error"]
+            if error_issues:
+                raise BuildError(
+                    f"'{category_name}' has {len(error_issues)} lint error(s) — "
+                    "fix them or pass --force to build anyway"
+                )
+
+    rendercv_data = build_rendercv_data(data_dir, profile)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    extension = _FORMAT_EXTENSIONS[fmt]
+    # An absolute path, since RenderCV's --*-path flags resolve relative
+    # to the *input* YAML file (a scratch tempfile, below) otherwise.
+    output_path = (output_dir / f"{profile.output}.{extension}").resolve()
+
+    # Every format RenderCV doesn't explicitly disable still gets
+    # generated into a default `rendercv_output/` folder relative to
+    # cwd unless redirected — `--output-folder` catches all of those
+    # byproducts in a scratch dir instead of guessing which
+    # `--dont-generate-*` flags are safe (PDF likely renders *through*
+    # Typst internally, so blindly disabling Typst risks breaking PDF).
+    with tempfile.TemporaryDirectory() as scratch_dir_name:
+        scratch_dir = Path(scratch_dir_name)
+        input_path = scratch_dir / "input.yaml"
+        with open(input_path, "w", encoding="utf-8") as fh:
+            yaml.safe_dump(rendercv_data, fh, allow_unicode=True, sort_keys=False)
+
+        try:
+            subprocess.run(
+                [
+                    "rendercv", "render", str(input_path),
+                    _FORMAT_PATH_FLAGS[fmt], str(output_path),
+                    "--output-folder", str(scratch_dir / "rendercv_output"),
+                ],
+                check=True, capture_output=True, text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            raise BuildError(f"rendercv render failed: {exc.stderr}") from exc
+
+    return output_path
