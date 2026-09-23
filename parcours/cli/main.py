@@ -2,12 +2,21 @@
 """The Typer app — thin, owns all prompts/printing (see SPECS.md, "Code
 architecture: modular core + thin interfaces")."""
 
+import csv
+import json
+import sys
 from pathlib import Path
 
 import typer
 
 from ..core.build import BuildError, run_build
-from ..core.data import load_category_rows
+from ..core.data import (
+    NotASelectQuery,
+    format_table,
+    load_category_rows,
+    query_category_rows,
+    run_select_query,
+)
 from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry
 from ..core.handlers import load_handler
 from ..core.handlers.base import CategoryHandler, HandlerContext
@@ -82,6 +91,42 @@ def lint(category: str = typer.Argument(None, help="Only lint this category")):
 
     error_count = sum(1 for i in issues if i.severity == "error")
     raise typer.Exit(code=1 if error_count else 0)
+
+
+def _print_csv(columns: list[str], rows: list[dict]) -> None:
+    writer = csv.writer(sys.stdout)
+    writer.writerow(columns)
+    for row in rows:
+        writer.writerow([row.get(col, "") for col in columns])
+
+
+@app.command()
+def query(
+    sql: str = typer.Argument(..., help="A SELECT (or WITH...SELECT) query, e.g. \"SELECT year, count(*) FROM publications GROUP BY year\""),
+    fmt: str = typer.Option("table", "--format", help="Output format: table, csv, or json"),
+):
+    """Run a read-only SQL query directly against your category CSVs."""
+    data_dir = _find_repo_or_exit()
+
+    if fmt not in ("table", "csv", "json"):
+        typer.echo(f"Unknown format: '{fmt}' (expected table, csv, or json)")
+        raise typer.Exit(code=2)
+
+    try:
+        columns, rows = run_select_query(data_dir, sql)
+    except NotASelectQuery as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=2)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+
+    if fmt == "table":
+        typer.echo(format_table(columns, rows))
+    elif fmt == "csv":
+        _print_csv(columns, rows)
+    else:
+        typer.echo(json.dumps(rows, indent=2))
 
 
 @app.command(name="list")

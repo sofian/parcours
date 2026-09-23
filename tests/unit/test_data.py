@@ -164,3 +164,114 @@ def test_query_date_range_combines_with_filters(tmp_path):
     )
 
     assert sorted(r["id"] for r in rows) == ["w2", "w3"]
+
+
+from parcours.core.data import NotASelectQuery, format_table, run_select_query
+
+
+def test_run_select_query_reads_a_category_by_name(tmp_path):
+    (tmp_path / "widgets.csv").write_text(
+        "id,title_en\nw1,First\nw2,Second\n", encoding="utf-8"
+    )
+
+    columns, rows = run_select_query(tmp_path, "SELECT id, title_en FROM widgets ORDER BY id")
+
+    assert columns == ["id", "title_en"]
+    assert rows == [{"id": "w1", "title_en": "First"}, {"id": "w2", "title_en": "Second"}]
+
+
+def test_run_select_query_with_cte(tmp_path):
+    (tmp_path / "widgets.csv").write_text("id,status\nw1,draft\nw2,published\n", encoding="utf-8")
+
+    columns, rows = run_select_query(
+        tmp_path,
+        "WITH published AS (SELECT * FROM widgets WHERE status = 'published') "
+        "SELECT id FROM published",
+    )
+
+    assert rows == [{"id": "w2"}]
+
+
+def test_run_select_query_joins_across_two_categories(tmp_path):
+    (tmp_path / "widgets.csv").write_text("id,gadget_id\nw1,g1\n", encoding="utf-8")
+    (tmp_path / "gadgets.csv").write_text("id,name\ng1,Gadget One\n", encoding="utf-8")
+
+    columns, rows = run_select_query(
+        tmp_path,
+        "SELECT widgets.id, gadgets.name FROM widgets "
+        "JOIN gadgets ON widgets.gadget_id = gadgets.id",
+    )
+
+    assert rows == [{"id": "w1", "name": "Gadget One"}]
+
+
+def test_run_select_query_rejects_non_select_statements(tmp_path):
+    (tmp_path / "widgets.csv").write_text("id,status\nw1,draft\n", encoding="utf-8")
+
+    with pytest.raises(NotASelectQuery):
+        run_select_query(tmp_path, "DELETE FROM widgets")
+
+
+def test_run_select_query_rejects_update(tmp_path):
+    (tmp_path / "widgets.csv").write_text("id,status\nw1,draft\n", encoding="utf-8")
+
+    with pytest.raises(NotASelectQuery):
+        run_select_query(tmp_path, "UPDATE widgets SET status = 'x'")
+
+
+def test_run_select_query_leaves_the_csv_untouched(tmp_path):
+    csv_path = tmp_path / "widgets.csv"
+    csv_path.write_text("id,status\nw1,draft\n", encoding="utf-8")
+    before = csv_path.read_bytes()
+
+    with pytest.raises(NotASelectQuery):
+        run_select_query(tmp_path, "DROP TABLE widgets")
+
+    assert csv_path.read_bytes() == before
+
+
+def test_run_select_query_rejects_a_chained_second_statement(tmp_path):
+    (tmp_path / "widgets.csv").write_text("id,status\nw1,draft\n", encoding="utf-8")
+
+    with pytest.raises(NotASelectQuery):
+        run_select_query(tmp_path, "SELECT * FROM widgets; DROP TABLE widgets")
+
+
+def test_run_select_query_rejects_a_chained_copy_that_would_overwrite_a_real_csv(tmp_path):
+    # A real, verified exploit if only the first word were checked: DuckDB's
+    # execute() runs every semicolon-separated statement, so a chained COPY
+    # can silently overwrite any file on disk, including another category's
+    # real CSV, with no git-history undo path.
+    csv_path = tmp_path / "widgets.csv"
+    csv_path.write_text("id,status\nw1,draft\n", encoding="utf-8")
+    before = csv_path.read_bytes()
+    escaped = str(csv_path).replace("'", "''")
+
+    with pytest.raises(NotASelectQuery):
+        run_select_query(
+            tmp_path,
+            f"SELECT 1 as x; COPY (SELECT 'PWNED' as y) TO '{escaped}'",
+        )
+
+    assert csv_path.read_bytes() == before
+
+
+def test_run_select_query_tolerates_one_harmless_trailing_semicolon(tmp_path):
+    (tmp_path / "widgets.csv").write_text("id,status\nw1,draft\n", encoding="utf-8")
+
+    columns, rows = run_select_query(tmp_path, "SELECT id FROM widgets;")
+
+    assert rows == [{"id": "w1"}]
+
+
+def test_format_table_aligns_columns():
+    text = format_table(["id", "name"], [{"id": "w1", "name": "First"}, {"id": "w2", "name": "B"}])
+
+    lines = text.splitlines()
+    assert lines[0].startswith("id ")
+    assert "w1" in lines[2]
+    assert "w2" in lines[3]
+
+
+def test_format_table_handles_no_rows():
+    assert format_table(["id"], []) == "(no rows)"
