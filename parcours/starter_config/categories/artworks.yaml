@@ -9,7 +9,8 @@ fields:
   - {name: date,           type: date, precision: year, required: true}  # production year
   - {name: description_en}
   - {name: description_fr}                                       # CCV's "Description / Contribution Value"
-  - {name: contributors}                                         # free text names list, like grants' co_investigators
+  - {name: co_authors}                                           # other primary authors (not you) — "Last, First; Last, First"
+  - {name: collaborators}                                        # named collaborators, credited separately from primary authorship — same "Last, First; Last, First" format
   - {name: url}
 require_one_of:
   - [title_en, title_fr]

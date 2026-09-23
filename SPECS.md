@@ -458,7 +458,8 @@ fields:
   - {name: date,           type: date, precision: year, required: true}  # production year
   - {name: description_en}
   - {name: description_fr}                                       # CCV's "Description / Contribution Value"
-  - {name: contributors}                                         # free text names list, like grants' co_investigators
+  - {name: co_authors}                                           # other primary authors (not you) — "Last, First; Last, First"
+  - {name: collaborators}                                        # named collaborators, credited separately from primary authorship — same "Last, First; Last, First" format
   - {name: url}
 require_one_of:
   - [title_en, title_fr]
@@ -482,8 +483,22 @@ dedup:
 - No separate medium/type field: CCV has none, and the bilingual
   `description` carries whatever detail is needed instead.
 - `Number of Contributors` is dropped — blank in 53 of 56 reference
-  records, and derivable from `contributors` anyway.
+  records, and derivable from `co_authors`/`collaborators` anyway.
 - `venue` is dropped — not tracked here.
+- **`co_authors`/`collaborators` name format**: `"Last, First; Last, First"`
+  — semicolon-separated, each person `Last, First` — chosen specifically
+  so a future citation-formatting step can parse last names out and sort
+  by them, not just display the string as typed. `co_authors` never
+  includes you: your own name comes from `identity.yaml` and gets
+  combined with `co_authors` and alphabetized by last name together
+  when a work is cited (e.g. "Audry, Sofian" + "Gagné, Rosalie D." →
+  "Sofian Audry and Rosalie D. Gagné, ..."), so you never retype your
+  own name on every artwork. `collaborators` uses the same format and
+  is cited separately (e.g. "... in collaboration with Etienne
+  Montenegro"). Neither field is validated at write time yet (free
+  text, like grants' `co_investigators`) — the format is a convention
+  enforced by documentation and by whatever future `build`/`cite` code
+  consumes it, not by `parco lint`.
 - `date` is the **production year**, not a performance/exhibition date —
   `precision: year` (a floor, not a ceiling, per Category schemas above:
   a more precise date is still fine if known, just not required).
@@ -1352,7 +1367,7 @@ Entry type per category:
 |---|---|---|
 | publications, review, catalog | `PublicationEntry` | title/authors/journal/doi from Zotero via citekey |
 | grants | `NormalEntry` | highlights: funder+role, amount+currency, co_investigators |
-| artworks | `NormalEntry` | single `date` (production year); highlights: role, contributors |
+| artworks | `NormalEntry` | single `date` (production year); highlights: role, co_authors, collaborators |
 | students | `NormalEntry` | start/end = supervision dates; highlights: degree_type/status, institution, thesis_title |
 | teaching | `ExperienceEntry` | company=organization, position=course_label+title; single `date` per offering |
 | service | `ExperienceEntry` | company=organization, position=role; highlights: type, detail |

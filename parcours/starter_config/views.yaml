@@ -59,7 +59,8 @@ artworks:
     date: date
     highlights:
       - "{role}"
-      - "{contributors}"
+      - "{co_authors}"
+      - "{collaborators}"
 
 students:
   source: students
