@@ -338,18 +338,46 @@ than being a record type of its own).
 **`education`'s `advisor` field**: an earlier pass noted "CCV has no
 equivalent field," which is wrong — CCV has a structured `Education →
 Degrees → Supervisors` sub-record (`Supervisor Name`, `Start Date`,
-`End Date`). The importer can populate `advisor` by joining supervisor
-names (same `"Last, First; Last, First"` convention as `person_list`,
-though `advisor` itself stays plain text) — the sub-record's own dates
-are then dropped, since `advisor` has no date fields to hold them.
+`End Date`). The importer populates `advisor` by joining every
+`Supervisor Name` present with `"; "`, **as CCV gives them, with no
+reformatting attempted** — `advisor` is plain free text (unlike
+`co_investigators` above, it's never validated as `person_list`), and
+`Supervisor Name` has the same unsplit-free-text shape as
+`Investigator Name` (no `Last, First` convention to preserve even if
+we wanted to), so joining verbatim is both safe and sufficient. The
+sub-record's own dates are dropped, since `advisor` has no date fields
+to hold them.
 
-**Bilingual wire form**: a real export was checked and found to use
-*exclusively* the unsplit `<value type="Bilingual">` blob form — the
-split `<bilingual><french>/<english>` form (see above) never actually
-occurred. The importer must still handle both, since the split form is
-a real, documented CCV output mode (just not one this particular export
-happened to use) — but the unsplit form is the one to prioritize when
-writing and testing the importer first.
+**Bilingual wire form — corrected**: an earlier pass of this
+verification checked for the split `<bilingual>` element in the wrong
+place (as a child of `<value>`) and concluded the export used the
+unsplit form exclusively; re-checking against the real structure
+documented above (`<bilingual>` is a **sibling** of `<value>`, both
+children of `<field>`) shows the opposite. Every one of the export's
+483 `Bilingual` fields carries a `<bilingual>` sibling element
+(present, though often empty); of the 108 actually populated, **all
+108 carry real split content**, and the unsplit `<value>` blob is never
+populated on its own — when it does carry text (105 of the 108), that
+text is always an exact duplicate of the split form's `<english>`
+value. The importer should therefore **prefer the split
+`<bilingual>` sibling**, falling back to the unsplit `<value>` blob
+only when the split sibling is absent or empty — assigning that
+fallback text to whichever language the export's root `lang` attribute
+declares (see below), since an unsplit blob carries no language marker
+of its own. Both forms are still real, documented CCV output modes and
+the importer must handle both; this correction is about which one
+actually carries data in practice, not about removing either code path.
+
+**Export default language**: the root `<generic-cv lang="en"|"fr" …>`
+element carries the whole export's default language (confirmed present
+on the real export). The importer uses it for exactly two things: as
+the fallback assignment target for an unsplit Bilingual blob (above),
+and for routing a single-language `String`-typed title field (e.g.
+Artwork Title, Presentation Title, Catalogue Title) to `title_en` or
+`title_fr` — these CCV fields carry one string with no per-field
+language marker, so the export's own declared language is the only
+signal available for which side to fill, leaving the other blank (safe
+given every affected schema uses `require_one_of` for that pair).
 
 **`grants`' `Funding Sources` sub-record isn't always exactly one per
 grant** — a reference export had 33 Funding Sources for 32 parent
@@ -361,6 +389,51 @@ report for manual review, rather than silently dropping the second
 source or guessing how to merge them. `Project Description`/`Research
 Uptake` (both Bilingual, no dedicated field) map to `grants`' existing
 `note_en`/`note_fr` fields.
+
+**`grants`' `Other Investigators` sub-record** (a real, previously-
+unnoticed nested record: `Investigator Name`, `Role`) is **not**
+auto-written into `grants.co_investigators` — checked against the real
+export, CCV's `Investigator Name` is one unsplit free-text string with
+no `Last, First` convention (0 of 15 reference values contain a comma,
+same for `Supervisor Name`/`Student Name` elsewhere), so there's no
+safe way to machine-split it into `person_list`'s required format
+without risking a silently wrong first/last split on a multi-word name.
+Instead, any grant with one or more `Other Investigators` records is
+flagged in the import report (naming the raw investigator name(s)) for
+manual entry into `co_investigators` — the same treatment as a grant
+with more than one `Funding Sources` record, just for a different
+reason (unsafe auto-format, not ambiguous choice).
+
+**`person_list` import fields — parse-as-validation-gate**: rather than
+a per-field reliability judgment call, the importer feeds every CCV
+string headed for a `person_list` field through `core/names.py`'s own
+`parse_person_list` unchanged: it parses cleanly → write it verbatim
+(no reformatting attempted); it raises `InvalidPersonListError` → leave
+the field blank and flag that row in the report for manual entry. This
+one mechanism correctly handles every case found in the real export
+without per-field special-casing: `artworks`/`audio-recordings`'
+`Contributors` field turns out to already follow the exact `Last,
+First; Last, First` convention (verified: comma count is exactly
+semicolon count + 1 across every one of 55 real populated values) and
+parses cleanly; `presentations`' `Co-Presenters` is inconsistent (some
+values fit the convention, some don't) and is flagged whenever it
+doesn't parse, never partially imported. `grants`' joined `Other
+Investigators` names (see above) always fail to parse, by the same
+mechanism, since CCV's underlying `Investigator Name` never contains a
+comma — so they're always flagged, consistent with the reasoning
+above, just expressed as one general rule instead of a one-off.
+
+**`artworks`' `Contributors` maps only to `co_authors`, never
+`collaborators`**: CCV's own "Contribution Role"/"Contributors" split
+has no equivalent of our primary-author-vs-named-collaborator
+distinction — `Contributors` is one undifferentiated name list — so
+import writes the whole parsed (or flagged) list into `co_authors` and
+leaves `collaborators` blank; the user reclassifies specific names by
+hand afterward if a real collaborator is mixed into that list. Your own
+name, if present in `Contributors` (checked by exact match against
+`identity.yaml`'s `name.first`/`name.last`), is filtered out before
+parsing — `co_authors` never includes you (see the `artworks` schema
+notes above).
 
 Several nested reference-table list sub-records across categories
 (Employment/Education's own "Areas of Research"/"Fields of
