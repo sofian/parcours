@@ -11,6 +11,7 @@ from ..core.data import load_category_rows
 from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry
 from ..core.handlers import load_handler
 from ..core.handlers.base import CategoryHandler, HandlerContext
+from ..core.init import GitInitFailed, InitAnswers, RepoAlreadyExists, scaffold_repo
 from ..core.lint import ConfigError, run_lint
 from ..core.profiles import load_profile
 from ..core.repo import DataRepoNotFound, find_data_repo
@@ -403,6 +404,97 @@ def build(
         raise typer.Exit(code=1)
 
     typer.echo(f"Built {output_path}")
+
+
+def _prompt_required(label: str) -> str:
+    while True:
+        value = typer.prompt(label).strip()
+        if value:
+            return value
+        typer.echo(f"'{label}' is required.")
+
+
+@app.command()
+def init(
+    path: Path = typer.Argument(None, help="Where to scaffold the new data repo (defaults to the current directory)"),
+):
+    """Interactively scaffold a brand-new parco data repo."""
+    target = (path or Path.cwd()).expanduser().resolve()
+
+    if (target / "parco.yaml").is_file():
+        typer.echo(f"A parco data repo already exists at {target}.")
+        raise typer.Exit(code=1)
+
+    first_name = _prompt_required("First name")
+    last_name = _prompt_required("Last name")
+    variant_name = typer.prompt("Identity variant name", default="academic")
+
+    typer.echo("Which language(s) do you want profiles for?")
+    typer.echo("  1. English")
+    typer.echo("  2. French")
+    typer.echo("  3. Both")
+    while True:
+        choice = typer.prompt("Choice", default="1")
+        if choice == "1":
+            languages = ["en"]
+            break
+        if choice == "2":
+            languages = ["fr"]
+            break
+        if choice == "3":
+            languages = ["en", "fr"]
+            break
+        typer.echo("Not a valid choice.")
+
+    title_en = _prompt_required("Headline/title (English)") if "en" in languages else ""
+    title_fr = _prompt_required("Headline/title (French)") if "fr" in languages else ""
+    email = _prompt_required("Email")
+    phone = typer.prompt("Phone ([Enter] to skip)", default="", show_default=False)
+    homepage = typer.prompt("Homepage ([Enter] to skip)", default="", show_default=False)
+    currency = _prompt_required("Currency (e.g. CAD)")
+
+    typer.echo("\nReview:")
+    typer.echo(f"  Name: {first_name} {last_name}")
+    typer.echo(f"  Identity variant: {variant_name}")
+    typer.echo(f"  Language(s): {', '.join(languages)}")
+    if title_en:
+        typer.echo(f"  Title (EN): {title_en}")
+    if title_fr:
+        typer.echo(f"  Title (FR): {title_fr}")
+    typer.echo(f"  Email: {email}")
+    typer.echo(f"  Phone: {phone or '(skip)'}")
+    typer.echo(f"  Homepage: {homepage or '(skip)'}")
+    typer.echo(f"  Currency: {currency}")
+
+    if not typer.confirm("Scaffold this repo?"):
+        typer.echo("Aborted, nothing written.")
+        raise typer.Exit(code=0)
+
+    answers = InitAnswers(
+        first_name=first_name,
+        last_name=last_name,
+        variant_name=variant_name,
+        languages=languages,
+        currency=currency,
+        title_en=title_en,
+        title_fr=title_fr,
+        email=email,
+        phone=phone,
+        homepage=homepage,
+    )
+
+    try:
+        scaffold_repo(target, answers)
+    except RepoAlreadyExists as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+    except GitInitFailed as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+
+    typer.echo(f"\nInitialized a new parco data repo at {target}.")
+    typer.echo("Next: `parco add <category>` to start entering data, "
+               "`parco build --profile <name>` once you have some.")
 
 
 if __name__ == "__main__":
