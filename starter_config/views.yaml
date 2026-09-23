@@ -1,0 +1,211 @@
+# starter_config/views.yaml
+#
+# Reference views.yaml for the 18 non-skills category schemas drafted in
+# SPECS.md's "Category schemas (drafts)" and mapped in "views.yaml
+# (draft)". Copy into your data repo as `views.yaml`. `skills` is not
+# included — its GROUP BY-aggregating view is a deferred follow-up (see
+# SPECS.md's "First-cut scope").
+
+publications:
+  source: publications
+  entry_type: PublicationEntry
+  fields:
+    title: "{zotero_title}"
+    authors: "{zotero_authors}"
+    journal: "{zotero_journal}"
+    doi: "{zotero_doi}"
+    url: "{zotero_url}"
+    date: "{zotero_date}"
+
+review:
+  source: review
+  entry_type: PublicationEntry
+  fields:
+    title: "{zotero_title}"
+    authors: "{zotero_authors}"
+    journal: "{zotero_journal}"
+    doi: "{zotero_doi}"
+    url: "{zotero_url}"
+    date: "{zotero_date}"
+
+catalog:
+  source: catalog
+  entry_type: PublicationEntry
+  fields:
+    title: "{zotero_title}"
+    authors: "{zotero_authors}"
+    journal: "{zotero_journal}"
+    doi: "{zotero_doi}"
+    url: "{zotero_url}"
+    date: "{zotero_date}"
+
+grants:
+  source: grants
+  entry_type: NormalEntry
+  fields:
+    name: "{title}"
+    start_date: start_date
+    end_date: end_date
+    highlights:
+      - "{funder} — {role}"
+      - "{amount} {currency}"
+      - "{co_investigators}"
+
+artworks:
+  source: artworks
+  entry_type: NormalEntry
+  fields:
+    name: "{title}"
+    date: date
+    highlights:
+      - "{role}"
+      - "{contributors}"
+
+students:
+  source: students
+  entry_type: NormalEntry
+  fields:
+    name: "{student_name}"
+    start_date: supervision_start_date
+    end_date: supervision_end_date
+    highlights:
+      - "{degree_type} — {degree_status}"
+      - "{institution}"
+      - "{thesis_title}"
+
+teaching:
+  source: teaching
+  entry_type: ExperienceEntry
+  fields:
+    company: organization
+    position: "{course_label} — {title}"
+    date: date
+    highlights:
+      - "{department}"
+
+service:
+  source: service
+  entry_type: ExperienceEntry
+  fields:
+    company: organization
+    position: "{role}"
+    start_date: start_date
+    end_date: end_date
+    highlights:
+      - "{type}"
+      - "{detail}"
+
+outreach:
+  source: outreach
+  entry_type: ExperienceEntry
+  fields:
+    company: organization
+    position: "{role}"
+    start_date: start_date
+    end_date: end_date
+    summary: "{description}"
+
+presentations:
+  source: presentations
+  entry_type: NormalEntry
+  fields:
+    name: "{title}"
+    date: date
+    summary: "{event}"
+    highlights:
+      - "{location}"
+      - "{co_presenters}"
+
+press:
+  source: press
+  entry_type: NormalEntry
+  fields:
+    name: "{outlet}"
+    date: date
+    highlights:
+      - "{author}"
+      - "{program}"
+
+education:
+  source: education
+  entry_type: EducationEntry
+  fields:
+    institution: organization
+    area: "{specialization}"
+    degree: "{degree_name}"
+    start_date: start_date
+    end_date: end_date
+    summary: "{thesis_title}"
+    highlights:
+      - "{advisor}"
+      - "{note}"
+
+positions:
+  source: positions
+  entry_type: ExperienceEntry
+  fields:
+    company: organization
+    position: "{title}"
+    start_date: start_date
+    end_date: end_date
+    highlights:
+      - "{faculty}"
+      - "{department}"
+
+recognitions:
+  source: recognitions
+  entry_type: NormalEntry
+  fields:
+    name: "{name}"
+    date: date
+    highlights:
+      - "{organization}"
+      - "{amount} {currency}"
+      - "{description}"
+
+exhibitions:
+  source: exhibitions
+  entry_type: NormalEntry
+  fields:
+    name: "{title}"
+    start_date: start_date
+    end_date: end_date
+    location: "{location}"
+    highlights:
+      - "{event}"
+      - "{venue}"
+      - "{curator}"
+
+curatorship:
+  source: curatorship
+  entry_type: NormalEntry
+  fields:
+    name: "{title}"
+    start_date: start_date
+    end_date: end_date
+    location: "{location}"
+    highlights:
+      - "{event}"
+      - "{venue}"
+      - "{curator}"
+
+residencies:
+  source: residencies
+  entry_type: NormalEntry
+  fields:
+    name: "{organization}"
+    location: "{location}"
+    start_date: start_date
+    end_date: end_date
+
+software:
+  source: software
+  entry_type: NormalEntry
+  fields:
+    name: title
+    summary: "{description}"
+    start_date: start_date
+    end_date: end_date
+    highlights:
+      - "{role}"
+      - "{url}"
