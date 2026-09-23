@@ -95,7 +95,6 @@ def list_command(
     data_dir = _find_repo_or_exit()
 
     if category is None:
-        typer.echo("Available categories:")
         _print_available_categories(data_dir)
         raise typer.Exit(code=0)
 

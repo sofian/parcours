@@ -86,8 +86,8 @@ def test_list_with_no_category_shows_available_categories_not_an_error(tmp_path,
     result = runner.invoke(app, ["list"])
 
     assert result.exit_code == 0
-    assert "Available categories" in result.stdout
-    assert "widgets" in result.stdout
+    assert result.stdout.strip() == "widgets"
+    assert "Available categories" not in result.stdout
     assert "Unknown category" not in result.stdout
     assert "required" not in result.stdout.lower()
 
