@@ -1250,8 +1250,11 @@ actual `identity.yaml`, in the private data repo, not here.)
   and the full `sections` list. The language-specific profile itself
   then only needs `extends` plus `meta.language` (and anything else it
   genuinely wants to override). Merging is a single, shallow level — no
-  chained `extends`, no per-section deep merge: the child's top-level
-  keys (`meta`, `sections`, ...) replace the base's wholesale where
+  chained `extends`, no per-section deep merge: `meta` merges key-by-key
+  (the child overrides only the keys it sets — e.g. a language child
+  setting only `meta.language` still inherits the base's `meta.name`/
+  `format`/`theme`/`identity_variant` individually); every other
+  top-level key (`sections`, ...) replaces the base's wholesale when
   present, otherwise the base's value is inherited untouched. A base
   file's leading underscore is a naming convention, not enforced — it's
   never meant to be built directly (it has no `meta.language`).
@@ -1353,7 +1356,7 @@ Entry type per category:
 | students | `NormalEntry` | start/end = supervision dates; highlights: degree_type/status, institution, thesis_title |
 | teaching | `ExperienceEntry` | company=organization, position=course_label+title; single `date` per offering |
 | service | `ExperienceEntry` | company=organization, position=role; highlights: type, detail |
-| outreach | `ExperienceEntry` | summary=outcome; highlights: evidence, description |
+| outreach | `ExperienceEntry` | company=organization, position=role; summary=description (no highlights) |
 | presentations | `NormalEntry` | single `date`; summary=event; highlights: invited/keynote |
 | press | `NormalEntry` | single `date`; highlights: author, program |
 | education | `EducationEntry` | institution=organization, area=specialization, degree=degree_name; summary=thesis_title; highlights: advisor, note |
