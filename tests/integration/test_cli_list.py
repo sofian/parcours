@@ -272,6 +272,11 @@ def test_list_format_citation_uses_custom_style_flag(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.stdout
     assert "Doe" in result.stdout
+    # APA (the default) wraps the year in parentheses ("Doe, J. (2024)...");
+    # chicago-author-date does not ("Doe, J. 2024...") — verified empirically
+    # against the real installed citeproc-py. This confirms the requested
+    # style was actually used, not just that some citation rendered.
+    assert "(2024)" not in result.stdout
 
 
 def test_list_format_citation_reads_default_style_from_parco_yaml(tmp_path, monkeypatch):
@@ -285,6 +290,38 @@ def test_list_format_citation_reads_default_style_from_parco_yaml(tmp_path, monk
 
     assert result.exit_code == 0, result.stdout
     assert "Doe" in result.stdout
+    # Same distinguishing check as test_list_format_citation_uses_custom_style_flag:
+    # APA (the fallback if parco.yaml's citation_style were ignored) would
+    # render "(2024)"; chicago-author-date does not.
+    assert "(2024)" not in result.stdout
+
+
+def test_list_format_citation_handles_duplicate_citekeys_without_crashing(tmp_path, monkeypatch):
+    repo = _setup_publications_repo(tmp_path)
+    monkeypatch.chdir(repo)
+    # A second row citing the SAME resolvable citekey as an existing row.
+    with open(repo / "publications.csv", "a", encoding="utf-8") as fh:
+        fh.write("p3,doe2024widgets\n")
+
+    result = runner.invoke(app, ["list", "publications", "--format", "citation"])
+
+    assert result.exit_code == 0, result.stdout
+    # Both rows citing the same key must render the SAME citation, not crash.
+    lines = [line for line in result.stdout.splitlines() if "Journal of Widgets" in line]
+    assert len(lines) == 2
+    assert lines[0] == lines[1]
+
+
+def test_list_format_citation_blank_citekey_does_not_print_the_word_none(tmp_path, monkeypatch):
+    repo = _setup_publications_repo(tmp_path)
+    monkeypatch.chdir(repo)
+    with open(repo / "publications.csv", "a", encoding="utf-8") as fh:
+        fh.write("p4,\n")
+
+    result = runner.invoke(app, ["list", "publications", "--format", "citation"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "'None'" not in result.stdout
 
 
 def test_list_unknown_format_exits_cleanly(tmp_path, monkeypatch):

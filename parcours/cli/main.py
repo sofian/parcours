@@ -250,21 +250,31 @@ def _print_citations(
         typer.echo(str(exc))
         raise typer.Exit(code=2)
 
-    resolved_records = []
-    row_has_record = []
+    # citeproc-py's own bibliography.register() dedupes by citekey
+    # internally, so two rows sharing one citekey would otherwise
+    # desynchronize a positional zip against render_citations()'s
+    # output — verified live: it silently mis-attributes an earlier
+    # row's citation to a later one, then crashes with StopIteration.
+    # Deduping here and keying the rendered output by id avoids this.
+    resolved_by_key: dict[str, dict] = {}
+    row_keys: list[str | None] = []
     for row in rows:
         citekey = row.get("citekey") or ""
         record = handler.resolve(citekey) if citekey else None
-        row_has_record.append(record is not None)
         if record is not None:
-            resolved_records.append(record)
-
-    citations = iter(render_citations(resolved_records, style_path))
-    for row, has_record in zip(rows, row_has_record):
-        if has_record:
-            typer.echo(next(citations))
+            resolved_by_key.setdefault(record["id"], record)
+            row_keys.append(record["id"])
         else:
-            typer.echo(f"[citekey '{row.get('citekey', '')}' not found in Zotero]")
+            row_keys.append(None)
+
+    citations_by_key = dict(zip(
+        resolved_by_key.keys(), render_citations(list(resolved_by_key.values()), style_path)
+    ))
+    for row, key in zip(rows, row_keys):
+        if key is not None:
+            typer.echo(citations_by_key[key])
+        else:
+            typer.echo(f"[citekey '{row.get('citekey') or ''}' not found in Zotero]")
 
 
 def _available_categories(data_dir: Path) -> list[str]:
