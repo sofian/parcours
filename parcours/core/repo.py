@@ -53,3 +53,15 @@ def _validate_repo(path: Path) -> Path:
     if not path.is_dir():
         raise DataRepoNotFound(f"Data repo path does not exist: {path}")
     return path
+
+
+def load_repo_config(data_dir: Path) -> dict:
+    """Reads `parco.yaml`'s own content (distinct from just checking it
+    exists, which `find_data_repo` already does) — e.g. `citation_style`
+    for `list --format citation`'s default. Returns {} if the file is
+    missing or empty, never raises."""
+    config_path = data_dir / MARKER_FILENAME
+    if not config_path.is_file():
+        return {}
+    with open(config_path, "r", encoding="utf-8") as fh:
+        return yaml.safe_load(fh) or {}

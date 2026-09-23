@@ -186,3 +186,174 @@ def test_list_desc_without_order_by_exits_cleanly(tmp_path, monkeypatch):
 
     assert result.exit_code == 2
     assert "--desc requires --order-by" in result.stdout
+
+
+def _setup_publications_repo(tmp_path):
+    (tmp_path / "parco.yaml").write_text("name: test-repo\n")
+    (tmp_path / "categories").mkdir()
+    (tmp_path / "categories" / "publications.yaml").write_text("""
+name: publications
+handler: publications
+options:
+  json: zotero/library.json
+fields:
+  - {name: id, generated: true}
+  - {name: citekey, required: true}
+""")
+    (tmp_path / "categories" / "widgets.yaml").write_text("""
+name: widgets
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: title_en, required: true}
+""")
+    (tmp_path / "vocab.yaml").write_text("{}\n")
+    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "widgets.csv").write_text("id,title_en\nw1,A Widget\n", encoding="utf-8")
+    (tmp_path / "publications.csv").write_text(
+        "id,citekey\np1,doe2024widgets\np2,nonexistent-key\n", encoding="utf-8"
+    )
+    (tmp_path / "zotero").mkdir()
+    (tmp_path / "zotero" / "library.json").write_text("""[
+        {
+            "id": "doe2024widgets",
+            "type": "article-journal",
+            "title": "On Widgets",
+            "author": [{"given": "Jane", "family": "Doe"}],
+            "container-title": "Journal of Widgets",
+            "issued": {"date-parts": [[2024, 3]]}
+        }
+    ]""", encoding="utf-8")
+    return tmp_path
+
+
+def test_list_format_citation_renders_a_resolved_citekey(tmp_path, monkeypatch):
+    repo = _setup_publications_repo(tmp_path)
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["list", "publications", "--format", "citation"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "*Journal of Widgets*" in result.stdout
+    assert "Doe" in result.stdout
+
+
+def test_list_format_citation_shows_a_note_for_an_unresolved_citekey(tmp_path, monkeypatch):
+    repo = _setup_publications_repo(tmp_path)
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(
+        app, ["list", "publications", "--format", "citation", "--search", "nonexistent-key"]
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "not found in Zotero" in result.stdout
+
+
+def test_list_format_citation_rejects_a_non_capable_category(tmp_path, monkeypatch):
+    repo = _setup_publications_repo(tmp_path)
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["list", "widgets", "--format", "citation"])
+
+    assert result.exit_code == 2
+    assert "publications" in result.stdout
+
+
+def test_list_format_citation_uses_custom_style_flag(tmp_path, monkeypatch):
+    repo = _setup_publications_repo(tmp_path)
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(
+        app,
+        ["list", "publications", "--format", "citation", "--style", "chicago-author-date",
+         "--search", "doe2024widgets"],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "Doe" in result.stdout
+
+
+def test_list_format_citation_reads_default_style_from_parco_yaml(tmp_path, monkeypatch):
+    repo = _setup_publications_repo(tmp_path)
+    (repo / "parco.yaml").write_text("citation_style: chicago-author-date\n")
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(
+        app, ["list", "publications", "--format", "citation", "--search", "doe2024widgets"]
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "Doe" in result.stdout
+
+
+def test_list_unknown_format_exits_cleanly(tmp_path, monkeypatch):
+    repo = _setup_publications_repo(tmp_path)
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["list", "widgets", "--format", "xml"])
+
+    assert result.exit_code == 2
+    assert "table" in result.stdout.lower()
+
+
+def test_list_filter_flag(tmp_path, monkeypatch):
+    repo = _setup_ordering_repo(tmp_path)
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["list", "presentations", "--filter", "weight=5"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "id=a1" in result.stdout
+    assert "id=d4" not in result.stdout
+
+
+def _setup_date_filter_repo(tmp_path):
+    # A separate fixture from `_setup_ordering_repo`: that one names its date
+    # field `event_date`, which `CategorySchema.default_date_field()` doesn't
+    # recognize (by design, it only matches `start_date`/`date` — see
+    # core/schema.py). `--after`/`--before` need a field literally named
+    # `date` to resolve, so this uses that name instead, mirroring the real
+    # `presentations` schema in SPECS.md.
+    (tmp_path / "parco.yaml").write_text("name: test-repo\n")
+    (tmp_path / "categories").mkdir()
+    (tmp_path / "categories" / "presentations.yaml").write_text("""
+name: presentations
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: title_en, required: true}
+  - {name: date, type: date, precision: year}
+""")
+    (tmp_path / "vocab.yaml").write_text("{}\n")
+    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "presentations.csv").write_text(
+        "id,title_en,date\n"
+        "a1,Middle Talk,2022\n"
+        "b2,Oldest Talk,2019\n"
+        "c3,Newest Talk,2024\n",
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+def test_list_after_before(tmp_path, monkeypatch):
+    repo = _setup_date_filter_repo(tmp_path)
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["list", "presentations", "--after", "2020", "--before", "2022"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "id=a1" in result.stdout
+    assert "id=b2" not in result.stdout
+    assert "id=c3" not in result.stdout
+
+
+def test_list_after_with_no_date_field_exits_cleanly(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["list", "widgets", "--after", "2020"])
+
+    assert result.exit_code == 2
+    assert "date field" in result.stdout

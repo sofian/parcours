@@ -10,6 +10,7 @@ from pathlib import Path
 import typer
 
 from ..core.build import BuildError, run_build
+from ..core.citations import UnknownCitationStyle, render_citations, resolve_style
 from ..core.data import (
     NotASelectQuery,
     format_table,
@@ -20,6 +21,7 @@ from ..core.data import (
 from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry
 from ..core.handlers import load_handler
 from ..core.handlers.base import CategoryHandler, HandlerContext
+from ..core.handlers.publications import PublicationsHandler
 from ..core.init import (
     GitIdentityMissing,
     GitInitFailed,
@@ -30,7 +32,7 @@ from ..core.init import (
 )
 from ..core.lint import ConfigError, run_lint
 from ..core.profiles import load_profile
-from ..core.repo import DataRepoNotFound, find_data_repo
+from ..core.repo import DataRepoNotFound, find_data_repo, load_repo_config
 from ..core.schema import CategorySchema, load_all_schemas
 from ..core.stats import UnknownStatsField, aggregate_counts
 from ..core.translations import (
@@ -170,8 +172,13 @@ def list_command(
     search: str = typer.Option(None, "--search", help="Only show entries matching this text"),
     order_by: str = typer.Option(None, "--order-by", help="Sort by this field"),
     desc: bool = typer.Option(False, "--desc", help="Sort descending (requires --order-by)"),
+    filter_flags: list[str] = typer.Option(None, "--filter", help="field=value, repeatable"),
+    after: str = typer.Option(None, "--after", help="Inclusive lower bound on the category's date field"),
+    before: str = typer.Option(None, "--before", help="Inclusive upper bound on the category's date field"),
+    fmt: str = typer.Option("table", "--format", help="Output format: table or citation"),
+    style: str = typer.Option(None, "--style", help="Citation style: apa, chicago-author-date, mla, or a path to a .csl file"),
 ):
-    """List entries in a category, optionally filtered by --search text and sorted by --order-by."""
+    """List entries in a category, optionally filtered/sorted, as summaries or citations."""
     data_dir = _find_repo_or_exit()
 
     if category is None:
@@ -180,6 +187,21 @@ def list_command(
 
     schema = _load_schema_or_exit(data_dir, category)
 
+    if fmt not in ("table", "citation"):
+        typer.echo(f"Unknown format: '{fmt}' (expected table or citation)")
+        raise typer.Exit(code=2)
+
+    handler = None
+    if fmt == "citation":
+        handler = load_handler(schema, HandlerContext(data_dir=data_dir))
+        if not isinstance(handler, PublicationsHandler):
+            capable = _citation_capable_categories(data_dir)
+            typer.echo(
+                f"'{category}' doesn't support --format citation. "
+                f"Categories that do: {', '.join(capable) or '(none configured)'}"
+            )
+            raise typer.Exit(code=2)
+
     if desc and not order_by:
         typer.echo("--desc requires --order-by")
         raise typer.Exit(code=2)
@@ -187,7 +209,10 @@ def list_command(
         typer.echo(f"Unknown field: '{order_by}'")
         raise typer.Exit(code=2)
 
-    rows = load_category_rows(data_dir, category)
+    filters = _parse_filter_flags(schema, filter_flags or [])
+    date_range = _resolve_date_range(schema, after, before)
+
+    rows = query_category_rows(data_dir, category, filters=filters, date_range=date_range)
     if search:
         rows = search_rows(rows, search)
     if order_by:
@@ -197,9 +222,49 @@ def list_command(
         typer.echo("No entries found.")
         raise typer.Exit(code=0)
 
+    if fmt == "citation":
+        _print_citations(data_dir, rows, handler, style)
+        return
+
     extra_fields = [order_by] if order_by else None
     for row in rows:
         typer.echo(row_summary(schema, row, extra_fields=extra_fields))
+
+
+def _citation_capable_categories(data_dir: Path) -> list[str]:
+    capable = []
+    for name, category_schema in sorted(load_all_schemas(data_dir / "categories").items()):
+        category_handler = load_handler(category_schema, HandlerContext(data_dir=data_dir))
+        if isinstance(category_handler, PublicationsHandler):
+            capable.append(name)
+    return capable
+
+
+def _print_citations(
+    data_dir: Path, rows: list[dict], handler: PublicationsHandler, style: str | None
+) -> None:
+    style_name = style or load_repo_config(data_dir).get("citation_style", "apa")
+    try:
+        style_path = resolve_style(style_name)
+    except UnknownCitationStyle as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=2)
+
+    resolved_records = []
+    row_has_record = []
+    for row in rows:
+        citekey = row.get("citekey") or ""
+        record = handler.resolve(citekey) if citekey else None
+        row_has_record.append(record is not None)
+        if record is not None:
+            resolved_records.append(record)
+
+    citations = iter(render_citations(resolved_records, style_path))
+    for row, has_record in zip(rows, row_has_record):
+        if has_record:
+            typer.echo(next(citations))
+        else:
+            typer.echo(f"[citekey '{row.get('citekey', '')}' not found in Zotero]")
 
 
 def _available_categories(data_dir: Path) -> list[str]:

@@ -1,6 +1,7 @@
 import pytest
 from pathlib import Path
 from parcours.core.repo import find_data_repo, DataRepoNotFound, MARKER_FILENAME
+from parcours.core.repo import load_repo_config
 
 
 def test_finds_marker_in_current_directory(tmp_path):
@@ -65,3 +66,21 @@ def test_raises_when_nothing_found(tmp_path, monkeypatch):
 def test_explicit_path_must_exist(tmp_path):
     with pytest.raises(DataRepoNotFound):
         find_data_repo(explicit=tmp_path / "does_not_exist")
+
+
+def test_load_repo_config_reads_parco_yaml(tmp_path):
+    (tmp_path / "parco.yaml").write_text("citation_style: chicago-author-date\n", encoding="utf-8")
+
+    config = load_repo_config(tmp_path)
+
+    assert config == {"citation_style": "chicago-author-date"}
+
+
+def test_load_repo_config_missing_file_returns_empty_dict(tmp_path):
+    assert load_repo_config(tmp_path) == {}
+
+
+def test_load_repo_config_empty_file_returns_empty_dict(tmp_path):
+    (tmp_path / "parco.yaml").write_text("", encoding="utf-8")
+
+    assert load_repo_config(tmp_path) == {}
