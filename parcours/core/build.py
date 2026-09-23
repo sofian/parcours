@@ -141,10 +141,17 @@ def build_rendercv_data(data_dir: Path, profile: Profile) -> dict:
         # equal (e.g. a `grants-recent` view still reads `grants`).
         view = views[section["source"]]
         schema = schemas[view.source]
-        title = translations.resolve_or_literal("section", section["id"], language)
-        sections[title] = _build_section_entries(
+        entries = _build_section_entries(
             data_dir, schema, view, section, language, translations
         )
+        if not entries:
+            # A category with no rows yet gets no section at all, not an
+            # empty heading — the common case for a freshly-scaffolded
+            # repo (see SPECS.md, "Init"), and no CV format wants a
+            # visible section with nothing under it.
+            continue
+        title = translations.resolve_or_literal("section", section["id"], language)
+        sections[title] = entries
 
     cv["sections"] = sections
 

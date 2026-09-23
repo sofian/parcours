@@ -106,6 +106,32 @@ def test_build_resolves_a_section_title_from_translations(tmp_path, monkeypatch)
     assert "Subventions" not in data["cv"]["sections"]
 
 
+def test_build_omits_a_section_entirely_when_its_category_has_no_rows(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "grants.csv").write_text(
+        "id,title_en,title_fr,funder,role,start_date,end_date,amount,currency,co_investigators\n"
+        "g1,Big Grant,Grande subvention,FRQSC,PI,2020-01,2022-01,50000,CAD,\n"
+    )
+    # publications.csv is never written — a freshly-scaffolded, no-data category.
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},
+        sections=[
+            {"id": "grants", "source": "grants"},
+            {"id": "publications", "source": "publications"},
+        ],
+    )
+    monkeypatch.setattr(
+        "parcours.core.build.load_views",
+        lambda path: {"grants": _grants_view(), "publications": _publications_view()},
+    )
+
+    data = build_rendercv_data(repo, profile)
+
+    assert "Grants" in data["cv"]["sections"]
+    assert "Publications" not in data["cv"]["sections"]
+    assert len(data["cv"]["sections"]) == 1
+
+
 def test_build_maps_grant_rows_into_normal_entries(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     (repo / "grants.csv").write_text(
