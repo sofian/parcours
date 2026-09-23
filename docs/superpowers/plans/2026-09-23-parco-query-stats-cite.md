@@ -338,6 +338,40 @@ def test_run_select_query_leaves_the_csv_untouched(tmp_path):
     assert csv_path.read_bytes() == before
 
 
+def test_run_select_query_rejects_a_chained_second_statement(tmp_path):
+    (tmp_path / "widgets.csv").write_text("id,status\nw1,draft\n", encoding="utf-8")
+
+    with pytest.raises(NotASelectQuery):
+        run_select_query(tmp_path, "SELECT * FROM widgets; DROP TABLE widgets")
+
+
+def test_run_select_query_rejects_a_chained_copy_that_would_overwrite_a_real_csv(tmp_path):
+    # A real, verified exploit if only the first word were checked: DuckDB's
+    # execute() runs every semicolon-separated statement, so a chained COPY
+    # can silently overwrite any file on disk, including another category's
+    # real CSV, with no git-history undo path.
+    csv_path = tmp_path / "widgets.csv"
+    csv_path.write_text("id,status\nw1,draft\n", encoding="utf-8")
+    before = csv_path.read_bytes()
+    escaped = str(csv_path).replace("'", "''")
+
+    with pytest.raises(NotASelectQuery):
+        run_select_query(
+            tmp_path,
+            f"SELECT 1 as x; COPY (SELECT 'PWNED' as y) TO '{escaped}'",
+        )
+
+    assert csv_path.read_bytes() == before
+
+
+def test_run_select_query_tolerates_one_harmless_trailing_semicolon(tmp_path):
+    (tmp_path / "widgets.csv").write_text("id,status\nw1,draft\n", encoding="utf-8")
+
+    columns, rows = run_select_query(tmp_path, "SELECT id FROM widgets;")
+
+    assert rows == [{"id": "w1"}]
+
+
 def test_format_table_aligns_columns():
     text = format_table(["id", "name"], [{"id": "w1", "name": "First"}, {"id": "w2", "name": "B"}])
 
@@ -463,6 +497,19 @@ def run_select_query(data_dir: Path, sql: str) -> tuple[list[str], list[dict]]:
             f"Only SELECT (or WITH ... SELECT) queries are allowed, got: {stripped[:50]!r}"
         )
 
+    # DuckDB's execute() runs every statement in a semicolon-separated
+    # string, so checking only the first word is NOT enough on its own —
+    # verified directly: "SELECT 1; COPY (SELECT 'x') TO 'grants.csv'"
+    # passes the check above and then silently overwrites a real file,
+    # with no git-history undo path. A single harmless trailing `;` is
+    # tolerated; anything after it is not.
+    body = stripped[:-1] if stripped.endswith(";") else stripped
+    if ";" in body:
+        raise NotASelectQuery(
+            "Only a single SELECT (or WITH ... SELECT) statement is allowed "
+            "— remove the semicolon-separated second statement"
+        )
+
     connection = duckdb.connect(database=":memory:")
     try:
         for csv_path in sorted(data_dir.glob("*.csv")):
@@ -474,7 +521,7 @@ def run_select_query(data_dir: Path, sql: str) -> tuple[list[str], list[dict]]:
             )
 
         try:
-            result = connection.execute(stripped)
+            result = connection.execute(body)
         except duckdb.Error as exc:
             raise ValueError(f"Query failed: {exc}") from exc
 
@@ -567,7 +614,7 @@ def query(
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `pytest tests/unit/test_data.py tests/integration/test_cli_query.py -v`
-Expected: PASS (8 new unit tests, 5 new integration tests)
+Expected: PASS (11 new unit tests, 5 new integration tests)
 
 - [ ] **Step 6: Run the full suite to verify no regressions**
 
