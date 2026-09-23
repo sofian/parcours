@@ -1307,7 +1307,41 @@ copy) or a `"{field}"` template string (composed/formatted). A bare
 just `title` if the field isn't a bilingual pair — based on the
 profile's own language, the same resolution `translations.csv` already uses;
 this is the general rule for every bilingual field, not something each
-view has to spell out.
+view has to spell out. A bare, single-placeholder template (`"{field}"`
+with no surrounding literal text) whose resolved value is already a
+Python list — not a string — passes that list through unchanged rather
+than stringifying it; this is what lets `authors: "{zotero_authors}"`
+populate `PublicationEntry.authors: list[str]` directly. Every other
+template shape (a compound string mixing multiple `{field}`s and/or
+literal text, or a value that isn't a list) always produces a string,
+same as `highlights`' own list-of-separately-resolved-strings shape.
+
+**Zotero-backed views (`publications`, `review`, `catalog`):** these
+categories' `fields` templates reference the *resolved Zotero CSL-JSON
+record*, not raw CSV columns — the row itself only really has `id` and
+`citekey`. Before running the generic `{field}` template substitution
+on such a row, `build` resolves `citekey` via the schema's own handler
+(`PublicationsHandler.resolve()`, the same shared capability `parco
+lint` already uses to validate citekeys) and merges a normalized subset
+of the CSL-JSON record into the row under fixed keys the template
+mapping can reference like any other field:
+`zotero_title`, `zotero_authors` (the CSL-JSON `author` list of
+`{family, given}` objects, converted to a Python `list[str]` of
+`"Given Family"` strings — not joined into one string, so it maps
+straight onto `PublicationEntry.authors: list[str]`, see Mechanism
+above), `zotero_journal` (CSL-JSON's `container-title`), `zotero_doi`
+(CSL-JSON's `DOI`), `zotero_url` (CSL-JSON's `URL`), `zotero_date`
+(CSL-JSON's `issued.date-parts`, formatted to an ISO partial date
+string). This
+keeps the `{field}` template engine itself uniform — always a flat-dict
+lookup, no branching on category — by pushing the one truly
+category-specific step (Zotero resolution + shape normalization) into
+`build`'s row-preparation step, gated on `isinstance(handler,
+PublicationsHandler)`, before templating runs. A `citekey` that fails
+to resolve (already an `error`-severity `parco lint` issue) means those
+`zotero_*` keys are simply absent from the row — the affected fields
+render blank rather than crashing, since `build` already refuses to run
+past a lint error unless `--force`.
 
 Entry type per category:
 
@@ -1343,6 +1377,20 @@ grants:
       - "{funder} — {role}"
       - "{amount} {currency}"
       - "{co_investigators}"
+```
+
+Worked example (`publications`, Zotero-backed):
+```yaml
+publications:
+  source: publications
+  entry_type: PublicationEntry
+  fields:
+    title: "{zotero_title}"
+    authors: "{zotero_authors}"
+    journal: "{zotero_journal}"
+    doi: "{zotero_doi}"
+    url: "{zotero_url}"
+    date: "{zotero_date}"
 ```
 
 **`skills` is the one view that isn't a flat row-to-entry mapping.**
