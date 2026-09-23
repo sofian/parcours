@@ -32,6 +32,7 @@ from ..core.lint import ConfigError, run_lint
 from ..core.profiles import load_profile
 from ..core.repo import DataRepoNotFound, find_data_repo
 from ..core.schema import CategorySchema, load_all_schemas
+from ..core.stats import UnknownStatsField, aggregate_counts
 from ..core.translations import (
     TranslationExists,
     TranslationNotFound,
@@ -129,6 +130,40 @@ def query(
         typer.echo(json.dumps(rows, indent=2))
 
 
+@app.command()
+def stats(
+    category: str = typer.Argument(None, help="Category to aggregate"),
+    by: str = typer.Option(..., "--by", help="Field to group by, or 'year' for the category's date field"),
+    search: str = typer.Option(None, "--search", help="Only count entries matching this text"),
+    filter_flags: list[str] = typer.Option(None, "--filter", help="field=value, repeatable"),
+    after: str = typer.Option(None, "--after", help="Inclusive lower bound on the category's date field"),
+    before: str = typer.Option(None, "--before", help="Inclusive upper bound on the category's date field"),
+):
+    """Count entries in a category, grouped by a field (or 'year')."""
+    data_dir = _find_repo_or_exit()
+    schema = _require_category_or_exit(data_dir, category)
+
+    filters = _parse_filter_flags(schema, filter_flags or [])
+    date_range = _resolve_date_range(schema, after, before)
+
+    rows = query_category_rows(data_dir, category, filters=filters, date_range=date_range)
+    if search:
+        rows = search_rows(rows, search)
+
+    try:
+        counts = aggregate_counts(schema, rows, by)
+    except UnknownStatsField as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=2)
+
+    if not counts:
+        typer.echo("No entries found.")
+        raise typer.Exit(code=0)
+
+    for value, count in counts:
+        typer.echo(f"{value}: {count}")
+
+
 @app.command(name="list")
 def list_command(
     category: str = typer.Argument(None, help="Category to list (omit to see available categories)"),
@@ -196,6 +231,32 @@ def _require_category_or_exit(data_dir: Path, category: str | None) -> CategoryS
         _print_available_categories(data_dir)
         raise typer.Exit(code=2)
     return _load_schema_or_exit(data_dir, category)
+
+
+def _parse_filter_flags(schema: CategorySchema, filter_flags: list[str]) -> dict[str, list[str]]:
+    filters: dict[str, list[str]] = {}
+    for flag in filter_flags:
+        if "=" not in flag:
+            typer.echo(f"Invalid --filter '{flag}' (expected field=value)")
+            raise typer.Exit(code=2)
+        field_name, value = flag.split("=", 1)
+        if schema.get_field(field_name) is None:
+            typer.echo(f"Unknown field: '{field_name}'")
+            raise typer.Exit(code=2)
+        filters.setdefault(field_name, []).append(value)
+    return filters
+
+
+def _resolve_date_range(
+    schema: CategorySchema, after: str | None, before: str | None
+) -> tuple[str, str | None, str | None] | None:
+    if after is None and before is None:
+        return None
+    date_field = schema.default_date_field()
+    if date_field is None:
+        typer.echo(f"'{schema.name}' has no date field to filter on with --after/--before.")
+        raise typer.Exit(code=2)
+    return (date_field, after, before)
 
 
 def _load_vocab_and_handler_or_exit(
