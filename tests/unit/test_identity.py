@@ -36,7 +36,26 @@ def test_resolve_identity_builds_full_name_and_contact_fields(tmp_path):
     assert cv["name"] == "Jane Doe"
     assert cv["email"] == "jane.doe@example.edu"
     assert cv["phone"] == "+1 555-000-1111"
-    assert cv["website"] == "example.com"
+    assert cv["website"] == "https://example.com"
+
+
+def test_resolve_identity_adds_a_scheme_to_a_bare_homepage_domain(tmp_path):
+    identity = load_identity(_write_identity(tmp_path))
+
+    cv = resolve_identity(identity, "artist", "en")
+
+    assert cv["website"] == "https://example.com"
+
+
+def test_resolve_identity_leaves_an_already_schemed_homepage_alone():
+    identity = {
+        "name": {"first": "Jane", "last": "Doe"},
+        "variants": {"artist": {"homepage": "https://example.org"}},
+    }
+
+    cv = resolve_identity(identity, "artist", "en")
+
+    assert cv["website"] == "https://example.org"
 
 
 def test_resolve_identity_resolves_bilingual_title_by_language():

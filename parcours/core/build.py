@@ -1,7 +1,8 @@
 """Assembles a RenderCV YAML input from a profile + views.yaml + category
 data (see SPECS.md, "Build / query" and "views.yaml (draft)"). Core
-layer: no prompting, no subprocess here — see the CLI `build` command
-for lint-gating and the `rendercv` invocation."""
+layer: no prompting, no interactive I/O — the one sanctioned exception
+is `run_build`'s subprocess call out to the external `rendercv` CLI,
+treated like Pandoc elsewhere in this codebase."""
 
 import subprocess
 import tempfile
@@ -73,8 +74,26 @@ def _map_row_to_entry(view: ViewSpec, row: dict, language: str) -> dict:
     return entry
 
 
+def _resolve_glossary_fields(schema, row: dict, translations, language: str) -> dict:
+    """Replaces every `glossary:`-marked field's raw value with its
+    translated form (see SPECS.md: `build` is what actually *consumes*
+    the glossary, not just `lint`). Unmatched values fall back to the
+    literal, per `resolve_or_literal`."""
+    glossary_fields = [f for f in schema.fields if f.glossary]
+    if not glossary_fields:
+        return row
+    resolved = dict(row)
+    for field_spec in glossary_fields:
+        raw_value = row.get(field_spec.name)
+        if raw_value:
+            resolved[field_spec.name] = translations.resolve_or_literal(
+                field_spec.glossary, raw_value, language
+            )
+    return resolved
+
+
 def _build_section_entries(
-    data_dir: Path, schema, view: ViewSpec, section: dict, language: str
+    data_dir: Path, schema, view: ViewSpec, section: dict, language: str, translations
 ) -> list[dict]:
     rows = query_category_rows(
         data_dir,
@@ -83,12 +102,24 @@ def _build_section_entries(
         order_by=section.get("order_by"),
         limit=section.get("limit"),
     )
+    rows = [_resolve_glossary_fields(schema, row, translations, language) for row in rows]
 
     handler = load_handler(schema, HandlerContext(data_dir=data_dir))
     if isinstance(handler, PublicationsHandler):
         rows = [_merge_zotero_fields(handler, row) for row in rows]
 
     return [_map_row_to_entry(view, row, language) for row in rows]
+
+
+# RenderCV's `locale` block is a discriminated union keyed on a spelled-out
+# language *name* ("english", "french", ... — see `available_locales` in
+# rendercv.schema.models.locale), not an ISO code, and it's what localizes
+# month names on rendered dates.
+_RENDERCV_LOCALES = {"en": "english", "fr": "french"}
+
+
+def _rendercv_locale(language: str) -> str:
+    return _RENDERCV_LOCALES.get(language, "english")
 
 
 def build_rendercv_data(data_dir: Path, profile: Profile) -> dict:
@@ -105,17 +136,22 @@ def build_rendercv_data(data_dir: Path, profile: Profile) -> dict:
 
     sections = {}
     for section in profile.sections:
-        source = section["source"]
-        view = views[source]
-        schema = schemas[source]
+        # A section's `source` names a *view*; the view's own `source`
+        # names the underlying category — the two are only incidentally
+        # equal (e.g. a `grants-recent` view still reads `grants`).
+        view = views[section["source"]]
+        schema = schemas[view.source]
         title = translations.resolve_or_literal("section", section["id"], language)
-        sections[title] = _build_section_entries(data_dir, schema, view, section, language)
+        sections[title] = _build_section_entries(
+            data_dir, schema, view, section, language, translations
+        )
 
     cv["sections"] = sections
 
     return {
         "cv": cv,
         "design": {"theme": profile.meta["theme"]},
+        "locale": {"language": _rendercv_locale(language)},
     }
 
 
@@ -140,7 +176,8 @@ def run_build(
         raise BuildError(f"Format '{fmt}' is not yet supported (docx needs the Pandoc integration)")
 
     if not force:
-        category_names = {section["source"] for section in profile.sections}
+        views = load_views(data_dir / "views.yaml")
+        category_names = {views[section["source"]].source for section in profile.sections}
         for category_name in category_names:
             issues = run_lint(data_dir, category_filter=category_name)
             error_issues = [issue for issue in issues if issue.severity == "error"]
@@ -180,6 +217,9 @@ def run_build(
                 check=True, capture_output=True, text=True,
             )
         except subprocess.CalledProcessError as exc:
-            raise BuildError(f"rendercv render failed: {exc.stderr}") from exc
+            # RenderCV prints its validation-error table to stdout, not
+            # stderr — dropping stdout throws away the actual diagnosis.
+            detail = "\n".join(part for part in [exc.stdout, exc.stderr] if part)
+            raise BuildError(f"rendercv render failed: {detail}") from exc
 
     return output_path

@@ -41,6 +41,10 @@ def query_category_rows(
     if filters:
         clauses = []
         for field_name, allowed_values in filters.items():
+            # A profile's `filter` is "simple key→value" — a scalar would
+            # otherwise be iterated character-by-character below.
+            if not isinstance(allowed_values, (list, tuple)):
+                allowed_values = [allowed_values]
             placeholders = ", ".join("?" for _ in allowed_values)
             clauses.append(f'"{field_name}" IN ({placeholders})')
             params.extend(allowed_values)

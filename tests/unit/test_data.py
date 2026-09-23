@@ -48,6 +48,17 @@ def test_query_filters_by_allowed_values(tmp_path):
     assert sorted(r["id"] for r in rows) == ["w2", "w3"]
 
 
+def test_query_filters_by_a_scalar_value(tmp_path):
+    (tmp_path / "widgets.csv").write_text(
+        "id,title_en,status\nw1,First,draft\nw2,Second,published\nw3,Third,published\n",
+        encoding="utf-8",
+    )
+
+    rows = query_category_rows(tmp_path, "widgets", filters={"status": "published"})
+
+    assert sorted(r["id"] for r in rows) == ["w2", "w3"]
+
+
 def test_query_filters_by_multiple_fields_anded_together(tmp_path):
     (tmp_path / "widgets.csv").write_text(
         "id,title_en,status\nw1,First,draft\nw2,Second,published\nw3,First,published\n",

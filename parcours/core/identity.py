@@ -37,7 +37,12 @@ def resolve_identity(identity: dict, variant_name: str, language: str) -> dict:
 
     for source_key, cv_key in [("email", "email"), ("phone", "phone"), ("homepage", "website")]:
         value = variant_fields.get(source_key)
-        if value:
-            cv[cv_key] = value
+        if not value:
+            continue
+        # SPECS.md documents `homepage:` with bare-domain examples, but
+        # RenderCV's `cv.website` requires an absolute URL.
+        if cv_key == "website" and "://" not in value:
+            value = f"https://{value}"
+        cv[cv_key] = value
 
     return cv
