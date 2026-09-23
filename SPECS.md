@@ -1233,24 +1233,47 @@ actual `identity.yaml`, in the private data repo, not here.)
 - YAML config files, one per CV variant/language combination
   (`profiles/academic-en.yaml`, `profiles/short-fr.yaml`, etc.).
 - Each profile has `meta` (name, language, format, RenderCV theme,
-  `identity_variant`) and a `sections` list. Each section references a
-  `source` (a named, fixed view over the data — never raw SQL in
-  profile files), plus optional `filter` (simple key→value, not
-  arbitrary SQL), `order_by`, `limit`, `group_by`, `citation_style`.
+  `identity_variant`, `output` — see below) and a `sections` list. Each
+  section references a `source` (a named, fixed view over the data —
+  never raw SQL in profile files), plus optional `filter` (simple
+  key→value, not arbitrary SQL), `order_by`, `limit`, `group_by`,
+  `citation_style`.
 - Section `title` is **not** hardcoded per profile — resolved from
   `translations.csv` via the section's `id`, keyed to `meta.language`.
 - **Views are defined in `views.yaml` in the data repo**, not in code.
   Each named view maps to a table, its fields, and a RenderCV entry
   type (see views.yaml (draft), below). The tool ships a starter
   `views.yaml`; no category names are hardcoded.
+- **`extends`:** a profile may name a base file (`extends: _academic`,
+  resolving to `profiles/_academic.yaml`) holding everything that isn't
+  language-specific — `meta.name`/`format`/`theme`/`identity_variant`
+  and the full `sections` list. The language-specific profile itself
+  then only needs `extends` plus `meta.language` (and anything else it
+  genuinely wants to override). Merging is a single, shallow level — no
+  chained `extends`, no per-section deep merge: the child's top-level
+  keys (`meta`, `sections`, ...) replace the base's wholesale where
+  present, otherwise the base's value is inherited untouched. A base
+  file's leading underscore is a naming convention, not enforced — it's
+  never meant to be built directly (it has no `meta.language`).
+- **`meta.output`:** the base filename `parco build` writes to (the
+  format's extension is added automatically, based on what's being
+  built — never part of `output` itself). Supports the same `{field}`
+  template substitution as `views.yaml`'s field mappings (see views.yaml
+  (draft), below), resolved against the profile's own `meta` fields —
+  e.g. `output: "cv-{name}-{language}"` on a base profile produces
+  `cv-academic-en`/`cv-academic-fr` for each language child
+  automatically, with nothing to override per child. Defaults to
+  `"cv-{name}-{language}"` when omitted entirely.
 
 Example:
 ```yaml
+# profiles/_academic.yaml (a base — never built directly)
 meta:
-  name: short
-  language: en
+  name: academic
   format: pdf
   theme: sb2nov
+  identity_variant: academic
+  output: "cv-{name}-{language}"
 sections:
   - id: publications
     source: publications
@@ -1258,6 +1281,12 @@ sections:
     order_by: year desc
     limit: 10
     citation_style: apa
+```
+```yaml
+# profiles/academic-en.yaml
+extends: _academic
+meta:
+  language: en
 ```
 
 ## views.yaml (draft)
@@ -1420,16 +1449,26 @@ clients that call into it.
 ```
 parcours/
   core/
-    data.py       # CSV/DuckDB access, queries
-    entries.py    # add/edit/delete logic
-    lint.py        # returns a list of LintIssue objects
-    build.py         # profile → RenderCV YAML → rendered output
-    cite.py            # citeproc wrapper
-    sync.py              # git operations, remote reconciliation
-    vocab.py               # loads/validates against vocab.yaml
-    handlers/                # per-category behavior: generic.py, publications.py
+    data.py           # CSV/DuckDB access, queries (implemented)
+    schema.py         # categories/<name>.yaml loading (implemented)
+    vocab.py          # loads/validates against vocab.yaml (implemented)
+    translations.py   # translations.csv + glossary lookups (implemented)
+    dates.py          # ISO partial dates (implemented)
+    matching.py       # fuzzy string matching (implemented)
+    validation.py     # common field validation (implemented)
+    lint.py           # returns a list of LintIssue objects (implemented)
+    entries.py        # add/edit/delete logic (implemented)
+    repo.py           # data-repo discovery (implemented)
+    handlers/         # per-category behavior: generic.py, publications.py (implemented)
+    identity.py       # identity.yaml + variant resolution (planned, build)
+    profiles.py       # profiles/*.yaml loading + `extends` merge (planned, build)
+    views.py          # views.yaml loading (planned, build)
+    build.py          # profile → RenderCV YAML → rendered output (planned)
+    cite.py           # citeproc wrapper (planned)
+    sync.py           # git operations, remote reconciliation (planned)
   cli/
-    main.py       # Typer app — thin, owns all prompts/printing
+    main.py       # Typer app — thin, owns all prompts/printing (implemented)
+    wizard.py     # field-collection loop, search/pick, confirm+dedup (implemented)
   web/            # future: FastAPI wrapping the same core functions
   gui/            # future: same core functions, different frontend
 ```
@@ -1495,11 +1534,62 @@ out of sync.
 
 ### Build / query
 ```
-parco build --profile <name> --lang <fr|en> --format <pdf|docx>
+parco build --profile <name> [--format pdf|latex|typst|html] [--force] [--output-dir <dir>]
 parco query "<SQL>"
 parco stats --type <category> --by <dimension>
 parco cite --key <citekey> --style <chicago|apa|...>
 ```
+No `--lang` flag — a profile's own `meta.language` (and its filename,
+by convention, e.g. `academic-en.yaml`) is the one source of truth for
+which language it renders; `extends` (see Profiles) is how two
+language variants share everything else without duplicating it.
+`--format` stays independent of `--profile`/language, since output
+format genuinely is a separate, later decision (the same profile might
+reasonably be built as both PDF and — once supported — DOCX); it
+defaults to the profile's own `meta.format` when omitted. Output lands
+in a `build/` directory at the data repo's root by default (git-ignored
+— rendered CVs are generated artifacts, not source data),
+overridable with `--output-dir`.
+
+**`build`'s pipeline, in order:** load the profile (resolving `extends`
+if present) → run `parco lint` scoped to the categories the profile's
+sections reference, aborting on any `error`-severity issue unless
+`--force` (warnings, e.g. the `glossary:` check, never block) → load
+`identity.yaml` and resolve the variant named by
+`meta.identity_variant` into RenderCV's `cv:` name/email/phone/
+location/social_networks → for each section, run its `filter`/
+`order_by`/`limit` as a DuckDB query against the view's `source` table
+(translated to parameterized `WHERE`/`ORDER BY`/`LIMIT` — never raw
+SQL) → map each row to an entry dict via the view's `fields` (see
+views.yaml (draft)): a plain field name copies directly, a `{field}`
+template auto-resolves a bilingual pair by `meta.language` — falling
+back to the other language if the profile's own is blank, the same
+"never blank just from a language mismatch" principle the glossary
+fallback already uses — and a `glossary:`-marked field resolves through
+`TranslationsTable.resolve_or_literal` instead of the raw value (this
+is `build` actually consuming the glossary mechanism, not just linting
+it) → resolve each section's displayed title from `translations.csv`
+by its `id` + `meta.language` (RenderCV's `sections` dict is keyed by
+the literal displayed title, so this must happen before assembly) →
+assemble the full RenderCV YAML (`cv`, `design: {theme: meta.theme}`,
+minimal `locale`/`settings`) to a temp file → shell out to the
+`rendercv render` CLI (an external dependency, like Pandoc — its PDF
+path needs an extra `rendercv_fonts` package a plain `pip install
+rendercv` doesn't pull in, so importing its internals directly would be
+fragile against a package never meant as a stable public API),
+targeting only the requested format's output flag (`--pdf-path`
+etc., others disabled), writing to `meta.output`'s resolved filename.
+
+**First-cut scope:** all 18 non-skills categories get real views (once
+the pipeline above works for one category, the rest are config, not
+new code or new risk) — `skills`' `group_by` aggregation is the one
+category deferred. Also deferred: `docx` (rejected with a clear
+"not yet supported" message pending the Pandoc integration this
+already has a working spike for — see Output formats), citeproc-styled
+`citation_style` (ignored for now — RenderCV's own `PublicationEntry`
+layout doesn't need it; `citation_style` only matters for the separate
+`parco cite` command), and currency conversion (`grants.amount` renders
+as-is; no `rates.csv` fetching exists yet in any form).
 
 ### Data entry (wizard-first, not flag-required)
 ```
@@ -1716,8 +1806,22 @@ wizard is also implemented (see CLI's "Data entry"): field-by-field
 prompting with vocab numbered-choice and `require_one_of` handling,
 substring search + numbered pick for `edit`/`delete`, the
 confirm-before-write + duplicate-check screen, and per-write git
-auto-commit (`core/entries.py`). What remains is `sync`, `build`, and
-`refresh`/`import` — see CLI.
+auto-commit (`core/entries.py`). `parco list --order-by`/`--desc` and
+`parco translation add/edit/delete/list` (managing `translations.csv`)
+are implemented too, along with a `glossary: <category>` field marker
+and its warning-level `parco lint` check.
+
+`build`'s design (first cut) is now complete — see CLI's "Build /
+query": profile loading with `extends`, `meta.output` templating,
+lint-gating with `--force`, the full pipeline from DuckDB query through
+`{field}`/`glossary:` resolution to `rendercv render` invocation, and
+its deferred-scope boundary (skills aggregation, `docx`, citation
+styles, currency conversion). Verified against the real installed
+RenderCV 2.8 package (`Cv`/`Section`/entry-type field shapes, and that
+`rendercv render`'s CLI needs an extra `rendercv_fonts` package for its
+PDF path — hence treating `rendercv` as an external CLI dependency, not
+a Python import), not assumed from memory. What remains to design is
+`sync` and `refresh`/`import` — see CLI.
 
 ## Known limitations / follow-up from prior plans' final reviews
 
