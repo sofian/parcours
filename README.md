@@ -2,7 +2,7 @@
 
 A personal, portable system for maintaining academic and artistic CV data as structured, git-tracked plain text — with a command-line tool (`parco`) to enter data through a wizard, validate it, and generate CV documents in multiple versions and languages.
 
-> **Status:** the core is implemented and usable today — scaffold a new data repo with `parco init`, enter data with `parco add`/`edit`/`delete`/`list`, validate it with `parco lint`, and render a CV with `parco build`. Querying, statistics, and citation formatting (`parco query`/`stats`/`cite`) and remote sync/import (`parco sync`/`refresh`/`import`) are still being designed and aren't built yet — see [`SPECS.md`](SPECS.md)'s "Design status" section for the current, authoritative breakdown of what's built vs. planned.
+> **Status:** the core is implemented and usable today — scaffold a new data repo with `parco init`, enter data with `parco add`/`edit`/`delete`/`list`, validate it with `parco lint`, render a CV with `parco build`, run ad-hoc SQL with `parco query`, count entries with `parco stats`, and format citations with `parco list --format citation`. Remote sync/import (`parco sync`/`refresh`/`import`) are still being designed and aren't built yet — see [`SPECS.md`](SPECS.md)'s "Design status" section for the current, authoritative breakdown of what's built vs. planned.
 
 ## Why
 
@@ -23,8 +23,8 @@ CSV files (source of truth, git-tracked)
         │
         ├──► RenderCV (YAML) ──► PDF / Typst / HTML         (parco build)
         ├──► Pandoc          ──► DOCX                        (parco build --format docx, planned)
-        ├──► citeproc + CSL  ──► formatted citations         (parco list --format citation, planned)
-        ├──► SQL result tables ──► stats / ad-hoc queries    (parco stats / parco query, planned)
+        ├──► citeproc + CSL  ──► formatted citations         (parco list --format citation)
+        ├──► SQL result tables ──► stats / ad-hoc queries    (parco stats / parco query)
         └──► (future) MCP-DuckDB server ──► read-only chatbot
 ```
 
@@ -53,16 +53,18 @@ parco build --profile academic-en --format pdf
 # Manage translations.csv (section titles, content glossaries like place names)
 parco translation add location montreal --en "Montreal, Canada" --fr "Montréal, Canada"
 parco translation list
+
+# Ad-hoc SQL, counts, and formatted citations
+parco query "SELECT status, count(*) FROM grants GROUP BY status"
+parco stats grants --by year
+parco list publications --format citation --style apa
 ```
 
-`add`/`edit`/`delete`/`list` never hardcode a category list — `categories/*.yaml` in your data repo defines what exists, and every one of these commands shows you the available categories if you omit one or type it wrong. `add`/`edit` also accept `--field value` flags to pre-fill the wizard (e.g. `parco add grants --funder FRQSC`) without skipping it.
+`add`/`edit`/`delete`/`list` never hardcode a category list — `categories/*.yaml` in your data repo defines what exists, and every one of these commands shows you the available categories if you omit one or type it wrong. `add`/`edit` also accept `--field value` flags to pre-fill the wizard (e.g. `parco add grants --funder FRQSC`) without skipping it. `stats`' `--by year` special-case only applies to categories with a real local date field — the shipped `publications` schema keeps its dates in Zotero rather than a local column, so use a category like `grants` for that example.
 
 **Not built yet** — designed in [`SPECS.md`](SPECS.md) but not implemented:
 
 ```bash
-parco query "SELECT year, count(*) FROM publications GROUP BY year"
-parco stats --type publications --by year
-parco list publications --format citation --style apa
 parco refresh zotero --collection "CV"
 parco refresh rates
 parco import ccv --file export.xml --dry-run

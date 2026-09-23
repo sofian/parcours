@@ -1510,6 +1510,17 @@ skills-text:                               # expertise / other
   exact formatter mechanism for this (a built-in option vs. a small
   custom formatter) gets confirmed against the real installed package
   during implementation, not assumed here.
+- **Known upstream limitation (citeproc-py 0.11.1, not a bug here):**
+  the bundled Chicago and MLA styles set `initialize-with=". "` at the
+  top-level `<style>` element but then try to turn it back off for most
+  name elements via `initialize="false"`; citeproc-py's `Name.get_option`
+  (`citeproc/model.py`) only ever consults `initialize-with`, walking up
+  to the nearest `cs:citation`/`cs:bibliography` ancestor and ultimately
+  the top-level `<style>` value — it never reads a local `initialize`
+  attribute. So author given names render abbreviated to initials
+  ("Doe, J.") in Chicago/MLA output even though those real styles want
+  them spelled out in full ("Doe, Jane"). Verified empirically against
+  the installed package; nothing to fix in this codebase.
 
 ## Output formats
 
@@ -1803,17 +1814,19 @@ Positional `<category>`, matching `list`/`add`/`edit`/`delete` (not a
 <field> ORDER BY <field>` against the named category, applied *after*
 whichever filtering options are given — `--by` aggregates whatever
 subset of rows survives the filters, not the whole table (e.g. `parco
-stats publications --by year --filter status=published` counts only
-published publications, per year). `<field>` is validated against the
+stats grants --by year --filter status=awarded` counts only awarded
+grants, per year). `<field>` is validated against the
 category's real schema fields, the same way `list --order-by` already
 validates — an unknown field is a clean error, not a DuckDB traceback.
 One special case: `--by year` is recognized whenever the category has
 a `date` or `start_date` field, grouping by the year extracted via
 `core/dates.py`'s existing `parse_partial_date` rather than the raw
 string value (so `2024-03` and `2024-09` count as the same group) —
-this is the flagship use case (`publications` per year) and worth a
-small special-case rather than making everyone write `parco query` by
-hand for it. **No dollar-amount aggregation in this first cut** —
+this is the flagship use case (a category with a real local date
+field, per year — `publications`' own dates live in Zotero, not a
+local column, so `stats publications --by year` genuinely doesn't
+apply to it) and worth a small special-case rather than making everyone
+write `parco query` by hand for it. **No dollar-amount aggregation in this first cut** —
 summing `grants.amount` across mixed currencies would be silently
 misleading with no `rates.csv` conversion in place yet (see Currency
 conversion); `stats` waits for that to exist as its own piece of work
@@ -2127,6 +2140,17 @@ qualify without the full `publications` handler is declared but
 unimplemented) — `artworks`' `person_list`-based citation (see Category
 schemas: `artworks`) is a separate, clean, deliberate follow-up. What
 remains to design is `sync` and `refresh`/`import` — see CLI.
+
+`query`/`stats`/`list --format citation`'s implementation is now
+complete too: `query` is a SELECT-only passthrough (validated with
+DuckDB's own statement parser, not a regex) with `table`/`csv`/`json`
+output; `stats` is count-only, sharing `list`'s `--search`/`--filter`/
+`--after`/`--before` filtering, with the `--by year` special case
+(applicable only to categories with a real local date field — see
+Stats); and citation formatting is `list --format citation`, rendering
+resolved citekeys through citeproc-py against the three bundled CSL
+styles (APA, Chicago author-date, MLA) as Markdown-style output, for
+Zotero-backed categories only.
 
 ## Known limitations / follow-up from prior plans' final reviews
 
