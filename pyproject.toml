@@ -23,3 +23,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["parcours*"]
+
+[tool.setuptools.package-data]
+parcours = ["starter_config/**/*.yaml", "starter_config/**/*.csv"]

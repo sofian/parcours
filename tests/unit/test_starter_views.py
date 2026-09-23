@@ -3,7 +3,7 @@ from pathlib import Path
 
 from parcours.core.views import load_views
 
-_STARTER_VIEWS_PATH = Path(__file__).parent.parent.parent / "starter_config" / "views.yaml"
+_STARTER_VIEWS_PATH = Path(__file__).parent.parent.parent / "parcours" / "starter_config" / "views.yaml"
 
 _EXPECTED_ENTRY_TYPES = {
     "publications": "PublicationEntry",
