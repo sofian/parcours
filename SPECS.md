@@ -929,7 +929,11 @@ dedup:
 
 ### exhibitions (handler: generic)
 
-No CCV equivalent — grounded entirely in the LaTeX CV.
+Maps from CCV's Artistic Exhibitions (see CCV export structure, above)
+— the single largest record chain in a real export (43 records) — with
+`location`/`event`/`curator` left blank on import (no CCV source for
+any of the three; see CCV export structure) for manual completion
+afterward.
 
 ```yaml
 name: exhibitions
