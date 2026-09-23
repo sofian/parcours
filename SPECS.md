@@ -1587,6 +1587,55 @@ Python-based (Typer), single package, no server/daemon — reads
 CSVs + runs DuckDB fresh on each invocation, no persistent state to get
 out of sync.
 
+### Init
+```
+parco init [path]                          # defaults to cwd; wizard-driven
+```
+Scaffolds a brand-new parco data repo. Refuses if `path/parco.yaml`
+already exists — re-running `init` to "add missing pieces" to an
+existing repo isn't supported in v1; start fresh in a new directory or
+edit files by hand. Runs as a wizard (the same field-by-field,
+confirm-before-write pattern as `add`/`edit` — see Data entry), asking
+for:
+- your name (first/last)
+- one starting `identity_variant` name (default `"academic"`) plus its
+  headline/title, email, phone (optional), homepage (optional)
+- which language(s) you want profiles for: `en`, `fr`, or both
+- your currency (e.g. `CAD`) — written to *both* `parco.yaml`'s
+  `currency.default` and `currency.report` (see Currency conversion);
+  diverge them later by hand if you ever report in a different
+  currency than you're normally paid/funded in
+
+**What gets written**, all folded into one `git init` + one commit
+("Initialized parco data repo"):
+- `parco.yaml` (the repo marker + `currency` config)
+- all 19 categories, always, regardless of which you'll actually use:
+  an empty (header-only) CSV plus a `categories/<name>.yaml` schema for
+  each — an unused category costs nothing, and `lint`/`build` already
+  skip categories with no rows
+- `vocab.yaml`, `translations.csv` — copied verbatim from the tool's
+  bundled starter config, not wizard-generated (these are broad,
+  reusable defaults, not personal to any one user)
+- `views.yaml` — copied verbatim from the already-built
+  `starter_config/views.yaml` (see Build / query)
+- `identity.yaml` — generated from the wizard's name/variant answers
+- `profiles/`: one language chosen → a single flat
+  `profiles/academic-<lang>.yaml`; both chosen → a
+  `profiles/_academic.yaml` base (`name`/`format`/`theme`/
+  `identity_variant`/`sections`) plus `profiles/academic-en.yaml`/
+  `academic-fr.yaml` children via `extends` (see Profiles) —
+  exercising that mechanism from the very first repo a user creates,
+  not only as a hand-written example
+
+**New bundled starter content this requires** (doesn't exist as real
+files yet — only as prose/YAML already fully drafted elsewhere in this
+document): `starter_config/categories/<name>.yaml` (all 19),
+`starter_config/vocab.yaml`, `starter_config/translations.csv`. These
+get transcribed faithfully from this spec's Category schemas /
+vocab.yaml (draft) sections, the same way `starter_config/views.yaml`
+already was — no new schema design, just getting the already-agreed
+shapes into real files `init` can copy.
+
 ### Build / query
 ```
 parco build --profile <name> [--format pdf|typst|html] [--force] [--output-dir <dir>]
@@ -1634,6 +1683,16 @@ rendercv` doesn't pull in, so importing its internals directly would be
 fragile against a package never meant as a stable public API),
 targeting only the requested format's output flag (`--pdf-path`
 etc., others disabled), writing to `meta.output`'s resolved filename.
+
+`init`'s design is now complete too — see CLI's "Init": a wizard
+(name, one identity variant, language(s), currency) that scaffolds a
+fresh repo (`parco.yaml`, all 19 categories, `vocab.yaml`,
+`translations.csv`, `views.yaml`, `identity.yaml`, `profiles/`) and
+`git init`s it. It needs new bundled starter content that doesn't
+exist as real files yet — `starter_config/categories/*.yaml` (19),
+`starter_config/vocab.yaml`, `starter_config/translations.csv` — all
+straightforward transcription from already-drafted sections of this
+document, not new design.
 
 **First-cut scope:** all 18 non-skills categories get real views (once
 the pipeline above works for one category, the rest are config, not
@@ -1876,7 +1935,7 @@ RenderCV 2.8 package (`Cv`/`Section`/entry-type field shapes, and that
 `rendercv render`'s CLI needs an extra `rendercv_fonts` package for its
 PDF path — hence treating `rendercv` as an external CLI dependency, not
 a Python import), not assumed from memory. What remains to design is
-`sync` and `refresh`/`import` — see CLI.
+`query`/`stats`/`cite`, plus `sync` and `refresh`/`import` — see CLI.
 
 ## Known limitations / follow-up from prior plans' final reviews
 
