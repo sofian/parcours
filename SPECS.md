@@ -35,7 +35,7 @@ CSV files (source of truth, git-tracked)
         ▼
    DuckDB (SQL queries run directly on CSVs, no import step)
         │
-        ├──► RenderCV (YAML) ──► LaTeX/PDF/Typst/HTML   (parco build)
+        ├──► RenderCV (YAML) ──► PDF/Typst/HTML         (parco build)
         ├──► Pandoc            ──► DOCX                  (parco build --format docx)
         ├──► citeproc + CSL    ──► formatted citations   (parco cite)
         ├──► SQL result tables ──► stats / ad-hoc queries (parco stats / parco query)
@@ -1439,7 +1439,11 @@ skills-text:                               # expertise / other
 
 ## Output formats
 
-- **PDF/LaTeX/Typst/HTML** via **RenderCV** (YAML data → chosen theme).
+- **PDF/Typst/HTML** via **RenderCV** (YAML data → chosen theme).
+  RenderCV 2.8's own CLI (`rendercv render --help`, verified against the
+  real installed package, not assumed) has no LaTeX output path at all
+  — it renders through Typst, not LaTeX, so an earlier draft's "PDF/
+  LaTeX/Typst/HTML" was simply wrong for this version.
 - **DOCX** via **Pandoc**, converting RenderCV's Markdown output with a
   user-editable `reference.docx` for styling — some funding agencies
   require Word, not PDF. Pandoc is an external dependency (CI must
@@ -1582,7 +1586,7 @@ out of sync.
 
 ### Build / query
 ```
-parco build --profile <name> [--format pdf|latex|typst|html] [--force] [--output-dir <dir>]
+parco build --profile <name> [--format pdf|typst|html] [--force] [--output-dir <dir>]
 parco query "<SQL>"
 parco stats --type <category> --by <dimension>
 parco cite --key <citekey> --style <chicago|apa|...>
