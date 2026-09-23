@@ -372,6 +372,37 @@ def test_run_select_query_tolerates_one_harmless_trailing_semicolon(tmp_path):
     assert rows == [{"id": "w1"}]
 
 
+def test_run_select_query_rejects_a_with_prefixed_delete(tmp_path):
+    # A real, verified bypass of a naive "first word is select/with, no
+    # semicolon" check: DuckDB accepts "WITH x AS (...) DELETE ..." as a
+    # single, semicolon-free statement whose real type is DELETE, not
+    # SELECT. It happens to mutate nothing today only because categories
+    # are DuckDB VIEWs, not base tables (DuckDB itself refuses a DELETE
+    # against a view) — an incidental protection, not something the
+    # SELECT-only check itself was verifying before this test existed.
+    csv_path = tmp_path / "widgets.csv"
+    csv_path.write_text("id,status\nw1,draft\n", encoding="utf-8")
+    before = csv_path.read_bytes()
+
+    with pytest.raises(NotASelectQuery):
+        run_select_query(
+            tmp_path,
+            "WITH x AS (SELECT 1) DELETE FROM widgets WHERE id = 'w1'",
+        )
+
+    assert csv_path.read_bytes() == before
+
+
+def test_run_select_query_accepts_a_semicolon_inside_a_string_literal(tmp_path):
+    # The old semicolon-counting check would have falsely rejected this
+    # single, legitimate statement.
+    (tmp_path / "widgets.csv").write_text("id,status\nw1,draft\n", encoding="utf-8")
+
+    columns, rows = run_select_query(tmp_path, "SELECT 'a;b' AS x")
+
+    assert rows == [{"x": "a;b"}]
+
+
 def test_format_table_aligns_columns():
     text = format_table(["id", "name"], [{"id": "w1", "name": "First"}, {"id": "w2", "name": "B"}])
 
@@ -490,28 +521,37 @@ def run_select_query(data_dir: Path, sql: str) -> tuple[list[str], list[dict]]:
     project's own docs already writes it) — no `.csv` suffix, no
     quoting, and ALL_VARCHAR-typed like every other read path in this
     codebase."""
-    stripped = sql.strip()
-    first_word = stripped.split(None, 1)[0].lower() if stripped else ""
-    if first_word not in ("select", "with"):
-        raise NotASelectQuery(
-            f"Only SELECT (or WITH ... SELECT) queries are allowed, got: {stripped[:50]!r}"
-        )
-
-    # DuckDB's execute() runs every statement in a semicolon-separated
-    # string, so checking only the first word is NOT enough on its own —
-    # verified directly: "SELECT 1; COPY (SELECT 'x') TO 'grants.csv'"
-    # passes the check above and then silently overwrites a real file,
-    # with no git-history undo path. A single harmless trailing `;` is
-    # tolerated; anything after it is not.
-    body = stripped[:-1] if stripped.endswith(";") else stripped
-    if ";" in body:
-        raise NotASelectQuery(
-            "Only a single SELECT (or WITH ... SELECT) statement is allowed "
-            "— remove the semicolon-separated second statement"
-        )
-
     connection = duckdb.connect(database=":memory:")
     try:
+        # A naive "does the string start with select/with, and does it
+        # contain a semicolon" check was tried and replaced: it let
+        # "WITH x AS (SELECT 1) DELETE FROM widgets WHERE id='w1'" through
+        # (first word "with", no `;`) even though DuckDB parses it as a
+        # DELETE statement, not a SELECT — verified live. It also
+        # falsely rejected a harmless `;` inside a string literal or SQL
+        # comment (e.g. `SELECT 'a;b'`). `extract_statements` is a real
+        # parse (verified: it does NOT require the referenced tables/
+        # views to exist yet, so this runs before the views below are
+        # created) that reports the true statement count and each
+        # statement's real type — one mechanism replaces both ad-hoc
+        # string checks and closes the false negative and both false
+        # positives at once.
+        try:
+            statements = connection.extract_statements(sql)
+        except duckdb.Error as exc:
+            raise NotASelectQuery(f"Could not parse query: {exc}") from exc
+
+        if len(statements) != 1:
+            raise NotASelectQuery(
+                f"Only a single SELECT (or WITH ... SELECT) statement is allowed, "
+                f"got {len(statements)} statements"
+            )
+        if statements[0].type != duckdb.StatementType.SELECT:
+            raise NotASelectQuery(
+                "Only SELECT (or WITH ... SELECT) queries are allowed, got a "
+                f"{statements[0].type} statement"
+            )
+
         for csv_path in sorted(data_dir.glob("*.csv")):
             category_name = csv_path.stem.replace('"', '""')
             escaped_path = str(csv_path).replace("'", "''")
@@ -521,7 +561,7 @@ def run_select_query(data_dir: Path, sql: str) -> tuple[list[str], list[dict]]:
             )
 
         try:
-            result = connection.execute(body)
+            result = connection.execute(sql)
         except duckdb.Error as exc:
             raise ValueError(f"Query failed: {exc}") from exc
 
@@ -614,7 +654,7 @@ def query(
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `pytest tests/unit/test_data.py tests/integration/test_cli_query.py -v`
-Expected: PASS (11 new unit tests, 5 new integration tests)
+Expected: PASS (13 new unit tests, 5 new integration tests)
 
 - [ ] **Step 6: Run the full suite to verify no regressions**
 
