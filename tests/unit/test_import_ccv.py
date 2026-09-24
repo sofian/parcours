@@ -502,3 +502,101 @@ def test_map_artistic_exhibition():
     assert row.fields["event"] == ""
     assert row.fields["location"] == ""
     assert row.fields["curator"] == ""
+
+
+def test_map_grant_single_funding_source():
+    el = _record("""
+    <section label="Research Funding History" recordId="g1">
+      <field label="Funding Title"><value type="String">A Grant</value></field>
+      <field label="Funding Role"><lov id="1">Principal Investigator</lov></field>
+      <field label="Funding Status"><lov id="2">Awarded</lov></field>
+      <field label="Funding Start Date"><value type="YearMonth">2021/4</value></field>
+      <field label="Funding End Date"><value type="YearMonth">2024/3</value></field>
+      <field label="Project Description">
+        <value type="Bilingual"></value>
+        <bilingual><french></french><english>A project</english></bilingual>
+      </field>
+      <field label="Research Uptake">
+        <value type="Bilingual"></value>
+        <bilingual><french></french><english>Some uptake</english></bilingual>
+      </field>
+      <section label="Funding Sources" recordId="g1f1">
+        <field label="Funding Organization"><lov id="3">Test Funder</lov></field>
+        <field label="Program Name"><value type="String">Test Program</value></field>
+        <field label="Total Funding"><value type="Number">50000</value></field>
+        <field label="Currency of Total Funding"><lov id="4">CAD</lov></field>
+      </section>
+    </section>
+    """)
+    row = map_record(el, "Research Funding History", "en", _ctx())
+    assert row.category == "grants"
+    assert row.fields["title_en"] == "A Grant"
+    assert row.fields["funder"] == "Test Funder"
+    assert row.fields["program"] == "Test Program"
+    assert row.fields["role"] == "pi"
+    assert row.fields["status"] == "awarded"
+    assert row.fields["start_date"] == "2021-04"
+    assert row.fields["end_date"] == "2024-03"
+    assert row.fields["amount"] == "50000"
+    assert row.fields["currency"] == "CAD"
+    assert "A project" in row.fields["note_en"]
+    assert "Some uptake" in row.fields["note_en"]
+    assert row.fields["co_investigators"] == ""
+    assert row.flag is None
+
+
+def test_map_grant_completed_status_collapses_to_awarded():
+    el = _record("""
+    <section label="Research Funding History" recordId="g2">
+      <field label="Funding Title"><value type="String">Another Grant</value></field>
+      <field label="Funding Role"><lov id="1">Co-investigator</lov></field>
+      <field label="Funding Status"><lov id="2">Completed</lov></field>
+      <field label="Funding Start Date"><value type="YearMonth">2015/1</value></field>
+    </section>
+    """)
+    row = map_record(el, "Research Funding History", "en", _ctx())
+    assert row.fields["role"] == "co-pi"
+    assert row.fields["status"] == "awarded"
+
+
+def test_map_grant_flags_multiple_funding_sources():
+    el = _record("""
+    <section label="Research Funding History" recordId="g3">
+      <field label="Funding Title"><value type="String">Multi-source Grant</value></field>
+      <field label="Funding Start Date"><value type="YearMonth">2016/1</value></field>
+      <section label="Funding Sources" recordId="g3f1">
+        <field label="Funding Organization"><lov id="1">Funder A</lov></field>
+        <field label="Total Funding"><value type="Number">10000</value></field>
+      </section>
+      <section label="Funding Sources" recordId="g3f2">
+        <field label="Funding Organization"><lov id="2">Funder B</lov></field>
+        <field label="Total Funding"><value type="Number">5000</value></field>
+      </section>
+    </section>
+    """)
+    row = map_record(el, "Research Funding History", "en", _ctx())
+    assert row.fields["funder"] == "Funder A"
+    assert row.fields["amount"] == "10000"
+    assert row.flag is not None
+    assert "Funding Sources" in row.flag
+
+
+def test_map_grant_flags_other_investigators_unparseable():
+    el = _record("""
+    <section label="Research Funding History" recordId="g4">
+      <field label="Funding Title"><value type="String">Team Grant</value></field>
+      <field label="Funding Start Date"><value type="YearMonth">2017/1</value></field>
+      <section label="Other Investigators" recordId="g4i1">
+        <field label="Investigator Name"><value type="String">Jane Smith</value></field>
+      </section>
+      <section label="Other Investigators" recordId="g4i2">
+        <field label="Investigator Name"><value type="String">John Doe</value></field>
+      </section>
+    </section>
+    """)
+    row = map_record(el, "Research Funding History", "en", _ctx())
+    assert row.fields["co_investigators"] == ""
+    assert row.flag is not None
+    assert "co_investigators" in row.flag
+    assert "Jane Smith" in row.flag
+    assert "John Doe" in row.flag

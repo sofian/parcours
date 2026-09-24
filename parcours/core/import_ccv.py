@@ -525,3 +525,77 @@ def _map_exhibition(record_el, lang, ctx) -> MappedRow:
             "end_date": "",
         },
     )
+
+
+_GRANT_ROLE = {
+    "Principal Applicant": "pi",
+    "Principal Investigator": "pi",
+    "Co-applicant": "co-pi",
+    "Co-investigator": "co-pi",
+    "Collaborator": "collaborator",
+}
+
+_GRANT_STATUS = {
+    "Awarded": "awarded",
+    "Completed": "awarded",
+    "Declined": "declined",
+}
+
+
+@_register("Research Funding History")
+def _map_grant(record_el, lang, ctx) -> MappedRow:
+    title_fr, title_en = x.field_single_language(record_el, "Funding Title", lang)
+    project_description_fr, project_description_en = x.field_bilingual(record_el, "Project Description", lang)
+    research_uptake_fr, research_uptake_en = x.field_bilingual(record_el, "Research Uptake", lang)
+    note_en = "\n\n".join(part for part in (project_description_en, research_uptake_en) if part)
+    note_fr = "\n\n".join(part for part in (project_description_fr, research_uptake_fr) if part)
+
+    funding_sources = x.sub_records(record_el, "Funding Sources")
+    flags = []
+    funder = program = amount = currency = ""
+    if funding_sources:
+        first_source = funding_sources[0]
+        funder = x.field_lov(first_source, "Funding Organization") or x.field_text(first_source, "Other Funding Organization")
+        program = x.field_text(first_source, "Program Name")
+        amount = x.field_text(first_source, "Total Funding")
+        currency = x.field_lov(first_source, "Currency of Total Funding")
+        if len(funding_sources) > 1:
+            flags.append(
+                f"{len(funding_sources)} Funding Sources found for this grant — "
+                f"using the first ({funder!r}); the rest need manual review"
+            )
+
+    other_investigators = x.sub_records(record_el, "Other Investigators")
+    co_investigators = ""
+    if other_investigators:
+        names = [x.field_text(inv, "Investigator Name") for inv in other_investigators]
+        names = [n for n in names if n]
+        joined = "; ".join(names)
+        parsed = x.try_person_list(joined)
+        if parsed:
+            co_investigators = parsed
+        else:
+            flags.append(
+                f"co_investigators needs manual entry — CCV gives unsplit investigator name(s): {', '.join(names)}"
+            )
+
+    return MappedRow(
+        category="grants",
+        ccv_label="Research Funding History",
+        fields={
+            "title_en": title_en,
+            "title_fr": title_fr,
+            "funder": funder,
+            "program": program,
+            "role": _GRANT_ROLE.get(x.field_lov(record_el, "Funding Role"), ""),
+            "status": _GRANT_STATUS.get(x.field_lov(record_el, "Funding Status"), ""),
+            "start_date": x.field_yearmonth(record_el, "Funding Start Date"),
+            "end_date": x.field_yearmonth(record_el, "Funding End Date"),
+            "amount": amount,
+            "currency": currency or ctx.default_currency,
+            "co_investigators": co_investigators,
+            "note_en": note_en,
+            "note_fr": note_fr,
+        },
+        flag="; ".join(flags) or None,
+    )
