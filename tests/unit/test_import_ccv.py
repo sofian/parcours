@@ -459,6 +459,20 @@ def test_map_visual_artwork_unrecognized_role_defaults_to_author():
     assert row.fields["role"] == "author"
 
 
+def test_map_visual_artwork_contributors_all_self_leaves_co_authors_blank_no_flag():
+    el = _record("""
+    <section label="Visual Artworks" recordId="a5">
+      <field label="Artwork Title"><value type="String">Solo Piece</value></field>
+      <field label="Publication Date"><value type="YearMonth">2021/1</value></field>
+      <field label="Contribution Role"><value type="String">Author</value></field>
+      <field label="Contributors"><value type="String">Doe, Jane</value></field>
+    </section>
+    """)
+    row = map_record(el, "Visual Artworks", "en", _ctx())
+    assert row.fields["co_authors"] == ""
+    assert row.flag is None
+
+
 def test_map_audio_recording_uses_piece_title_and_release_date_year():
     el = _record("""
     <section label="Audio Recordings" recordId="a4">
