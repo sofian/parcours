@@ -407,3 +407,84 @@ def test_map_students():
     assert row.fields["thesis_title"] == "A Dissertation"
     assert row.fields["present_position"] == "Postdoc"
     assert row.fields["present_organization"] == "Another University"
+
+
+def test_map_visual_artwork_contributors_parses_and_filters_self():
+    el = _record("""
+    <section label="Visual Artworks" recordId="a1">
+      <field label="Artwork Title"><value type="String">Untitled</value></field>
+      <field label="Publication Date"><value type="YearMonth">2020/3</value></field>
+      <field label="Description / Contribution Value">
+        <value type="Bilingual"></value>
+        <bilingual><french></french><english>A description</english></bilingual>
+      </field>
+      <field label="URL"><value type="String">http://example.com</value></field>
+      <field label="Contribution Role"><value type="String">Artist</value></field>
+      <field label="Contributors"><value type="String">Doe, Jane; Smith, John</value></field>
+    </section>
+    """)
+    row = map_record(el, "Visual Artworks", "en", _ctx())
+    assert row.category == "artworks"
+    assert row.fields["title_en"] == "Untitled"
+    assert row.fields["date"] == "2020"
+    assert row.fields["role"] == "author"
+    assert row.fields["co_authors"] == "Smith, John"
+    assert row.fields["collaborators"] == ""
+    assert row.flag is None
+
+
+def test_map_visual_artwork_flags_unparseable_contributors():
+    el = _record("""
+    <section label="Visual Artworks" recordId="a2">
+      <field label="Artwork Title"><value type="String">Another Piece</value></field>
+      <field label="Publication Date"><value type="YearMonth">2019/1</value></field>
+      <field label="Contribution Role"><value type="String">Collaborator</value></field>
+      <field label="Contributors"><value type="String">John Smith and Jane Doe</value></field>
+    </section>
+    """)
+    row = map_record(el, "Visual Artworks", "en", _ctx())
+    assert row.fields["role"] == "collaborator"
+    assert row.fields["co_authors"] == ""
+    assert row.flag is not None
+
+
+def test_map_visual_artwork_unrecognized_role_defaults_to_author():
+    el = _record("""
+    <section label="Visual Artworks" recordId="a3">
+      <field label="Artwork Title"><value type="String">A Piece</value></field>
+      <field label="Publication Date"><value type="YearMonth">2018/1</value></field>
+    </section>
+    """)
+    row = map_record(el, "Visual Artworks", "en", _ctx())
+    assert row.fields["role"] == "author"
+
+
+def test_map_audio_recording_uses_piece_title_and_release_date_year():
+    el = _record("""
+    <section label="Audio Recordings" recordId="a4">
+      <field label="Piece Title"><value type="String">A Track</value></field>
+      <field label="Release Date"><value type="Date">2017-06-01</value></field>
+    </section>
+    """)
+    row = map_record(el, "Audio Recordings", "en", _ctx())
+    assert row.category == "artworks"
+    assert row.fields["title_en"] == "A Track"
+    assert row.fields["date"] == "2017"
+
+
+def test_map_artistic_exhibition():
+    el = _record("""
+    <section label="Artistic Exhibitions" recordId="e1">
+      <field label="Title of Work"><value type="String">A Show</value></field>
+      <field label="Venue"><value type="String">A Gallery</value></field>
+      <field label="Date of First Performance"><value type="Date">2021-04-10</value></field>
+    </section>
+    """)
+    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
+    assert row.category == "exhibitions"
+    assert row.fields["title_en"] == "A Show"
+    assert row.fields["venue"] == "A Gallery"
+    assert row.fields["start_date"] == "2021-04-10"
+    assert row.fields["event"] == ""
+    assert row.fields["location"] == ""
+    assert row.fields["curator"] == ""

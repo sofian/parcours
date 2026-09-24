@@ -441,3 +441,87 @@ def _map_students(record_el, lang, ctx) -> MappedRow:
             "present_organization": x.field_text(record_el, "Present Organization"),
         },
     )
+
+
+_ARTWORK_ROLE = {
+    "Author": "author",
+    "Auteur": "author",
+    "Artist": "author",
+    "Principal investigator": "author",
+    "Collaborator": "collaborator",
+    "Artist collaborator": "collaborator",
+}
+
+
+def _remove_self_from_contributors(raw: str, own_name: tuple[str, str]) -> str:
+    """`own_name` is (last, first). Removes an exact 'Last, First' match
+    (whitespace-normalized) before the parse-as-validation-gate runs —
+    `co_authors` never includes you (see SPECS.md, `artworks` notes)."""
+    if not raw:
+        return raw
+    own_last, own_first = own_name
+    own_formatted = f"{own_last}, {own_first}".strip().lower()
+    remaining = [
+        chunk for chunk in (part.strip() for part in raw.split(";"))
+        if chunk and chunk.lower() != own_formatted
+    ]
+    return "; ".join(remaining)
+
+
+def _map_artwork_common(record_el, lang, ctx, title_label: str, date_field, date_label: str, ccv_label: str) -> MappedRow:
+    title_fr, title_en = x.field_single_language(record_el, title_label, lang)
+    description_fr, description_en = x.field_bilingual(record_el, "Description / Contribution Value", lang)
+    role_raw = x.field_text(record_el, "Contribution Role")
+
+    raw_contributors = x.field_text(record_el, "Contributors")
+    filtered_contributors = _remove_self_from_contributors(raw_contributors, ctx.own_name)
+    co_authors = x.try_person_list(filtered_contributors)
+    flag = None
+    if filtered_contributors and co_authors is None:
+        flag = f"co_authors could not be parsed as 'Last, First' from CCV's raw Contributors value: {raw_contributors!r}"
+
+    return MappedRow(
+        category="artworks",
+        ccv_label=ccv_label,
+        fields={
+            "title_en": title_en,
+            "title_fr": title_fr,
+            "role": _ARTWORK_ROLE.get(role_raw, "author"),
+            "date": date_field(record_el, date_label)[:4],
+            "description_en": description_en,
+            "description_fr": description_fr,
+            "co_authors": co_authors or "",
+            "collaborators": "",
+            "url": x.field_text(record_el, "URL"),
+        },
+        flag=flag,
+    )
+
+
+@_register("Visual Artworks")
+def _map_visual_artwork(record_el, lang, ctx) -> MappedRow:
+    return _map_artwork_common(record_el, lang, ctx, "Artwork Title", x.field_yearmonth, "Publication Date", "Visual Artworks")
+
+
+@_register("Audio Recordings")
+def _map_audio_recording(record_el, lang, ctx) -> MappedRow:
+    return _map_artwork_common(record_el, lang, ctx, "Piece Title", x.field_date, "Release Date", "Audio Recordings")
+
+
+@_register("Artistic Exhibitions")
+def _map_exhibition(record_el, lang, ctx) -> MappedRow:
+    title_fr, title_en = x.field_single_language(record_el, "Title of Work", lang)
+    return MappedRow(
+        category="exhibitions",
+        ccv_label="Artistic Exhibitions",
+        fields={
+            "title_en": title_en,
+            "title_fr": title_fr,
+            "event": "",
+            "venue": x.field_text(record_el, "Venue"),
+            "location": "",
+            "curator": "",
+            "start_date": x.field_date(record_el, "Date of First Performance"),
+            "end_date": "",
+        },
+    )
