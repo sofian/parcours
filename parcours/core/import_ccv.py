@@ -4,9 +4,17 @@ SPECS.md, "Import" and "CCV export structure"). Core layer: no
 prompting/printing — see `cli/main.py`'s `import_app` for that."""
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable
 
 from . import ccv_xml as x
+from .data import load_category_rows
+from .entries import generate_id, write_all_rows
+from .handlers import load_handler
+from .handlers.base import HandlerContext
+from .identity import load_identity
+from .repo import load_repo_config
+from .schema import load_all_schemas
 
 
 @dataclass
@@ -46,6 +54,22 @@ def map_record(record_el, label: str, lang: str, ctx: ImportContext):
     or a genuinely unmapped record (reported as skipped)."""
     mapper = MAPPERS[label]
     return mapper(record_el, lang, ctx)
+
+
+SUB_RECORD_LABELS = frozenset({
+    "Supervisors", "Funding Sources", "Other Investigators",
+    "Areas of Research", "Research Disciplines", "Fields of Application",
+    "Disciplines Trained In", "Research Specialization Keywords",
+    "Student Country of Citizenship", "Project Funding Sources",
+})
+
+
+@dataclass
+class ImportReport:
+    to_write: list[MappedRow] = field(default_factory=list)
+    flagged: list[FlaggedRecord] = field(default_factory=list)
+    skipped_labels: dict[str, int] = field(default_factory=dict)
+    dedup_matches: dict[int, list] = field(default_factory=dict)
 
 
 _DEGREE_TYPE = {
@@ -634,3 +658,84 @@ def extract_zotero_candidate(record_el, label: str, lang: str) -> ZoteroCandidat
     raw_year = year_fn(record_el, year_label)
     year = int(raw_year[:4]) if raw_year else None
     return ZoteroCandidate(title=title, year=year, ccv_label=label)
+
+
+def plan_import(data_dir: Path, xml_path: Path) -> ImportReport:
+    root, lang = x.parse_ccv_export(xml_path)
+    records = x.find_records(root)
+
+    identity = load_identity(data_dir / "identity.yaml")
+    own_name = (identity["name"]["last"], identity["name"]["first"])
+    repo_config = load_repo_config(data_dir)
+    default_currency = repo_config.get("currency", {}).get("default", "")
+    ctx = ImportContext(default_currency=default_currency, own_name=own_name)
+
+    schemas = load_all_schemas(data_dir / "categories")
+    handlers = {
+        name: load_handler(schema, HandlerContext(data_dir=data_dir))
+        for name, schema in schemas.items()
+    }
+    existing_rows_by_category = {
+        name: load_category_rows(data_dir, name) for name in schemas
+    }
+
+    report = ImportReport()
+
+    for record in records:
+        label = record.label
+        if label in SUB_RECORD_LABELS:
+            continue
+
+        if label in ZOTERO_MATCHED_LABELS:
+            candidate = extract_zotero_candidate(record.element, label, lang)
+            category = "catalog" if label == "Exhibition Catalogues" else "publications"
+            handler = handlers.get(category)
+            citekey = handler.match_citekey_by_title(candidate.title, candidate.year) if handler else None
+            if citekey is None:
+                report.flagged.append(FlaggedRecord(
+                    ccv_label=label,
+                    reason=f"No confident Zotero match for {candidate.title!r} ({candidate.year}) — needs a citekey",
+                ))
+                continue
+            schema = schemas[category]
+            row_id = generate_id(data_dir, category)
+            mapped = MappedRow(
+                category=category,
+                ccv_label=label,
+                fields={name: "" for name in schema.field_names() if name != "id"} | {"citekey": citekey},
+            )
+        elif label in MAPPERS:
+            mapped = map_record(record.element, label, lang, ctx)
+        else:
+            report.skipped_labels[label] = report.skipped_labels.get(label, 0) + 1
+            continue
+
+        if mapped.flag:
+            report.flagged.append(FlaggedRecord(ccv_label=mapped.ccv_label, reason=mapped.flag))
+
+        row_index = len(report.to_write)
+        report.to_write.append(mapped)
+
+        handler = handlers.get(mapped.category)
+        if handler is not None:
+            candidate_row = {"id": "", **mapped.fields}
+            matches = handler.find_matches(candidate_row, existing_rows_by_category[mapped.category])
+            if matches:
+                report.dedup_matches[row_index] = matches
+
+    return report
+
+
+def write_import(data_dir: Path, report: ImportReport) -> list[str]:
+    schemas = load_all_schemas(data_dir / "categories")
+    touched: set[str] = set()
+
+    for mapped in report.to_write:
+        schema = schemas[mapped.category]
+        rows = load_category_rows(data_dir, mapped.category)
+        row_id = generate_id(data_dir, mapped.category)
+        rows.append({"id": row_id, **mapped.fields})
+        write_all_rows(data_dir / f"{mapped.category}.csv", schema.field_names(), rows)
+        touched.add(f"{mapped.category}.csv")
+
+    return sorted(touched)

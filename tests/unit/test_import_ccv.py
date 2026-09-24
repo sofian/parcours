@@ -655,3 +655,190 @@ def test_extract_zotero_candidate_blank_year_is_none():
                  '</section>')
     candidate = extract_zotero_candidate(el, "Online Resources", "en")
     assert candidate.year is None
+
+
+import textwrap
+
+from parcours.core.import_ccv import ImportReport, plan_import, write_import
+from parcours.core.schema import CategorySchema, FieldSpec
+
+
+def _minimal_data_dir(tmp_path):
+    (tmp_path / "categories").mkdir()
+    education_schema = tmp_path / "categories" / "education.yaml"
+    education_schema.write_text(textwrap.dedent("""
+        name: education
+        handler: generic
+        fields:
+          - {name: id, generated: true}
+          - {name: degree_type, required: true}
+          - {name: degree_name_en}
+          - {name: degree_name_fr}
+          - {name: specialization_en}
+          - {name: specialization_fr}
+          - {name: organization, required: true}
+          - {name: degree_status, required: true}
+          - {name: start_date, type: date, precision: month, required: true}
+          - {name: end_date, type: date, precision: month}
+          - {name: thesis_title}
+          - {name: advisor}
+          - {name: note_en}
+          - {name: note_fr}
+        dedup:
+          - when: [{exact: organization}, {exact: degree_type}, {same_year: start_date}]
+            as: duplicate
+    """), encoding="utf-8")
+    (tmp_path / "education.csv").write_text(
+        "id,degree_type,degree_name_en,degree_name_fr,specialization_en,specialization_fr,"
+        "organization,degree_status,start_date,end_date,thesis_title,advisor,note_en,note_fr\n",
+        encoding="utf-8",
+    )
+    identity = tmp_path / "identity.yaml"
+    identity.write_text("name:\n  first: Jane\n  last: Doe\n", encoding="utf-8")
+    parco_yaml = tmp_path / "parco.yaml"
+    parco_yaml.write_text("currency:\n  default: CAD\n  report: CAD\n", encoding="utf-8")
+    return tmp_path
+
+
+def _write_xml(tmp_path, xml: str):
+    path = tmp_path / "export.xml"
+    path.write_text(xml, encoding="utf-8")
+    return path
+
+
+def test_plan_import_maps_a_known_record():
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        from pathlib import Path
+        data_dir = _minimal_data_dir(Path(d))
+        xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+          <section label="Education">
+            <section label="Degrees" recordId="r1">
+              <field label="Degree Type"><lov id="1">Doctorate</lov></field>
+              <field label="Organization">
+                <refTable refValueId="x" label="Organization">
+                  <linkedWith label="Organization" value="Test University" refOrLovId="z"/>
+                </refTable>
+              </field>
+              <field label="Degree Status"><lov id="2">Completed</lov></field>
+              <field label="Degree Start Date"><value type="YearMonth">2018/9</value></field>
+            </section>
+          </section>
+        </generic-cv:generic-cv>
+        """)
+        report = plan_import(data_dir, xml_path)
+        assert isinstance(report, ImportReport)
+        assert len(report.to_write) == 1
+        assert report.to_write[0].category == "education"
+        assert report.to_write[0].fields["organization"] == "Test University"
+
+
+def test_plan_import_ignores_known_sub_records_without_reporting_them_skipped():
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        from pathlib import Path
+        data_dir = _minimal_data_dir(Path(d))
+        xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+          <section label="Education">
+            <section label="Degrees" recordId="r1">
+              <field label="Degree Type"><lov id="1">Doctorate</lov></field>
+              <field label="Degree Status"><lov id="2">Completed</lov></field>
+              <field label="Degree Start Date"><value type="YearMonth">2018/9</value></field>
+              <section label="Supervisors" recordId="r1s1">
+                <field label="Supervisor Name"><value type="String">Jane Smith</value></field>
+              </section>
+            </section>
+          </section>
+        </generic-cv:generic-cv>
+        """)
+        report = plan_import(data_dir, xml_path)
+        assert "Supervisors" not in report.skipped_labels
+
+
+def test_plan_import_reports_genuinely_unmapped_records_as_skipped():
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        from pathlib import Path
+        data_dir = _minimal_data_dir(Path(d))
+        xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+          <section label="Personal Information">
+            <section label="Address" recordId="addr1">
+              <field label="City"><value type="String">Somewhere</value></field>
+            </section>
+          </section>
+        </generic-cv:generic-cv>
+        """)
+        report = plan_import(data_dir, xml_path)
+        assert report.skipped_labels.get("Address") == 1
+
+
+def test_plan_import_flags_dedup_duplicate_but_still_writes_it():
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        data_dir = _minimal_data_dir(Path(d))
+        # Seed an existing row that will collide via the dedup rule
+        # (exact organization, exact degree_type, same_year start_date).
+        (data_dir / "education.csv").write_text(
+            "id,degree_type,degree_name_en,degree_name_fr,specialization_en,specialization_fr,"
+            "organization,degree_status,start_date,end_date,thesis_title,advisor,note_en,note_fr\n"
+            "exist1,doctorate,,,,,Test University,completed,2018-09,,,,,\n",
+            encoding="utf-8",
+        )
+        xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+          <section label="Education">
+            <section label="Degrees" recordId="r1">
+              <field label="Degree Type"><lov id="1">Doctorate</lov></field>
+              <field label="Organization">
+                <refTable refValueId="x" label="Organization">
+                  <linkedWith label="Organization" value="Test University" refOrLovId="z"/>
+                </refTable>
+              </field>
+              <field label="Degree Status"><lov id="2">Completed</lov></field>
+              <field label="Degree Start Date"><value type="YearMonth">2018/9</value></field>
+            </section>
+          </section>
+        </generic-cv:generic-cv>
+        """)
+        report = plan_import(data_dir, xml_path)
+        assert len(report.to_write) == 1
+        assert 0 in report.dedup_matches
+        assert report.dedup_matches[0][0].kind == "duplicate"
+
+
+def test_write_import_writes_rows_and_never_commits():
+    import subprocess
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        data_dir = _minimal_data_dir(Path(d))
+        subprocess.run(["git", "init"], cwd=data_dir, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=data_dir, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "T"], cwd=data_dir, check=True, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=data_dir, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial"], cwd=data_dir, check=True, capture_output=True)
+
+        xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+          <section label="Education">
+            <section label="Degrees" recordId="r1">
+              <field label="Degree Type"><lov id="1">Doctorate</lov></field>
+              <field label="Degree Status"><lov id="2">Completed</lov></field>
+              <field label="Degree Start Date"><value type="YearMonth">2018/9</value></field>
+            </section>
+          </section>
+        </generic-cv:generic-cv>
+        """)
+        report = plan_import(data_dir, xml_path)
+        touched = write_import(data_dir, report)
+
+        assert touched == ["education.csv"]
+        content = (data_dir / "education.csv").read_text(encoding="utf-8")
+        assert "doctorate" in content
+
+        status = subprocess.run(["git", "status", "--porcelain"], cwd=data_dir, check=True, capture_output=True, text=True)
+        assert "education.csv" in status.stdout  # uncommitted
