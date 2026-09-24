@@ -439,7 +439,7 @@ from parcours.core.ccv_xml import (
 )
 
 _SAMPLE = """<?xml version="1.0" encoding="UTF-8"?>
-<generic-cv xmlns="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+<generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
   <section label="Education">
     <section label="Degrees" recordId="rec-1">
       <field label="Degree Type"><lov id="1">Doctorate</lov></field>
@@ -478,7 +478,7 @@ _SAMPLE = """<?xml version="1.0" encoding="UTF-8"?>
       </section>
     </section>
   </section>
-</generic-cv>
+</generic-cv:generic-cv>
 """
 
 
@@ -2375,7 +2375,7 @@ def test_plan_import_maps_a_known_record():
         from pathlib import Path
         data_dir = _minimal_data_dir(Path(d))
         xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
-        <generic-cv xmlns="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
           <section label="Education">
             <section label="Degrees" recordId="r1">
               <field label="Degree Type"><lov id="1">Doctorate</lov></field>
@@ -2388,7 +2388,7 @@ def test_plan_import_maps_a_known_record():
               <field label="Degree Start Date"><value type="YearMonth">2018/9</value></field>
             </section>
           </section>
-        </generic-cv>
+        </generic-cv:generic-cv>
         """)
         report = plan_import(data_dir, xml_path)
         assert isinstance(report, ImportReport)
@@ -2403,7 +2403,7 @@ def test_plan_import_ignores_known_sub_records_without_reporting_them_skipped():
         from pathlib import Path
         data_dir = _minimal_data_dir(Path(d))
         xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
-        <generic-cv xmlns="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
           <section label="Education">
             <section label="Degrees" recordId="r1">
               <field label="Degree Type"><lov id="1">Doctorate</lov></field>
@@ -2414,7 +2414,7 @@ def test_plan_import_ignores_known_sub_records_without_reporting_them_skipped():
               </section>
             </section>
           </section>
-        </generic-cv>
+        </generic-cv:generic-cv>
         """)
         report = plan_import(data_dir, xml_path)
         assert "Supervisors" not in report.skipped_labels
@@ -2426,13 +2426,13 @@ def test_plan_import_reports_genuinely_unmapped_records_as_skipped():
         from pathlib import Path
         data_dir = _minimal_data_dir(Path(d))
         xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
-        <generic-cv xmlns="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
           <section label="Personal Information">
             <section label="Address" recordId="addr1">
               <field label="City"><value type="String">Somewhere</value></field>
             </section>
           </section>
-        </generic-cv>
+        </generic-cv:generic-cv>
         """)
         report = plan_import(data_dir, xml_path)
         assert report.skipped_labels.get("Address") == 1
@@ -2452,7 +2452,7 @@ def test_plan_import_flags_dedup_duplicate_but_still_writes_it():
             encoding="utf-8",
         )
         xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
-        <generic-cv xmlns="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
           <section label="Education">
             <section label="Degrees" recordId="r1">
               <field label="Degree Type"><lov id="1">Doctorate</lov></field>
@@ -2465,7 +2465,7 @@ def test_plan_import_flags_dedup_duplicate_but_still_writes_it():
               <field label="Degree Start Date"><value type="YearMonth">2018/9</value></field>
             </section>
           </section>
-        </generic-cv>
+        </generic-cv:generic-cv>
         """)
         report = plan_import(data_dir, xml_path)
         assert len(report.to_write) == 1
@@ -2486,7 +2486,7 @@ def test_write_import_writes_rows_and_never_commits():
         subprocess.run(["git", "commit", "-m", "Initial"], cwd=data_dir, check=True, capture_output=True)
 
         xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
-        <generic-cv xmlns="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
           <section label="Education">
             <section label="Degrees" recordId="r1">
               <field label="Degree Type"><lov id="1">Doctorate</lov></field>
@@ -2494,7 +2494,7 @@ def test_write_import_writes_rows_and_never_commits():
               <field label="Degree Start Date"><value type="YearMonth">2018/9</value></field>
             </section>
           </section>
-        </generic-cv>
+        </generic-cv:generic-cv>
         """)
         report = plan_import(data_dir, xml_path)
         touched = write_import(data_dir, report)
@@ -2698,7 +2698,7 @@ dedup:
 """
 
 _SAMPLE_XML = """<?xml version="1.0"?>
-<generic-cv xmlns="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+<generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
   <section label="Education">
     <section label="Degrees" recordId="r1">
       <field label="Degree Type"><lov id="1">Doctorate</lov></field>
@@ -2706,7 +2706,7 @@ _SAMPLE_XML = """<?xml version="1.0"?>
       <field label="Degree Start Date"><value type="YearMonth">2018/9</value></field>
     </section>
   </section>
-</generic-cv>
+</generic-cv:generic-cv>
 """
 
 
