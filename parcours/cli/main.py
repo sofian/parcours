@@ -23,6 +23,7 @@ from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry
 from ..core.handlers import load_handler
 from ..core.handlers.base import CategoryHandler, HandlerContext
 from ..core.handlers.publications import PublicationsHandler
+from ..core.import_ccv import ImportReport, plan_import, write_import
 from ..core.init import (
     GitIdentityMissing,
     GitInitFailed,
@@ -483,6 +484,68 @@ def delete(
         typer.echo(f"Row written, but the commit failed: {exc}")
         raise typer.Exit(code=1)
     typer.echo(f"Deleted {category} entry {row['id']}.")
+
+
+import_app = typer.Typer(help="Bulk-seed data from a one-time export file (see SPECS.md, \"Import\").")
+app.add_typer(import_app, name="import")
+
+
+def _print_import_report(report: ImportReport) -> None:
+    by_category: dict[str, int] = {}
+    for mapped in report.to_write:
+        by_category[mapped.category] = by_category.get(mapped.category, 0) + 1
+
+    typer.echo("Import plan:")
+    for category, count in sorted(by_category.items()):
+        typer.echo(f"  {category}: {count} entr{'y' if count == 1 else 'ies'}")
+
+    if report.dedup_matches:
+        typer.echo(f"\n{len(report.dedup_matches)} possible duplicate(s) found (will still be written):")
+        for row_index, matches in report.dedup_matches.items():
+            mapped = report.to_write[row_index]
+            for match in matches:
+                typer.echo(f"  {mapped.category} ({mapped.ccv_label}): {match.reason}")
+
+    if report.flagged:
+        typer.echo(f"\n{len(report.flagged)} record(s) flagged for manual review (not imported):")
+        for flagged in report.flagged:
+            typer.echo(f"  {flagged.ccv_label}: {flagged.reason}")
+
+    if report.skipped_labels:
+        total_skipped = sum(report.skipped_labels.values())
+        typer.echo(f"\n{total_skipped} record(s) skipped (no category mapping):")
+        for label, count in sorted(report.skipped_labels.items()):
+            typer.echo(f"  {label}: {count}")
+
+
+@import_app.command(name="ccv")
+def import_ccv(
+    file: Path = typer.Option(..., "--file", help="Path to the CCV XML export"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Report what would be imported without writing anything"),
+):
+    """Bulk-import from a Canadian Common CV XML export."""
+    data_dir = _find_repo_or_exit()
+
+    report = plan_import(data_dir, file)
+    _print_import_report(report)
+
+    if not report.to_write:
+        typer.echo("\nNothing to import.")
+        return
+
+    if dry_run:
+        return
+
+    total = len(report.to_write)
+    categories = len({mapped.category for mapped in report.to_write})
+    if not typer.confirm(f"\nWrite {total} entries across {categories} categories to your working tree?"):
+        return
+
+    touched = write_import(data_dir, report)
+    typer.echo(f"\nWrote {total} entries to: {', '.join(touched)} (not committed).")
+    typer.echo("Review with `git diff`, `parco lint`, and `parco edit <category> --search ...`.")
+    typer.echo("When you're happy with it: parco commit")
+    typer.echo("To discard the import entirely: git checkout -- .")
 
 
 translation_app = typer.Typer(
