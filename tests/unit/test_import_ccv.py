@@ -1,3 +1,4 @@
+import json
 import xml.etree.ElementTree as ET
 
 from parcours.core.import_ccv import ImportContext, MappedRow, map_record
@@ -660,7 +661,6 @@ def test_extract_zotero_candidate_blank_year_is_none():
 import textwrap
 
 from parcours.core.import_ccv import ImportReport, plan_import, write_import
-from parcours.core.schema import CategorySchema, FieldSpec
 
 
 def _minimal_data_dir(tmp_path):
@@ -842,3 +842,102 @@ def test_write_import_writes_rows_and_never_commits():
 
         status = subprocess.run(["git", "status", "--porcelain"], cwd=data_dir, check=True, capture_output=True, text=True)
         assert "education.csv" in status.stdout  # uncommitted
+
+
+def _add_publications_category(data_dir):
+    (data_dir / "categories" / "publications.yaml").write_text(textwrap.dedent("""
+        name: publications
+        handler: publications
+        options:
+          json: zotero/library.json
+        fields:
+          - {name: id, generated: true}
+          - {name: weight, type: int}
+          - {name: citekey, required: true}
+          - {name: status, required: true}
+          - {name: refereed, type: bool}
+          - {name: invited, type: bool}
+          - {name: featured, type: bool}
+          - {name: note_en}
+          - {name: note_fr}
+    """), encoding="utf-8")
+    (data_dir / "publications.csv").write_text(
+        "id,weight,citekey,status,refereed,invited,featured,note_en,note_fr\n",
+        encoding="utf-8",
+    )
+    zotero_dir = data_dir / "zotero"
+    zotero_dir.mkdir()
+    (zotero_dir / "library.json").write_text(json.dumps([
+        {"id": "smith2020article", "title": "A Widget Study", "issued": {"date-parts": [[2020]]}},
+    ]), encoding="utf-8")
+    return data_dir
+
+
+def test_plan_import_dispatches_zotero_matched_records():
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        data_dir = _minimal_data_dir(Path(d))
+        _add_publications_category(data_dir)
+        xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+          <section label="Contributions">
+            <section label="Publications">
+              <section label="Journal Articles" recordId="p1">
+                <field label="Article Title"><value type="String">A Widget Study</value></field>
+                <field label="Year"><value type="Year">2020</value></field>
+              </section>
+              <section label="Journal Articles" recordId="p2">
+                <field label="Article Title"><value type="String">Totally Unrelated Nonexistent Title</value></field>
+                <field label="Year"><value type="Year">1999</value></field>
+              </section>
+            </section>
+          </section>
+        </generic-cv:generic-cv>
+        """)
+        report = plan_import(data_dir, xml_path)
+        assert len(report.to_write) == 1
+        assert report.to_write[0].category == "publications"
+        assert report.to_write[0].fields["citekey"] == "smith2020article"
+        assert len(report.flagged) == 1
+        assert report.flagged[0].ccv_label == "Journal Articles"
+        assert "No confident Zotero match" in report.flagged[0].reason
+
+
+def test_write_import_generates_distinct_ids_for_multiple_new_rows_same_category():
+    import subprocess
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        data_dir = _minimal_data_dir(Path(d))
+        subprocess.run(["git", "init"], cwd=data_dir, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=data_dir, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "T"], cwd=data_dir, check=True, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=data_dir, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial"], cwd=data_dir, check=True, capture_output=True)
+
+        xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+          <section label="Education">
+            <section label="Degrees" recordId="r1">
+              <field label="Degree Type"><lov id="1">Doctorate</lov></field>
+              <field label="Degree Status"><lov id="2">Completed</lov></field>
+              <field label="Degree Start Date"><value type="YearMonth">2018/9</value></field>
+            </section>
+            <section label="Degrees" recordId="r2">
+              <field label="Degree Type"><lov id="1">Doctorate</lov></field>
+              <field label="Degree Status"><lov id="2">Completed</lov></field>
+              <field label="Degree Start Date"><value type="YearMonth">2019/9</value></field>
+            </section>
+          </section>
+        </generic-cv:generic-cv>
+        """)
+        report = plan_import(data_dir, xml_path)
+        assert len(report.to_write) == 2
+
+        write_import(data_dir, report)
+
+        rows = (data_dir / "education.csv").read_text(encoding="utf-8").splitlines()[1:]
+        ids = [row.split(",")[0] for row in rows]
+        assert len(ids) == 2
+        assert len(set(ids)) == 2  # distinct, no collision

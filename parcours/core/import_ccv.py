@@ -698,7 +698,6 @@ def plan_import(data_dir: Path, xml_path: Path) -> ImportReport:
                 ))
                 continue
             schema = schemas[category]
-            row_id = generate_id(data_dir, category)
             mapped = MappedRow(
                 category=category,
                 ccv_label=label,
