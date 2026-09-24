@@ -312,9 +312,9 @@ Recording) showed three genuinely different shapes:
   Performance`, `Contribution Role`) is date-and-venue-shaped, describing
   a work *exhibited/performed somewhere* — this is `exhibitions`, not
   `artworks`, and by record count is the single largest chain in a real
-  export, not a marginal case. `exhibitions`' own `location`/`event`/
-  `curator` (required or glossary-backed) have no CCV source at all, so
-  every imported row needs manual completion of those fields.
+  export, not a marginal case. `exhibitions`' own `city`/`country`/
+  `event`/`curator` (required or glossary-backed) have no CCV source at
+  all, so every imported row needs manual completion of those fields.
 - **Visual Artworks** and **Audio Recordings** (`Artwork/Piece Title`,
   `Publication/Release Date`, `Contribution Role`, `Contributors`) are
   authorship-shaped and match `artworks` as originally mapped — just a
@@ -755,7 +755,8 @@ fields:
   - {name: title_fr}                                                    # usually only one filled
   - {name: event_en}
   - {name: event_fr}                                                    # Conference / Event Name — usually only one filled (e.g. "Colloque ACFAS" has no English name)
-  - {name: location,  required: true, glossary: location}                                   # city + country as one glossary-backed value, e.g. "Berlin, Germany"
+  - {name: city,      required: true, glossary: city}                                        # e.g. "The Hague"
+  - {name: country,   required: true, glossary: country}                                     # e.g. "Netherlands" — pre-populated in translations.csv at `init`, see Translations
   - {name: invited,   type: bool}
   - {name: keynote,   type: bool}
   - {name: date,      type: date, precision: month, required: true}     # at least year+month, like grants.start_date
@@ -782,17 +783,26 @@ dedup:
   Title` splits to `title_en`/`title_fr`, import fills the matching side
   and leaves the other blank — `require_one_of` covers the common case
   where only one language is ever given.
-- **`location` was originally two fields** (a country and a city,
-  matching CCV's own split) — collapsed into one after settling how
-  place names get translated (see Translations): a single
-  glossary-backed value covers both parts together as one unit (e.g.
-  "Berlin, Germany" / "Berlin, Allemagne"), which also correctly
-  handles cities whose name itself changes between languages (e.g. The
-  Hague / La Haye), which a separate city+country split couldn't. CCV's
-  fixed internal country list is not replicated in `vocab.yaml` — the
-  glossary approach makes that unnecessary. `"Online"` (one of CCV's
-  actual location values) is simply literal fallback text, no glossary
-  entry needed.
+- **`location` split back into `city` + `country`** (see Translations
+  for the full mechanism). This was tried both ways: originally two
+  fields matching CCV's own split, then collapsed into one combined
+  glossary value on the (mistaken) reasoning that a split "couldn't"
+  handle a city name changing between languages (The Hague / La Haye)
+  — it can, since `city` keeps the exact same glossary-backed,
+  literal-fallback behavior on its own that the combined field had.
+  Splitting back adds something the combined design genuinely couldn't
+  do: `country` gets pre-populated automatically at `parco init` from a
+  bundled EN/FR table (~195 countries, see Translations), so nearly
+  every country already resolves correctly with zero manual work —
+  `city` has no such bounded list and stays entirely manual, same as
+  before. Rendered as `"{city}, {country}"` in `views.yaml`. CCV's
+  fixed internal country list is not replicated in `vocab.yaml` —
+  `country`'s own pre-populated glossary makes that unnecessary.
+  `"Online"` (one of CCV's actual location values, entered in the free-
+  text `City` field since CCV's own `Location` is a closed country
+  list) writes into `city` as-is; `country` comes back blank from CCV
+  for these rows, same as any other missing-required-field gap `parco
+  lint` catches afterward — nothing import-side needs to special-case.
 - `Competitive?` is dropped — blank in 44 of 45 reference records.
 - `Main Audience` (CCV's `researcher`/`knowledge-user`/`general-public`
   list) is dropped — not tracked here.
@@ -1021,8 +1031,8 @@ dedup:
 
 Maps from CCV's Artistic Exhibitions (see CCV export structure, above)
 — the single largest record chain in a real export (43 records) — with
-`location`/`event`/`curator` left blank on import (no CCV source for
-any of the three; see CCV export structure) for manual completion
+`city`/`country`/`event`/`curator` left blank on import (no CCV source
+for any of them; see CCV export structure) for manual completion
 afterward.
 
 ```yaml
@@ -1035,7 +1045,8 @@ fields:
   - {name: title_fr}                                                # usually only one filled
   - {name: event}                                                    # free text — festival/series, e.g. "MUTEK Forum"
   - {name: venue}                                                    # free text — hosting institution, e.g. "National Gallery"
-  - {name: location,     required: true, glossary: location}                             # city + country as one glossary-backed value
+  - {name: city,         required: true, glossary: city}
+  - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — credited curator(s)
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}              # blank = single-day event or unknown
@@ -1047,8 +1058,9 @@ dedup:
     as: duplicate
 ```
 
-- `location` is one glossary-backed value covering city and country
-  together (see Translations), not separate fields.
+- `city`/`country` are each their own glossary-backed field (see
+  Translations) — `country`'s translations are pre-populated
+  automatically at `init`, `city`'s stay manual.
 - Scoped strictly to exhibitions **you exhibited in** — no `role`
   field; a separate `curatorship` category below covers when you were
   the curator instead.
@@ -1080,7 +1092,8 @@ fields:
   - {name: title_fr}
   - {name: event}
   - {name: venue}
-  - {name: location,     required: true, glossary: location}                             # city + country as one glossary-backed value
+  - {name: city,         required: true, glossary: city}
+  - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — co-curator(s), if any (your own curatorial role is implicit)
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}
@@ -1105,7 +1118,8 @@ fields:
   - {name: id,           generated: true}                       # res-2026-004
   - {name: weight,       type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: organization, required: true}                        # free text — e.g. "Hexagram", "LABoral"
-  - {name: location,     required: true, glossary: location}                         # city + country as one glossary-backed value
+  - {name: city,         required: true, glossary: city}
+  - {name: country,      required: true, glossary: country}                          # pre-populated in translations.csv at `init`, see Translations
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}           # blank = short/undated residency
 dedup:
@@ -1259,12 +1273,13 @@ Amounts can be converted to a reporting currency, mainly for statistics.
   `require_one_of` under Category schemas), where a missing translation
   is often not an oversight at all.
 - **`translations.csv` also serves as a content glossary**, not just UI chrome
-  — e.g. `category: location` rows translate a whole place name in one
-  unit (id `the-hague`: en "The Hague, Netherlands", fr "La Haye,
-  Pays-Bas"), the same pattern as the user's existing LaTeX `\gtr{}`
-  glossary. A field declares which glossary it's backed by with
-  `glossary: <category>` (parallel to `vocab: <name>` — see `location` on
-  `exhibitions`, `curatorship`, `residencies`, `presentations`); the
+  — e.g. `category: city` rows translate a single city name (id
+  `the-hague`: en "The Hague", fr "La Haye"), the same pattern as the
+  user's existing LaTeX `\gtr{}` glossary. A field declares which
+  glossary it's backed by with `glossary: <category>` (parallel to
+  `vocab: <name>` — see `city`/`country` on `exhibitions`,
+  `curatorship`, `residencies`, `presentations`, rendered together as
+  `"{city}, {country}"` in `views.yaml`); the
   value is looked up against `translations.csv` rows of that category
   when rendering, falling back to the literal text as typed when
   unmatched (an obscure place with no glossary entry) — the glossary is
@@ -1282,6 +1297,26 @@ Amounts can be converted to a reporting currency, mainly for statistics.
   would never expect capitalization alone to create two different
   places; the originally-typed casing is preserved for display, and
   `edit` never silently renames a glossary entry's stored casing.
+- **`category: country` is pre-populated, `category: city` never is:**
+  `city` and `country` are both plain glossary categories using the
+  exact same lookup/fallback mechanism above — no separate code path
+  for either — but `parco init` seeds `translations.csv` with ~195
+  `category: country` rows up front, from a small EN/FR table bundled
+  with `parco` itself (`starter_config/`, the same place `vocab.yaml`/
+  `views.yaml` come from). Country names are a small, closed, and
+  effectively unchanging set, so this makes nearly every country
+  already resolve correctly with zero manual work. `city` has no such
+  bounded list — there's no complete "every city in every language"
+  table worth bundling — so it stays entirely manual, exactly as before
+  the `location` split: you add an entry only for the specific cities
+  that actually need one (most don't — "Paris"/"Berlin"/"Montreal" are
+  the same in French), via the same `parco translation add city ...`
+  command as any other glossary category. Because the seeded rows
+  become part of *your* `translations.csv` the moment `init` copies
+  them, a future `parco` release with corrected/expanded country data
+  won't automatically reach an already-initialized repo — a rare,
+  minor cost given country names essentially never change, not an
+  ongoing sync mechanism this tool needs to build.
 - **Managing translations:** `translations.csv` has no `categories/*.yaml`
   schema (it's a fixed shape: `id, category, en, fr`), so it gets its own
   small command group rather than reusing `add`/`edit`/`delete`/`list`:
@@ -1366,10 +1401,13 @@ Notes on values not directly lifted from a CCV `lov` list:
   notes) but are included as real, expected activities.
 
 Not vocab-constrained even though `degree_type` might suggest it should
-be: `organization`, `venue`, `location`, and other free-text fields
+be: `organization`, `venue`, `city`, and other free-text fields
 throughout — deliberately open, per each schema's own notes (too many
 distinct real-world values to enumerate, e.g. every institution or
-venue that's ever hosted something).
+venue that's ever hosted something). `country` is the one exception
+worth naming: still not `vocab:`-constrained (no hard rejection of an
+unrecognized value), but its `glossary: country` pre-population means
+it behaves like a soft, warn-only vocab in practice.
 
 ## Identity / personal-info config
 
@@ -1877,7 +1915,11 @@ for:
   follow-up, not something `init` needs to work around
 - `vocab.yaml`, `translations.csv` — copied verbatim from the tool's
   bundled starter config, not wizard-generated (these are broad,
-  reusable defaults, not personal to any one user)
+  reusable defaults, not personal to any one user); `translations.csv`
+  additionally ships pre-populated with ~195 `category: country`
+  glossary rows (see Translations) so `city`/`country`-backed fields on
+  `presentations`/`exhibitions`/`curatorship`/`residencies` mostly
+  resolve correctly with no manual translation work
 - `views.yaml` — copied verbatim from the already-built
   `starter_config/views.yaml` (see Build)
 - `identity.yaml` — generated from the wizard's name/variant answers
