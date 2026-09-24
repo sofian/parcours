@@ -2390,10 +2390,11 @@ always runs the full parse → map → dedup pipeline and prints a report,
 writing everything **uncommitted** on confirmation rather than
 committing immediately — the one deliberate exception to the
 auto-commit rule, since a bulk import needs a real review window
-before it's locked into git history. Records get flagged for manual
-review (not auto-imported) only for genuine dedup ambiguity or, for
-`publications`/`catalog`, no confident Zotero fuzzy-match; records with
-no category mapping at all are skipped and reported, never imported.
+before it's locked into git history. A genuine dedup ambiguity or an
+unparseable `person_list` field still gets written, just flagged for a
+manual fix afterward; only a `publications`/`catalog` record with no
+confident Zotero fuzzy-match is excluded outright; records with no
+category mapping at all are skipped and reported, never imported.
 
 `query`/`stats`/`list --format citation`'s implementation is now
 complete too: `query` is a SELECT-only passthrough (validated with
