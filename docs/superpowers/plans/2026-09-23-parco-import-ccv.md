@@ -2728,10 +2728,13 @@ def _setup_data_repo(tmp_path):
     return tmp_path
 
 
-def test_import_ccv_dry_run_writes_nothing(tmp_path, monkeypatch):
+def test_import_ccv_dry_run_writes_nothing(tmp_path, tmp_path_factory, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     monkeypatch.chdir(repo)
-    xml_path = tmp_path / "export.xml"
+    # The export file must live OUTSIDE the git repo under test — writing it
+    # inside `tmp_path` would show up as an untracked file in every
+    # `git status --porcelain` assertion below, regardless of command behavior.
+    xml_path = tmp_path_factory.mktemp("ccv_export") / "export.xml"
     xml_path.write_text(_SAMPLE_XML, encoding="utf-8")
 
     result = runner.invoke(app, ["import", "ccv", "--file", str(xml_path), "--dry-run"])
@@ -2742,10 +2745,10 @@ def test_import_ccv_dry_run_writes_nothing(tmp_path, monkeypatch):
     assert status.stdout.strip() == ""
 
 
-def test_import_ccv_confirm_writes_uncommitted(tmp_path, monkeypatch):
+def test_import_ccv_confirm_writes_uncommitted(tmp_path, tmp_path_factory, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     monkeypatch.chdir(repo)
-    xml_path = tmp_path / "export.xml"
+    xml_path = tmp_path_factory.mktemp("ccv_export") / "export.xml"
     xml_path.write_text(_SAMPLE_XML, encoding="utf-8")
 
     result = runner.invoke(app, ["import", "ccv", "--file", str(xml_path)], input="y\n")
@@ -2758,10 +2761,10 @@ def test_import_ccv_confirm_writes_uncommitted(tmp_path, monkeypatch):
     assert "parco commit" in result.stdout
 
 
-def test_import_ccv_decline_writes_nothing(tmp_path, monkeypatch):
+def test_import_ccv_decline_writes_nothing(tmp_path, tmp_path_factory, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     monkeypatch.chdir(repo)
-    xml_path = tmp_path / "export.xml"
+    xml_path = tmp_path_factory.mktemp("ccv_export") / "export.xml"
     xml_path.write_text(_SAMPLE_XML, encoding="utf-8")
 
     result = runner.invoke(app, ["import", "ccv", "--file", str(xml_path)], input="n\n")
