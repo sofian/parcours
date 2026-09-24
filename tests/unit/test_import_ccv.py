@@ -252,3 +252,158 @@ def test_map_positions_non_academic_uses_unit_division_as_department():
     assert row.fields["organization"] == "Some Company"
     assert row.fields["department"] == "R&D"
     assert row.fields["faculty"] == ""
+
+
+def test_map_service_graduate_examination():
+    el = _record("""
+    <section label="Graduate Examination Activities" recordId="s1">
+      <field label="Graduate Examination Activity Role"><lov id="1">Thesis Defense Examiner</lov></field>
+      <field label="Organization">
+        <refTable refValueId="x" label="Organization">
+          <linkedWith label="Organization" value="Test University" refOrLovId="z"/>
+        </refTable>
+      </field>
+      <field label="Start Date"><value type="YearMonth">2020/1</value></field>
+      <field label="End Date"><value type="YearMonth">2020/1</value></field>
+      <field label="Student Name"><value type="String">A Student</value></field>
+    </section>
+    """)
+    row = map_record(el, "Graduate Examination Activities", "en", _ctx())
+    assert row.category == "service"
+    assert row.fields["type"] == "graduate-examination"
+    assert row.fields["role"] == "Thesis Defense Examiner"
+    assert row.fields["organization"] == "Test University"
+    assert row.fields["detail"] == "A Student"
+    assert row.fields["start_date"] == "2020-01"
+
+
+def test_map_service_funding_review():
+    el = _record("""
+    <section label="Research Funding Application Assessment Activities" recordId="s2">
+      <field label="Funding Reviewer Role"><lov id="1">External Reviewer</lov></field>
+      <field label="Other Organization"><value type="String">Some Agency</value></field>
+      <field label="Committee Name"><value type="String">Panel A</value></field>
+      <field label="Start Date"><value type="YearMonth">2019/1</value></field>
+    </section>
+    """)
+    row = map_record(el, "Research Funding Application Assessment Activities", "en", _ctx())
+    assert row.fields["type"] == "funding-review"
+    assert row.fields["role"] == "External Reviewer"
+    assert row.fields["organization"] == "Some Agency"
+    assert row.fields["detail"] == "Panel A"
+
+
+def test_map_service_volunteer():
+    el = _record("""
+    <section label="Community and Volunteer Activities" recordId="s3">
+      <field label="Role"><value type="String">Board Member</value></field>
+      <field label="Other Organization"><value type="String">Local Charity</value></field>
+      <field label="Start Date"><value type="YearMonth">2018/1</value></field>
+      <field label="Activity Description">
+        <value type="Bilingual"></value>
+        <bilingual><french></french><english>Helped organize events</english></bilingual>
+      </field>
+    </section>
+    """)
+    row = map_record(el, "Community and Volunteer Activities", "en", _ctx())
+    assert row.fields["type"] == "volunteer"
+    assert row.fields["role"] == "Board Member"
+    assert row.fields["detail"] == "Helped organize events"
+
+
+def test_map_service_committee_membership():
+    el = _record("""
+    <section label="Committee Memberships" recordId="s4">
+      <field label="Role"><lov id="1">Committee Member</lov></field>
+      <field label="Committee Name"><value type="String">Hiring Committee</value></field>
+      <field label="Other Organization"><value type="String">Test University</value></field>
+      <field label="Membership Start Date"><value type="YearMonth">2021/1</value></field>
+      <field label="Membership End Date"><value type="YearMonth">2022/1</value></field>
+    </section>
+    """)
+    row = map_record(el, "Committee Memberships", "en", _ctx())
+    assert row.fields["type"] == "committee"
+    assert row.fields["role"] == "Committee Member"
+    assert row.fields["detail"] == "Hiring Committee"
+    assert row.fields["start_date"] == "2021-01"
+    assert row.fields["end_date"] == "2022-01"
+
+
+def test_map_service_program_development():
+    el = _record("""
+    <section label="Program Development" recordId="s5">
+      <field label="Role"><value type="String">Chair</value></field>
+      <field label="Other Organization"><value type="String">Test University</value></field>
+      <field label="Program Title"><value type="String">New MFA Program</value></field>
+      <field label="Program Description">
+        <value type="Bilingual"></value>
+        <bilingual><french></french><english>A revised curriculum</english></bilingual>
+      </field>
+      <field label="Date First Taught"><value type="YearMonth">2020/9</value></field>
+    </section>
+    """)
+    row = map_record(el, "Program Development", "en", _ctx())
+    assert row.category == "service"
+    assert row.fields["type"] == "program-development"
+    assert row.fields["start_date"] == "2020-09"
+    assert row.fields["end_date"] == ""
+    assert "New MFA Program" in row.fields["detail"]
+    assert "A revised curriculum" in row.fields["detail"]
+
+
+def test_map_outreach():
+    el = _record("""
+    <section label="Knowledge and Technology Translation" recordId="o1">
+      <field label="Role"><value type="String">Consultant</value></field>
+      <field label="Knowledge and Technology Translation Activity Type"><lov id="1">Consulting for Industry</lov></field>
+      <field label="Group/Organization/Business Serviced"><value type="String">A Company</value></field>
+      <field label="Target Stakeholder"><lov id="2">Industrial Association/Producer Group</lov></field>
+      <field label="References / Citations / Web Sites"><value type="String">http://example.com</value></field>
+      <field label="Start Date"><value type="YearMonth">2017/1</value></field>
+      <field label="Activity Description">
+        <value type="Bilingual"></value>
+        <bilingual><french>Une activite</french><english>An activity</english></bilingual>
+      </field>
+    </section>
+    """)
+    row = map_record(el, "Knowledge and Technology Translation", "en", _ctx())
+    assert row.category == "outreach"
+    assert row.fields["activity_type"] == "industry-consulting"
+    assert row.fields["target_stakeholder"] == "industry-association"
+    assert row.fields["organization"] == "A Company"
+    assert row.fields["role"] == "Consultant"
+    assert row.fields["url"] == "http://example.com"
+    assert row.fields["description_en"] == "An activity"
+    assert row.fields["description_fr"] == "Une activite"
+
+
+def test_map_students():
+    el = _record("""
+    <section label="Student/Postdoctoral Supervision" recordId="st1">
+      <field label="Supervision Role"><lov id="1">Principal Supervisor</lov></field>
+      <field label="Supervision Start Date"><value type="YearMonth">2019/9</value></field>
+      <field label="Supervision End Date"><value type="YearMonth">2023/6</value></field>
+      <field label="Student Name"><value type="String">A Student</value></field>
+      <field label="Student Institution"><value type="String">Test University</value></field>
+      <field label="Degree Type or Postdoctoral Status"><lov id="2">Doctorate</lov></field>
+      <field label="Student Degree Status"><lov id="3">Completed</lov></field>
+      <field label="Student Degree Start Date"><value type="YearMonth">2019/9</value></field>
+      <field label="Student Degree Received Date"><value type="YearMonth">2023/6</value></field>
+      <field label="Thesis/Project Title"><value type="String">A Dissertation</value></field>
+      <field label="Present Position"><value type="String">Postdoc</value></field>
+      <field label="Present Organization"><value type="String">Another University</value></field>
+    </section>
+    """)
+    row = map_record(el, "Student/Postdoctoral Supervision", "en", _ctx())
+    assert row.category == "students"
+    assert row.fields["student_name"] == "A Student"
+    assert row.fields["role"] == "principal-supervisor"
+    assert row.fields["degree_type"] == "doctorate"
+    assert row.fields["degree_status"] == "completed"
+    assert row.fields["supervision_start_date"] == "2019-09"
+    assert row.fields["supervision_end_date"] == "2023-06"
+    assert row.fields["degree_start_date"] == "2019-09"
+    assert row.fields["degree_end_date"] == "2023-06"
+    assert row.fields["thesis_title"] == "A Dissertation"
+    assert row.fields["present_position"] == "Postdoc"
+    assert row.fields["present_organization"] == "Another University"

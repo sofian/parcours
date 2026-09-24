@@ -78,6 +78,27 @@ _POSITION_STATUS = {
 
 _YES_NO = {"Yes": "true", "No": "false"}
 
+_SUPERVISION_ROLE = {
+    "Principal Supervisor": "principal-supervisor",
+    "Co-Supervisor": "co-supervisor",
+}
+
+_OUTREACH_ACTIVITY_TYPE = {
+    "Business Innovation": "business-innovation",
+    "Community Engagement": "community-engagement",
+    "Consulting for Industry": "industry-consulting",
+    "Involvement in/Creation of Start-up": "startup-involvement",
+    "Technology, Product, Process, Service Improvement/Development": "technology-improvement",
+}
+
+_OUTREACH_STAKEHOLDER = {
+    "General Public": "general-public",
+    "Industrial Association/Producer Group": "industry-association",
+    "Industry/Business-Medium (100 to 500 employees)": "industry-business",
+    "Private Not-for-Profit Organization": "private-nonprofit",
+    "Utility": "utility",
+}
+
 
 def _normalize_apostrophe(text: str) -> str:
     return text.replace("’", "'")
@@ -286,5 +307,137 @@ def _map_positions_affiliation(record_el, lang, ctx) -> MappedRow:
             "position_status": "",
             "start_date": x.field_yearmonth(record_el, "Start Date"),
             "end_date": x.field_yearmonth(record_el, "End Date"),
+        },
+    )
+
+
+@_register("Graduate Examination Activities")
+def _map_service_graduate_examination(record_el, lang, ctx) -> MappedRow:
+    return MappedRow(
+        category="service",
+        ccv_label="Graduate Examination Activities",
+        fields={
+            "type": "graduate-examination",
+            "role": x.field_lov(record_el, "Graduate Examination Activity Role"),
+            "organization": x.field_organization(record_el),
+            "start_date": x.field_yearmonth(record_el, "Start Date"),
+            "end_date": x.field_yearmonth(record_el, "End Date"),
+            "detail": x.field_text(record_el, "Student Name"),
+        },
+    )
+
+
+@_register("Research Funding Application Assessment Activities")
+def _map_service_funding_review(record_el, lang, ctx) -> MappedRow:
+    return MappedRow(
+        category="service",
+        ccv_label="Research Funding Application Assessment Activities",
+        fields={
+            "type": "funding-review",
+            "role": x.field_lov(record_el, "Funding Reviewer Role"),
+            "organization": x.field_organization(record_el),
+            "start_date": x.field_yearmonth(record_el, "Start Date"),
+            "end_date": x.field_yearmonth(record_el, "End Date"),
+            "detail": x.field_text(record_el, "Committee Name"),
+        },
+    )
+
+
+@_register("Community and Volunteer Activities")
+def _map_service_volunteer(record_el, lang, ctx) -> MappedRow:
+    description_fr, description_en = x.field_bilingual(record_el, "Activity Description", lang)
+    detail = description_en or description_fr
+    return MappedRow(
+        category="service",
+        ccv_label="Community and Volunteer Activities",
+        fields={
+            "type": "volunteer",
+            "role": x.field_text(record_el, "Role"),
+            "organization": x.field_organization(record_el),
+            "start_date": x.field_yearmonth(record_el, "Start Date"),
+            "end_date": x.field_yearmonth(record_el, "End Date"),
+            "detail": detail,
+        },
+    )
+
+
+@_register("Committee Memberships")
+def _map_service_committee(record_el, lang, ctx) -> MappedRow:
+    return MappedRow(
+        category="service",
+        ccv_label="Committee Memberships",
+        fields={
+            "type": "committee",
+            "role": x.field_lov(record_el, "Role"),
+            "organization": x.field_organization(record_el),
+            "start_date": x.field_yearmonth(record_el, "Membership Start Date"),
+            "end_date": x.field_yearmonth(record_el, "Membership End Date"),
+            "detail": x.field_text(record_el, "Committee Name"),
+        },
+    )
+
+
+@_register("Program Development")
+def _map_service_program_development(record_el, lang, ctx) -> MappedRow:
+    description_fr, description_en = x.field_bilingual(record_el, "Program Description", lang)
+    program_title = x.field_text(record_el, "Program Title")
+    description = description_en or description_fr
+    detail = f"{program_title}: {description}" if description else program_title
+    return MappedRow(
+        category="service",
+        ccv_label="Program Development",
+        fields={
+            "type": "program-development",
+            "role": x.field_text(record_el, "Role"),
+            "organization": x.field_organization(record_el),
+            "start_date": x.field_yearmonth(record_el, "Date First Taught"),
+            "end_date": "",
+            "detail": detail,
+        },
+    )
+
+
+@_register("Knowledge and Technology Translation")
+def _map_outreach(record_el, lang, ctx) -> MappedRow:
+    description_fr, description_en = x.field_bilingual(record_el, "Activity Description", lang)
+    return MappedRow(
+        category="outreach",
+        ccv_label="Knowledge and Technology Translation",
+        fields={
+            "activity_type": _OUTREACH_ACTIVITY_TYPE.get(
+                x.field_lov(record_el, "Knowledge and Technology Translation Activity Type"), ""
+            ),
+            "target_stakeholder": _OUTREACH_STAKEHOLDER.get(x.field_lov(record_el, "Target Stakeholder"), ""),
+            "organization": x.field_text(record_el, "Group/Organization/Business Serviced"),
+            "role": x.field_text(record_el, "Role"),
+            "start_date": x.field_yearmonth(record_el, "Start Date"),
+            "end_date": x.field_yearmonth(record_el, "End Date"),
+            "description_en": description_en,
+            "description_fr": description_fr,
+            "url": x.field_text(record_el, "References / Citations / Web Sites"),
+        },
+    )
+
+
+@_register("Student/Postdoctoral Supervision")
+def _map_students(record_el, lang, ctx) -> MappedRow:
+    degree_type_raw = _normalize_apostrophe(x.field_lov(record_el, "Degree Type or Postdoctoral Status"))
+    degree_status_raw = x.field_lov(record_el, "Student Degree Status")
+    return MappedRow(
+        category="students",
+        ccv_label="Student/Postdoctoral Supervision",
+        fields={
+            "student_name": x.field_text(record_el, "Student Name"),
+            "role": _SUPERVISION_ROLE.get(x.field_lov(record_el, "Supervision Role"), ""),
+            "institution": x.field_text(record_el, "Student Institution"),
+            "degree_type": _DEGREE_TYPE.get(degree_type_raw, ""),
+            "degree_status": _DEGREE_STATUS.get(degree_status_raw, ""),
+            "supervision_start_date": x.field_yearmonth(record_el, "Supervision Start Date"),
+            "supervision_end_date": x.field_yearmonth(record_el, "Supervision End Date"),
+            "degree_start_date": x.field_yearmonth(record_el, "Student Degree Start Date"),
+            "degree_end_date": x.field_yearmonth(record_el, "Student Degree Received Date"),
+            "thesis_title": x.field_text(record_el, "Thesis/Project Title"),
+            "present_position": x.field_text(record_el, "Present Position"),
+            "present_organization": x.field_text(record_el, "Present Organization"),
         },
     )
