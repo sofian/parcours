@@ -42,9 +42,12 @@ CSV files (source of truth, git-tracked)
         └──► (future) MCP-DuckDB server ──► chatbot querying (read-only)
 ```
 
-Zotero (with Better BibTeX auto-export) is the canonical source for full
-bibliographic metadata; the publications CSV holds a citekey linking to it
-plus CV-specific fields Zotero doesn't track.
+A CSL-JSON export is the canonical source for full bibliographic
+metadata — Zotero with Better BibTeX auto-export is the reference path
+(the one this spec verifies against), but any citation manager able to
+produce a CSL-JSON file works identically, since the tool only ever
+reads that file. The publications CSV holds a citekey linking to it
+plus CV-specific fields the export doesn't track.
 
 ---
 
@@ -472,13 +475,16 @@ fields:
   exported CSL-JSON and joined on the citekey when building views. This
   is a join between the CSV and the export, not between tables.
 - **Every row's citekey must resolve in the export** — no local fallback
-  fields. In-progress work is added to Zotero first (manuscript/preprint
-  item types); `status` tracks the stage. `lint` flags unresolved keys.
-- Zotero's exports are the pair of files Better BibTeX keeps in sync
-  (BibTeX for citekeys, CSL-JSON for full metadata). No live Zotero
-  connection is needed. The export location is configurable (there is no
-  fixed default); files inside the data repo are versioned and synced
-  with it, files outside are not.
+  fields. In-progress work is added to your citation manager first
+  (manuscript/preprint item types); `status` tracks the stage. `lint`
+  flags unresolved keys.
+- For Zotero specifically, Better BibTeX keeps a pair of files in sync
+  (BibTeX for citekeys, CSL-JSON for full metadata) — `parco` only
+  reads the CSL-JSON one. No live connection to Zotero (or any other
+  citation manager) is needed at any point; it's a plain file on disk.
+  The export location is configurable (there is no fixed default);
+  files inside the data repo are versioned and synced with it, files
+  outside are not.
 - **Dedup:** same citekey already in the CSV → `duplicate`; different
   citekey with the same DOI as an existing row → `duplicate` (usually a
   doubled Zotero item); fuzzy title + same year → `duplicate` (weaker
