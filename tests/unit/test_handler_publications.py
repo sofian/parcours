@@ -99,6 +99,23 @@ def test_find_matches_fuzzy_title_and_same_year_is_duplicate(tmp_path):
     assert len(matches) == 1
 
 
+def test_find_matches_fuzzy_title_and_same_year_with_mixed_year_types_is_duplicate(tmp_path):
+    # Same real-world quirk as above, exercised through the dedup path:
+    # one record's year stored as an int, the other as a string, same
+    # actual year — must still be recognized as the same year.
+    json_path = _write_csl_json(tmp_path, [
+        {"id": "key-a", "title": "Machine Learning Art", "issued": {"date-parts": [[2024]]}},
+        {"id": "key-b", "title": "Machine Learning  Art", "issued": {"date-parts": [["2024"]]}},
+    ])
+    handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
+    entry = {"id": "new", "citekey": "key-a"}
+    existing = [{"id": "old", "citekey": "key-b"}]
+
+    matches = handler.find_matches(entry, existing)
+
+    assert len(matches) == 1
+
+
 def test_find_matches_no_false_positive_for_unrelated_publications(tmp_path):
     json_path = _write_csl_json(tmp_path, [
         {"id": "key-a", "title": "Machine Learning Art", "DOI": "10.1/a",
@@ -135,7 +152,7 @@ def test_match_citekey_by_title_returns_none_when_no_match(tmp_path):
     assert citekey is None
 
 
-def test_match_citekey_by_title_rejects_a_year_mismatch(tmp_path):
+def test_match_citekey_by_title_tolerates_a_one_year_difference(tmp_path):
     json_path = _write_csl_json(tmp_path, [
         {"id": "smith2020widget", "title": "A Widget Study", "issued": {"date-parts": [[2020]]}},
     ])
@@ -143,7 +160,34 @@ def test_match_citekey_by_title_rejects_a_year_mismatch(tmp_path):
 
     citekey = handler.match_citekey_by_title("A Widget Study", 2019)
 
+    assert citekey == "smith2020widget"
+
+
+def test_match_citekey_by_title_rejects_a_year_mismatch_beyond_one_year(tmp_path):
+    json_path = _write_csl_json(tmp_path, [
+        {"id": "smith2020widget", "title": "A Widget Study", "issued": {"date-parts": [[2020]]}},
+    ])
+    handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
+
+    citekey = handler.match_citekey_by_title("A Widget Study", 2015)
+
     assert citekey is None
+
+
+def test_match_citekey_by_title_handles_a_string_typed_year_in_csl_json(tmp_path):
+    # Real-world Better BibTeX CSL-JSON exports don't reliably agree on
+    # whether issued.date-parts' year is an int or a numeric string —
+    # confirmed against a real ~1800-item export mixing both. A naive
+    # `record_year != year` comparison would silently reject this match
+    # forever, since `2020 == "2020"` is always False in Python.
+    json_path = _write_csl_json(tmp_path, [
+        {"id": "smith2020widget", "title": "A Widget Study", "issued": {"date-parts": [["2020"]]}},
+    ])
+    handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
+
+    citekey = handler.match_citekey_by_title("A Widget Study", 2020)
+
+    assert citekey == "smith2020widget"
 
 
 def test_match_citekey_by_title_returns_none_when_ambiguous(tmp_path):

@@ -2235,12 +2235,20 @@ manual entry.
 
 **What gets excluded and never written** (the record is listed in the
 report instead): for `publications`/`catalog` specifically, no
-confident Zotero match (fuzzy title/DOI against your Zotero library,
-reusing `core/matching.py::fuzzy_match`; a confident match writes the
-row with that citekey, no match flags it as "needs a Zotero citekey").
-A record that's merely missing a required field still gets imported
-blank — that's exactly what `parco lint` exists to catch afterward,
-not something import should block on.
+confident Zotero match (fuzzy title, reusing
+`core/matching.py::fuzzy_match`, plus year when both sides have one —
+within 1 year counts as a match, since a CV's own recorded year and
+Zotero's `issued` date commonly disagree by one, e.g. an
+accepted/presented year vs. an actual publication year; a confident
+match writes the row with that citekey, no match flags it as "needs a
+Zotero citekey"). Real-world CSL-JSON exports don't reliably agree on
+whether `issued.date-parts`' year is an int or a numeric string
+(confirmed against a real ~1800-item Better BibTeX export mixing
+both) — the year is normalized to `int` before any comparison, so this
+never silently blocks an otherwise-confident match. A record that's
+merely missing a required field still gets imported blank — that's
+exactly what `parco lint` exists to catch afterward, not something
+import should block on.
 
 **What gets silently skipped** (counted and reported, never imported
 as one of the categories): any record whose CCV section doesn't map to
