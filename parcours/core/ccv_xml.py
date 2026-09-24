@@ -16,8 +16,15 @@ class CcvRecord:
     path: tuple[str, ...]
 
 
+class CcvParseError(Exception):
+    """Raised when the given file isn't parseable as XML."""
+
+
 def parse_ccv_export(xml_path: Path) -> tuple[ET.Element, str]:
-    tree = ET.parse(xml_path)
+    try:
+        tree = ET.parse(xml_path)
+    except ET.ParseError as exc:
+        raise CcvParseError(f"{xml_path} is not valid XML: {exc}") from exc
     root = tree.getroot()
     lang = root.get("lang") or "en"
     return root, lang
@@ -30,7 +37,7 @@ def find_records(root: ET.Element) -> list[CcvRecord]:
         if element.get("recordId") is not None:
             records.append(CcvRecord(
                 element=element,
-                label=element.get("label"),
+                label=element.get("label") or "",
                 path=tuple(_ancestor_labels(element, parent_map)),
             ))
     return records
@@ -70,7 +77,10 @@ def field_yearmonth(record_el: ET.Element, label: str) -> str:
     if not raw or "/" not in raw:
         return ""
     year, month = raw.split("/", 1)
-    return f"{year}-{int(month):02d}"
+    try:
+        return f"{year}-{int(month):02d}"
+    except ValueError:
+        return ""
 
 
 def field_date(record_el: ET.Element, label: str) -> str:

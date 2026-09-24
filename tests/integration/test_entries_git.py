@@ -36,6 +36,33 @@ def test_add_entry_creates_a_real_git_commit(tmp_path):
     assert f"Added widgets entry {row['id']}" in log
 
 
+def test_add_entry_commits_when_csv_was_already_tracked_and_clean(tmp_path):
+    _init_git_repo(tmp_path)
+    schema = CategorySchema(
+        name="widgets",
+        fields=[FieldSpec(name="id", generated=True), FieldSpec(name="title_en", required=True)],
+    )
+    # Pre-create and commit the CSV as an ordinary tracked, clean file —
+    # this is the realistic steady-state (parco init already committed
+    # every starter category's CSV), distinct from the untracked-first-row
+    # scenario the test above this one covers. If is_file_dirty were ever
+    # called AFTER write_all_rows instead of before, this exact scenario
+    # would wrongly see the write's own diff as "already dirty" and skip
+    # the commit.
+    (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
+    subprocess.run(["git", "add", "widgets.csv"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Add widgets.csv"], cwd=tmp_path, check=True, capture_output=True)
+    commits_before = _commit_count(tmp_path)
+
+    row = add_entry(tmp_path, schema, {"title_en": "A Widget"})
+
+    assert _commit_count(tmp_path) == commits_before + 1
+    log = subprocess.run(
+        ["git", "log", "--oneline", "-1"], cwd=tmp_path, check=True, capture_output=True, text=True
+    ).stdout
+    assert f"Added widgets entry {row['id']}" in log
+
+
 def test_edit_entry_with_no_changes_does_not_raise_or_create_a_spurious_commit(tmp_path):
     _init_git_repo(tmp_path)
     schema = CategorySchema(

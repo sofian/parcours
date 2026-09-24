@@ -77,6 +77,14 @@ def test_find_records_returns_every_recordid_element_with_its_path(root):
     assert ("Contributions", "Artistic Contributions", "Visual Artworks") in paths
 
 
+def test_find_records_defaults_label_to_empty_string_when_missing():
+    xml = '<root><section recordId="rec-1"><field label="X"/></section></root>'
+    root = ET.fromstring(xml)
+    records = find_records(root)
+    assert len(records) == 1
+    assert records[0].label == ""
+
+
 def test_field_lov_reads_display_text(root):
     degrees = find_records(root)[0].element
     assert field_lov(degrees, "Degree Type") == "Doctorate"
@@ -94,6 +102,12 @@ def test_field_yearmonth_reformats_slash_to_dash_and_zero_pads(root):
     assert field_yearmonth(degrees, "Degree Start Date") == "2018-09"
     assert field_yearmonth(degrees, "Degree Received Date") == "2022-06"
     assert field_yearmonth(degrees, "Missing Field") == ""
+
+
+def test_field_yearmonth_returns_empty_on_non_numeric_month():
+    xml = '<r label="X" recordId="1"><field label="D"><value type="YearMonth">2020/n.d.</value></field></r>'
+    el = ET.fromstring(xml)
+    assert field_yearmonth(el, "D") == ""
 
 
 def test_field_organization_resolves_reftable_linkedwith(root):

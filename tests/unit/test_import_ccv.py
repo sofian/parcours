@@ -658,6 +658,15 @@ def test_extract_zotero_candidate_blank_year_is_none():
     assert candidate.year is None
 
 
+def test_extract_zotero_candidate_non_numeric_year_is_none():
+    el = _record('<section label="Journal Articles" recordId="p6">'
+                 '<field label="Article Title"><value type="String">A Widget Study</value></field>'
+                 '<field label="Year"><value type="Year">n.d.</value></field>'
+                 '</section>')
+    candidate = extract_zotero_candidate(el, "Journal Articles", "en")
+    assert candidate.year is None
+
+
 import textwrap
 
 from parcours.core.import_ccv import ImportReport, plan_import, write_import

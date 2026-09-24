@@ -28,6 +28,7 @@ def test_delete_confirms_and_removes_the_row(tmp_path, monkeypatch):
     monkeypatch.chdir(repo)
     monkeypatch.setattr("parcours.core.entries.git_commit", lambda *a, **k: None)
     monkeypatch.setattr("parcours.core.entries.is_file_dirty", lambda *a, **k: False)
+    monkeypatch.setattr("parcours.cli.main.is_file_dirty", lambda *a, **k: False)
 
     result = runner.invoke(app, ["delete", "widgets", "--search", "First"], input="1\ny\n")
 

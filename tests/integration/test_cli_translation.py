@@ -15,6 +15,7 @@ def test_translation_add_creates_translations_csv_and_commits(tmp_path, monkeypa
     monkeypatch.chdir(repo)
     monkeypatch.setattr("parcours.core.translations.git_commit", lambda *a, **k: None)
     monkeypatch.setattr("parcours.core.translations.is_file_dirty", lambda *a, **k: False)
+    monkeypatch.setattr("parcours.cli.main.is_file_dirty", lambda *a, **k: False)
 
     result = runner.invoke(app, ["translation", "add", "location", "montreal", "--en", "Montreal", "--fr", "Montréal"])
 
@@ -29,6 +30,7 @@ def test_translation_add_prompts_for_missing_en_fr(tmp_path, monkeypatch):
     monkeypatch.chdir(repo)
     monkeypatch.setattr("parcours.core.translations.git_commit", lambda *a, **k: None)
     monkeypatch.setattr("parcours.core.translations.is_file_dirty", lambda *a, **k: False)
+    monkeypatch.setattr("parcours.cli.main.is_file_dirty", lambda *a, **k: False)
 
     result = runner.invoke(app, ["translation", "add", "location", "montreal"], input="Montreal\nMontréal\n")
 
@@ -41,6 +43,7 @@ def test_translation_add_rejects_an_existing_pair(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     (repo / "translations.csv").write_text("id,category,en,fr\nmontreal,location,Montreal,Montréal\n", encoding="utf-8")
     monkeypatch.chdir(repo)
+    monkeypatch.setattr("parcours.cli.main.is_file_dirty", lambda *a, **k: False)
 
     result = runner.invoke(app, ["translation", "add", "location", "montreal", "--en", "X", "--fr", "Y"])
 
@@ -54,6 +57,7 @@ def test_translation_edit_updates_existing_pair(tmp_path, monkeypatch):
     monkeypatch.chdir(repo)
     monkeypatch.setattr("parcours.core.translations.git_commit", lambda *a, **k: None)
     monkeypatch.setattr("parcours.core.translations.is_file_dirty", lambda *a, **k: False)
+    monkeypatch.setattr("parcours.cli.main.is_file_dirty", lambda *a, **k: False)
 
     result = runner.invoke(app, ["translation", "edit", "location", "montreal", "--fr", "Montréal"], input="\n")
 
@@ -81,6 +85,7 @@ def test_translation_delete_confirms_and_removes(tmp_path, monkeypatch):
     monkeypatch.chdir(repo)
     monkeypatch.setattr("parcours.core.translations.git_commit", lambda *a, **k: None)
     monkeypatch.setattr("parcours.core.translations.is_file_dirty", lambda *a, **k: False)
+    monkeypatch.setattr("parcours.cli.main.is_file_dirty", lambda *a, **k: False)
 
     result = runner.invoke(app, ["translation", "delete", "location", "montreal"], input="y\n")
 

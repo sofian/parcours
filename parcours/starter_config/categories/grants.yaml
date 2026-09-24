@@ -3,8 +3,8 @@ handler: generic
 fields:
   - {name: id,           generated: true}                   # grant-frqsc-2026
   - {name: weight,       type: int}                         # optional; higher = appears earlier, refines/overrides date-based ordering
-  - {name: title_en,     required: true}
-  - {name: title_fr,     required: true}
+  - {name: title_en}
+  - {name: title_fr}
   - {name: funder,       required: true}                    # free text
   - {name: program}
   - {name: role,         required: true, vocab: grant_role}     # PI / co-PI / collaborator
@@ -16,6 +16,8 @@ fields:
   - {name: co_investigators, type: person_list}
   - {name: note_en}
   - {name: note_fr}
+require_one_of:
+  - [title_en, title_fr]
 dedup:
   - when: [{exact: funder}, {overlap: [start_date, end_date]}, {fuzzy: [title_en, title_fr]}]
     as: duplicate

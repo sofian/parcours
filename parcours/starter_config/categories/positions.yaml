@@ -4,14 +4,16 @@ fields:
   - {name: id,               generated: true}                       # pos-2026-004
   - {name: weight,           type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: type,             required: true, vocab: position_type}   # academic / non-academic / affiliation
-  - {name: title_en,         required: true}
-  - {name: title_fr,         required: true}
+  - {name: title_en}
+  - {name: title_fr}
   - {name: organization,     required: true}                         # free text — CCV mostly supplies "Other Organization" here, not the refTable
   - {name: faculty}                                                   # free text — e.g. "School of Media"
   - {name: department}                                                # free text
   - {name: position_status,  vocab: position_status}                  # e.g. full-time / part-time / casual
   - {name: start_date,       type: date, precision: month, required: true}
   - {name: end_date,         type: date, precision: month}            # blank = ongoing
+require_one_of:
+  - [title_en, title_fr]
 dedup:
   - when: [{exact: organization}, {fuzzy: [title_en, title_fr]}, {overlap: [start_date, end_date]}]
     as: duplicate

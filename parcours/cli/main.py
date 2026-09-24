@@ -10,6 +10,7 @@ from pathlib import Path
 import typer
 
 from ..core.build import BuildError, run_build
+from ..core.ccv_xml import CcvParseError
 from ..core.citations import UnknownCitationStyle, render_citations, resolve_style
 from ..core.commit import commit_pending
 from ..core.data import (
@@ -19,7 +20,7 @@ from ..core.data import (
     query_category_rows,
     run_select_query,
 )
-from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry
+from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry, is_file_dirty
 from ..core.handlers import load_handler
 from ..core.handlers.base import CategoryHandler, HandlerContext
 from ..core.handlers.publications import PublicationsHandler
@@ -408,12 +409,20 @@ def add(ctx: typer.Context, category: str = typer.Argument(None, help="Category 
         typer.echo("Aborted, nothing written.")
         raise typer.Exit(code=0)
 
+    filename = f"{category}.csv"
+    was_dirty_before = is_file_dirty(data_dir, filename)
     try:
         row = add_entry(data_dir, schema, values)
     except CommitFailed as exc:
         typer.echo(f"Row written, but the commit failed: {exc}")
         raise typer.Exit(code=1)
-    typer.echo(f"Added {category} entry {row['id']}.")
+    if was_dirty_before:
+        typer.echo(
+            f"Added {category} entry {row['id']} (not committed — {filename} has other "
+            "pending changes; run 'parco commit' when ready)."
+        )
+    else:
+        typer.echo(f"Added {category} entry {row['id']}.")
 
 
 @app.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
@@ -446,12 +455,20 @@ def edit(
         typer.echo("Aborted, nothing written.")
         raise typer.Exit(code=0)
 
+    filename = f"{category}.csv"
+    was_dirty_before = is_file_dirty(data_dir, filename)
     try:
         updated = edit_entry(data_dir, schema, row["id"], values)
     except CommitFailed as exc:
         typer.echo(f"Row written, but the commit failed: {exc}")
         raise typer.Exit(code=1)
-    typer.echo(f"Edited {category} entry {updated['id']}.")
+    if was_dirty_before:
+        typer.echo(
+            f"Edited {category} entry {updated['id']} (not committed — {filename} has other "
+            "pending changes; run 'parco commit' when ready)."
+        )
+    else:
+        typer.echo(f"Edited {category} entry {updated['id']}.")
 
 
 @app.command()
@@ -478,12 +495,20 @@ def delete(
         typer.echo("Aborted, nothing deleted.")
         raise typer.Exit(code=0)
 
+    filename = f"{category}.csv"
+    was_dirty_before = is_file_dirty(data_dir, filename)
     try:
         delete_entry(data_dir, schema, row["id"])
     except CommitFailed as exc:
         typer.echo(f"Row written, but the commit failed: {exc}")
         raise typer.Exit(code=1)
-    typer.echo(f"Deleted {category} entry {row['id']}.")
+    if was_dirty_before:
+        typer.echo(
+            f"Deleted {category} entry {row['id']} (not committed — {filename} has other "
+            "pending changes; run 'parco commit' when ready)."
+        )
+    else:
+        typer.echo(f"Deleted {category} entry {row['id']}.")
 
 
 import_app = typer.Typer(help="Bulk-seed data from a one-time export file (see SPECS.md, \"Import\").")
@@ -506,6 +531,11 @@ def _print_import_report(report: ImportReport) -> None:
             for match in matches:
                 typer.echo(f"  {mapped.category} ({mapped.ccv_label}): {match.reason}")
 
+    if report.notes:
+        typer.echo(f"\n{len(report.notes)} imported row(s) need a manual fix:")
+        for note in report.notes:
+            typer.echo(f"  {note.ccv_label}: {note.reason}")
+
     if report.flagged:
         typer.echo(f"\n{len(report.flagged)} record(s) flagged for manual review (not imported):")
         for flagged in report.flagged:
@@ -520,13 +550,20 @@ def _print_import_report(report: ImportReport) -> None:
 
 @import_app.command(name="ccv")
 def import_ccv(
-    file: Path = typer.Option(..., "--file", help="Path to the CCV XML export"),
+    file: Path = typer.Option(
+        ..., "--file", exists=True, dir_okay=False, readable=True,
+        help="Path to the CCV XML export",
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Report what would be imported without writing anything"),
 ):
     """Bulk-import from a Canadian Common CV XML export."""
     data_dir = _find_repo_or_exit()
 
-    report = plan_import(data_dir, file)
+    try:
+        report = plan_import(data_dir, file)
+    except CcvParseError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
     _print_import_report(report)
 
     if not report.to_write:
@@ -574,6 +611,8 @@ def translation_add(
     if fr is None:
         fr = typer.prompt("fr ([Enter] to skip)", default="", show_default=False)
 
+    filename = "translations.csv"
+    was_dirty_before = is_file_dirty(data_dir, filename)
     try:
         entry = add_translation(data_dir, category, entry_id, en, fr)
     except TranslationExists as exc:
@@ -582,7 +621,13 @@ def translation_add(
     except CommitFailed as exc:
         typer.echo(f"Row written, but the commit failed: {exc}")
         raise typer.Exit(code=1)
-    typer.echo(f"Added translation {entry.category}:{entry.id}.")
+    if was_dirty_before:
+        typer.echo(
+            f"Added translation {entry.category}:{entry.id} (not committed — {filename} has other "
+            "pending changes; run 'parco commit' when ready)."
+        )
+    else:
+        typer.echo(f"Added translation {entry.category}:{entry.id}.")
 
 
 @translation_app.command(name="edit")
@@ -606,6 +651,8 @@ def translation_edit(
     if fr is None:
         fr = typer.prompt("fr", default=current.fr, show_default=bool(current.fr))
 
+    filename = "translations.csv"
+    was_dirty_before = is_file_dirty(data_dir, filename)
     try:
         entry = edit_translation(data_dir, category, entry_id, en, fr)
     except TranslationNotFound as exc:
@@ -614,7 +661,13 @@ def translation_edit(
     except CommitFailed as exc:
         typer.echo(f"Row written, but the commit failed: {exc}")
         raise typer.Exit(code=1)
-    typer.echo(f"Edited translation {entry.category}:{entry.id}.")
+    if was_dirty_before:
+        typer.echo(
+            f"Edited translation {entry.category}:{entry.id} (not committed — {filename} has other "
+            "pending changes; run 'parco commit' when ready)."
+        )
+    else:
+        typer.echo(f"Edited translation {entry.category}:{entry.id}.")
 
 
 @translation_app.command(name="delete")
@@ -638,6 +691,8 @@ def translation_delete(
         typer.echo("Aborted, nothing deleted.")
         raise typer.Exit(code=0)
 
+    filename = "translations.csv"
+    was_dirty_before = is_file_dirty(data_dir, filename)
     try:
         delete_translation(data_dir, category, entry_id)
     except TranslationNotFound as exc:
@@ -646,7 +701,13 @@ def translation_delete(
     except CommitFailed as exc:
         typer.echo(f"Row written, but the commit failed: {exc}")
         raise typer.Exit(code=1)
-    typer.echo(f"Deleted translation {category}:{entry_id}.")
+    if was_dirty_before:
+        typer.echo(
+            f"Deleted translation {category}:{entry_id} (not committed — {filename} has other "
+            "pending changes; run 'parco commit' when ready)."
+        )
+    else:
+        typer.echo(f"Deleted translation {category}:{entry_id}.")
 
 
 @translation_app.command(name="list")

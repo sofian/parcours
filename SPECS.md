@@ -495,8 +495,8 @@ handler: generic
 fields:
   - {name: id,           generated: true}                   # grant-frqsc-2026
   - {name: weight,       type: int}                         # optional; higher = appears earlier, refines/overrides date-based ordering
-  - {name: title_en,     required: true}
-  - {name: title_fr,     required: true}
+  - {name: title_en}
+  - {name: title_fr}
   - {name: funder,       required: true}                    # free text
   - {name: program}
   - {name: role,         required: true, vocab: grant_role}     # PI / co-PI / collaborator
@@ -508,14 +508,19 @@ fields:
   - {name: co_investigators, type: person_list}
   - {name: note_en}
   - {name: note_fr}
+require_one_of:
+  - [title_en, title_fr]
 dedup:
   - when: [{exact: funder}, {overlap: [start_date, end_date]}, {fuzzy: [title_en, title_fr]}]
     as: duplicate
 ```
 
 - Views resolve `title` to `title_en` / `title_fr` from the profile's
-  language, so profiles never mention suffixes. A blank required `_fr` or
-  `_en` field is a lint error (missing translation).
+  language, so profiles never mention suffixes. `title_en`/`title_fr`
+  were originally both `required: true`; loosened to `require_one_of`
+  (see Category schemas above) for the same reason as `artworks` —
+  the CCV importer can only ever fill one side per record, and forcing
+  a translation would mean inventing one.
 - Amounts are stored, which is one reason the data repo is private.
   Converted amounts are described under Currency conversion below.
 - RenderCV mapping (in `views.yaml`): a grant becomes a `NormalEntry` —
@@ -917,14 +922,16 @@ fields:
   - {name: id,               generated: true}                       # pos-2026-004
   - {name: weight,           type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: type,             required: true, vocab: position_type}   # academic / non-academic / affiliation
-  - {name: title_en,         required: true}
-  - {name: title_fr,         required: true}
+  - {name: title_en}
+  - {name: title_fr}
   - {name: organization,     required: true}                         # free text — CCV mostly supplies "Other Organization" here, not the refTable
   - {name: faculty}                                                   # free text — e.g. "School of Media"
   - {name: department}                                                # free text
   - {name: position_status,  vocab: position_status}                  # e.g. full-time / part-time / casual
   - {name: start_date,       type: date, precision: month, required: true}
   - {name: end_date,         type: date, precision: month}            # blank = ongoing
+require_one_of:
+  - [title_en, title_fr]
 dedup:
   - when: [{exact: organization}, {fuzzy: [title_en, title_fr]}, {overlap: [start_date, end_date]}]
     as: duplicate
@@ -952,10 +959,14 @@ dedup:
   professional-experience entries are full of it; that text would need
   manual entry either way, so it isn't a CCV-import gap, just a field
   this schema doesn't track.
-- `title` is bilingual (`title_en`/`title_fr`) for every row, even
-  though CCV's academic/non-academic subtypes use a single string
-  (`Affiliations` is already bilingual in CCV) — matches the pattern
-  used for `education`/`artworks`/`presentations`.
+- `title` is bilingual (`title_en`/`title_fr`), even though CCV's
+  academic/non-academic subtypes use a single string (`Affiliations`
+  is already bilingual in CCV). Unlike `education`'s
+  `degree_name_en`/`degree_name_fr` (both `required: true`, since
+  CCV's Degree Name field is genuinely bilingual there), `title_en`/
+  `title_fr` here use `require_one_of` — matching `artworks`/
+  `presentations` — since the importer can only ever fill one side per
+  record.
 
 ### recognitions (handler: generic)
 
@@ -2213,15 +2224,23 @@ actual export). Always runs the same full parse → map → dedup pipeline;
    --search ...` or by hand, then `parco commit` (see Commit) when
    satisfied — or `git checkout -- .` to discard the import entirely.
 
-**What gets flagged for manual review** (imported nowhere, listed in
-the report instead): genuine dedup ambiguity — a `duplicate` or
-`related` match against an existing row — and, for `publications`/
-`catalog` specifically, no confident Zotero match (fuzzy title/DOI
-against your Zotero library, reusing `core/matching.py::fuzzy_match`;
-a confident match writes the row with that citekey, no match flags it
-as "needs a Zotero citekey"). A record that's merely missing a
-required field still gets imported blank — that's exactly what `parco
-lint` exists to catch afterward, not something import should block on.
+**What gets written but flagged for a manual fix** (a soft warning,
+never a hard block — matches every other dedup check in this tool): a
+`duplicate`/`related` dedup match against an existing row still gets
+written to its category's CSV, with the match reported so it can be
+reviewed afterward; likewise a `person_list` field (`co_authors`,
+`co_presenters`, `co_investigators`) that fails to parse gets left
+blank on an otherwise-written row, with the raw value reported for
+manual entry.
+
+**What gets excluded and never written** (the record is listed in the
+report instead): for `publications`/`catalog` specifically, no
+confident Zotero match (fuzzy title/DOI against your Zotero library,
+reusing `core/matching.py::fuzzy_match`; a confident match writes the
+row with that citekey, no match flags it as "needs a Zotero citekey").
+A record that's merely missing a required field still gets imported
+blank — that's exactly what `parco lint` exists to catch afterward,
+not something import should block on.
 
 **What gets silently skipped** (counted and reported, never imported
 as one of the categories): any record whose CCV section doesn't map to

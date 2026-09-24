@@ -29,6 +29,7 @@ def test_add_writes_a_new_row_and_commits(tmp_path, monkeypatch):
     monkeypatch.chdir(repo)
     monkeypatch.setattr("parcours.core.entries.git_commit", lambda *a, **k: None)
     monkeypatch.setattr("parcours.core.entries.is_file_dirty", lambda *a, **k: False)
+    monkeypatch.setattr("parcours.cli.main.is_file_dirty", lambda *a, **k: False)
 
     result = runner.invoke(app, ["add", "widgets"], input="A Widget\n1\ny\n")
 
@@ -58,6 +59,7 @@ def test_add_warns_on_duplicate_and_can_proceed_anyway(tmp_path, monkeypatch):
     monkeypatch.chdir(repo)
     monkeypatch.setattr("parcours.core.entries.git_commit", lambda *a, **k: None)
     monkeypatch.setattr("parcours.core.entries.is_file_dirty", lambda *a, **k: False)
+    monkeypatch.setattr("parcours.cli.main.is_file_dirty", lambda *a, **k: False)
 
     result = runner.invoke(app, ["add", "widgets"], input="A Widget\n1\ny\ny\n")
 
@@ -72,6 +74,7 @@ def test_add_prefill_flags_are_used_as_wizard_defaults(tmp_path, monkeypatch):
     monkeypatch.chdir(repo)
     monkeypatch.setattr("parcours.core.entries.git_commit", lambda *a, **k: None)
     monkeypatch.setattr("parcours.core.entries.is_file_dirty", lambda *a, **k: False)
+    monkeypatch.setattr("parcours.cli.main.is_file_dirty", lambda *a, **k: False)
 
     result = runner.invoke(
         app, ["add", "widgets", "--title_en", "Prefilled Widget"], input="\n1\ny\n"

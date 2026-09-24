@@ -68,6 +68,7 @@ SUB_RECORD_LABELS = frozenset({
 class ImportReport:
     to_write: list[MappedRow] = field(default_factory=list)
     flagged: list[FlaggedRecord] = field(default_factory=list)
+    notes: list[FlaggedRecord] = field(default_factory=list)
     skipped_labels: dict[str, int] = field(default_factory=dict)
     dedup_matches: dict[int, list] = field(default_factory=dict)
 
@@ -656,7 +657,10 @@ def extract_zotero_candidate(record_el, label: str, lang: str) -> ZoteroCandidat
     title_fr, title_en = x.field_single_language(record_el, title_field, lang)
     title = title_en or title_fr
     raw_year = year_fn(record_el, year_label)
-    year = int(raw_year[:4]) if raw_year else None
+    try:
+        year = int(raw_year[:4]) if raw_year else None
+    except ValueError:
+        year = None
     return ZoteroCandidate(title=title, year=year, ccv_label=label)
 
 
@@ -710,7 +714,7 @@ def plan_import(data_dir: Path, xml_path: Path) -> ImportReport:
             continue
 
         if mapped.flag:
-            report.flagged.append(FlaggedRecord(ccv_label=mapped.ccv_label, reason=mapped.flag))
+            report.notes.append(FlaggedRecord(ccv_label=mapped.ccv_label, reason=mapped.flag))
 
         row_index = len(report.to_write)
         report.to_write.append(mapped)
