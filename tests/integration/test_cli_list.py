@@ -195,7 +195,7 @@ def _setup_publications_repo(tmp_path):
 name: publications
 handler: publications
 options:
-  json: zotero/library.json
+  json: reference/library.json
 fields:
   - {name: id, generated: true}
   - {name: citekey, required: true}
@@ -213,8 +213,8 @@ fields:
     (tmp_path / "publications.csv").write_text(
         "id,citekey\np1,doe2024widgets\np2,nonexistent-key\n", encoding="utf-8"
     )
-    (tmp_path / "zotero").mkdir()
-    (tmp_path / "zotero" / "library.json").write_text("""[
+    (tmp_path / "reference").mkdir()
+    (tmp_path / "reference" / "library.json").write_text("""[
         {
             "id": "doe2024widgets",
             "type": "article-journal",
@@ -247,7 +247,7 @@ def test_list_format_citation_shows_a_note_for_an_unresolved_citekey(tmp_path, m
     )
 
     assert result.exit_code == 0, result.stdout
-    assert "not found in Zotero" in result.stdout
+    assert "not found in citation export" in result.stdout
 
 
 def test_list_format_citation_rejects_a_non_capable_category(tmp_path, monkeypatch):

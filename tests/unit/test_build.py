@@ -25,7 +25,7 @@ fields:
 name: publications
 handler: publications
 options:
-  json: zotero/library.json
+  json: reference/library.json
 fields:
   - {name: id, generated: true}
   - {name: citekey, required: true}
@@ -176,8 +176,8 @@ def test_build_respects_section_filter_order_by_and_limit(tmp_path, monkeypatch)
 
 def test_build_merges_zotero_fields_for_publications_backed_handler(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "zotero").mkdir()
-    (repo / "zotero" / "library.json").write_text(json.dumps([
+    (repo / "reference").mkdir()
+    (repo / "reference" / "library.json").write_text(json.dumps([
         {
             "id": "doe2024widgets",
             "title": "On Widgets",
@@ -205,8 +205,8 @@ def test_build_merges_zotero_fields_for_publications_backed_handler(tmp_path, mo
 
 def test_build_leaves_zotero_fields_absent_for_an_unresolved_citekey(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "zotero").mkdir()
-    (repo / "zotero" / "library.json").write_text(json.dumps([]))
+    (repo / "reference").mkdir()
+    (repo / "reference" / "library.json").write_text(json.dumps([]))
     (repo / "publications.csv").write_text("id,citekey\np1,nonexistent-key\n")
     profile = Profile(
         meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},

@@ -698,7 +698,7 @@ def plan_import(data_dir: Path, xml_path: Path) -> ImportReport:
             if citekey is None:
                 report.flagged.append(FlaggedRecord(
                     ccv_label=label,
-                    reason=f"No confident Zotero match for {candidate.title!r} ({candidate.year}) — needs a citekey",
+                    reason=f"No confident match in your citation export for {candidate.title!r} ({candidate.year}) — needs a citekey",
                 ))
                 continue
             schema = schemas[category]

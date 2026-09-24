@@ -6,11 +6,11 @@ from parcours.core.handlers.publications import PublicationsHandler
 
 
 def _write_csl_json(tmp_path, records):
-    zotero_dir = tmp_path / "zotero"
-    zotero_dir.mkdir()
-    path = zotero_dir / "library.json"
+    reference_dir = tmp_path / "reference"
+    reference_dir.mkdir()
+    path = reference_dir / "library.json"
     path.write_text(json.dumps(records), encoding="utf-8")
-    return "zotero/library.json"
+    return "reference/library.json"
 
 
 def _schema(json_rel_path):

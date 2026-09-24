@@ -158,7 +158,7 @@ def test_stats_on_the_real_publications_schema_has_no_date_field_for_by_year(tmp
 name: publications
 handler: publications
 options:
-  json: zotero/library.json
+  json: reference/library.json
 fields:
   - {name: id, generated: true}
   - {name: citekey, required: true}

@@ -296,7 +296,7 @@ def _print_citations(
         if key is not None:
             typer.echo(citations_by_key[key])
         else:
-            typer.echo(f"[citekey '{row.get('citekey') or ''}' not found in Zotero]")
+            typer.echo(f"[citekey '{row.get('citekey') or ''}' not found in citation export]")
 
 
 def _available_categories(data_dir: Path) -> list[str]:
@@ -833,6 +833,11 @@ def init(
     )
     homepage = typer.prompt("Homepage ([Enter] to skip)", default="", show_default=False)
     currency = _prompt_required("Currency (e.g. CAD)")
+    citation_export_path = typer.prompt(
+        "Path to an existing citation export (CSL-JSON), if you have one already "
+        "([Enter] to skip and use the default)",
+        default="", show_default=False,
+    )
 
     typer.echo("\nReview:")
     typer.echo(f"  Name: {first_name} {last_name}")
@@ -846,6 +851,7 @@ def init(
     typer.echo(f"  Phone: {phone or '(skip)'}")
     typer.echo(f"  Homepage: {homepage or '(skip)'}")
     typer.echo(f"  Currency: {currency}")
+    typer.echo(f"  Citation export: {citation_export_path or '(default: reference/library.json)'}")
 
     if not typer.confirm("Scaffold this repo?"):
         typer.echo("Aborted, nothing written.")
@@ -862,6 +868,7 @@ def init(
         email=email,
         phone=phone,
         homepage=homepage,
+        citation_export_path=citation_export_path,
     )
 
     try:

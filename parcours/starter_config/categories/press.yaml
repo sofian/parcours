@@ -1,7 +1,7 @@
 name: press
 handler: generic
 options:
-  zotero: {bib: zotero/library.bib, json: zotero/library.json}  # for rows that set citekey
+  zotero: {bib: reference/library.bib, json: reference/library.json}  # for rows that set citekey
 fields:
   - {name: id,           generated: true}                    # press-2026-004
   - {name: weight,       type: int}                          # optional; higher = appears earlier, refines/overrides date-based ordering

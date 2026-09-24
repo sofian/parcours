@@ -31,7 +31,7 @@ class PublicationsHandler(CategoryHandler):
         if citekey and self.resolve(citekey) is None:
             return [LintIssue(
                 self.schema.name, entry.get("id"), "citekey",
-                f"citekey '{citekey}' does not resolve in the Zotero export",
+                f"citekey '{citekey}' does not resolve in the citation export",
             )]
         return []
 

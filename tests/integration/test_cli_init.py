@@ -17,11 +17,11 @@ def test_init_scaffolds_a_repo_for_a_single_language(tmp_path, monkeypatch):
     target = tmp_path / "my-cv"
 
     # first, last, variant(default), language choice(1=en), title_en,
-    # email, phone(skip), homepage(skip), currency, confirm
+    # email, phone(skip), homepage(skip), currency, citation export(skip), confirm
     result = runner.invoke(
         app,
         ["init", str(target)],
-        input="Jane\nDoe\n\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\ny\n",
+        input="Jane\nDoe\n\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\n\ny\n",
     )
 
     assert result.exit_code == 0, result.stdout
@@ -35,11 +35,11 @@ def test_init_scaffolds_a_bilingual_repo(tmp_path, monkeypatch):
     target = tmp_path / "my-cv"
 
     # first, last, variant(default), language choice(3=both),
-    # title_en, title_fr, email, phone(skip), homepage(skip), currency, confirm
+    # title_en, title_fr, email, phone(skip), homepage(skip), currency, citation export(skip), confirm
     result = runner.invoke(
         app,
         ["init", str(target)],
-        input="Jane\nDoe\n\n3\nAssociate Professor\nProfesseure agrégée\njane@example.edu\n\n\nCAD\ny\n",
+        input="Jane\nDoe\n\n3\nAssociate Professor\nProfesseure agrégée\njane@example.edu\n\n\nCAD\n\ny\n",
     )
 
     assert result.exit_code == 0, result.stdout
@@ -55,7 +55,7 @@ def test_init_aborts_when_confirm_declined(tmp_path, monkeypatch):
     result = runner.invoke(
         app,
         ["init", str(target)],
-        input="Jane\nDoe\n\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\nn\n",
+        input="Jane\nDoe\n\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\n\nn\n",
     )
 
     assert result.exit_code == 0
@@ -81,12 +81,28 @@ def test_init_phone_prompt_hints_international_format(tmp_path, monkeypatch):
     result = runner.invoke(
         app,
         ["init", str(target)],
-        input="Jane\nDoe\n\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\ny\n",
+        input="Jane\nDoe\n\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\n\ny\n",
     )
 
     assert result.exit_code == 0, result.stdout
     assert "+1 514 987 3000" in result.stdout
     assert "international format" in result.stdout
+
+
+def test_init_writes_a_provided_citation_export_path(tmp_path, monkeypatch):
+    _git_env(monkeypatch)
+    target = tmp_path / "my-cv"
+
+    result = runner.invoke(
+        app,
+        ["init", str(target)],
+        input="Jane\nDoe\n\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\n/home/jane/Zotero/library.json\ny\n",
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "Citation export: /home/jane/Zotero/library.json" in result.stdout
+    content = (target / "categories" / "publications.yaml").read_text(encoding="utf-8")
+    assert "json: /home/jane/Zotero/library.json" in content
 
 
 def test_init_rejects_variant_name_with_path_separator(tmp_path, monkeypatch):
@@ -95,11 +111,11 @@ def test_init_rejects_variant_name_with_path_separator(tmp_path, monkeypatch):
 
     # first, last, variant(rejected: contains '/'), variant(retry, valid),
     # language choice(1=en), title_en, email, phone(skip), homepage(skip),
-    # currency, confirm
+    # currency, citation export(skip), confirm
     result = runner.invoke(
         app,
         ["init", str(target)],
-        input="Jane\nDoe\n../../pwned\nacademic\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\ny\n",
+        input="Jane\nDoe\n../../pwned\nacademic\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\n\ny\n",
     )
 
     assert result.exit_code == 0, result.stdout
@@ -142,7 +158,7 @@ def test_init_defaults_to_the_current_directory(tmp_path, monkeypatch):
     result = runner.invoke(
         app,
         ["init"],
-        input="Jane\nDoe\n\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\ny\n",
+        input="Jane\nDoe\n\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\n\ny\n",
     )
 
     assert result.exit_code == 0, result.stdout

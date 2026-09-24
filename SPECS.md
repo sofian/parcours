@@ -451,8 +451,8 @@ rather than repeated in every affected category's own notes.
 name: publications
 handler: publications
 options:
-  bib: zotero/library.bib        # Better BibTeX auto-exports; absolute or
-  json: zotero/library.json      # relative to the data repo
+  bib: reference/library.bib        # Better BibTeX auto-exports; absolute or
+  json: reference/library.json      # relative to the data repo
   type_map:                      # CSL type -> CV type; lint flags unmapped types
     article-journal: journal-article
     paper-conference: conference-paper
@@ -803,7 +803,7 @@ dedup:
 name: press
 handler: generic
 options:
-  zotero: {bib: zotero/library.bib, json: zotero/library.json}  # for rows that set citekey
+  zotero: {bib: reference/library.bib, json: reference/library.json}  # for rows that set citekey
 fields:
   - {name: id,           generated: true}                    # press-2026-004
   - {name: weight,       type: int}                          # optional; higher = appears earlier, refines/overrides date-based ordering
@@ -844,8 +844,8 @@ dedup:
 name: review
 handler: publications
 options:
-  bib: zotero/library.bib
-  json: zotero/library.json
+  bib: reference/library.bib
+  json: reference/library.json
 fields:
   - {name: id,       generated: true}       # review-2026-004
   - {name: weight,   type: int}             # optional; higher = appears earlier, refines/overrides date-based ordering
@@ -864,8 +864,8 @@ contributions, not third-party reception of them) — Zotero-only.
 name: catalog
 handler: publications
 options:
-  bib: zotero/library.bib
-  json: zotero/library.json
+  bib: reference/library.bib
+  json: reference/library.json
 fields:
   - {name: id,       generated: true}       # catalog-2026-004
   - {name: weight,   type: int}             # optional; higher = appears earlier, refines/overrides date-based ordering
@@ -1200,9 +1200,11 @@ Amounts can be converted to a reporting currency, mainly for statistics.
 - **Config:** `parco.yaml` has `currency: {default: CAD, report: CAD}`.
   `default` pre-fills the wizard's `currency` field; `report` is the
   currency statistics convert into. Both are configurable.
-- **Rates are reference data, not a category:** a tracked `rates.csv` in
-  the data repo (`month, from, to, rate`), like `translations.csv`. No wizard,
-  no dedup.
+- **Rates are reference data, not a category:** a tracked
+  `reference/rates.csv` in the data repo (`month, from, to, rate`) —
+  grouped under `reference/` alongside other external-tool data the
+  software consults but doesn't own as a category (e.g. a citation
+  export, see "publications"). No wizard, no dedup.
 - **Source:** the ECB's published historical euro reference-rate file
   (42 currencies against the euro, since 1999). `parco` downloads it,
   averages the daily rates per month, and writes monthly rows to
@@ -1854,6 +1856,14 @@ for:
   `currency.default` and `currency.report` (see Currency conversion);
   diverge them later by hand if you ever report in a different
   currency than you're normally paid/funded in
+- path to an existing citation export (CSL-JSON), if you already have
+  one set up (optional — `[Enter]` skips and leaves the starter
+  default, `reference/library.json`, in place). A real path here is
+  written as a targeted text replace of the `json:` line in
+  `publications.yaml`/`catalog.yaml`/`review.yaml` — not a full YAML
+  re-dump, which would silently drop those files' hand-written
+  comments — so it works regardless of whether the path is inside or
+  outside the data repo, absolute or relative.
 
 **What gets written**, all folded into one `git init` + one commit
 ("Initialized parco data repo"):
@@ -2176,7 +2186,7 @@ error) if the working tree is already clean.
 ### Refresh (catch up with an external source that updates on its own)
 ```
 parco refresh zotero --collection "<name>"   # sync publications.csv against a Zotero collection
-parco refresh rates                           # (re-)fetch monthly exchange rates into rates.csv
+parco refresh rates                           # (re-)fetch monthly exchange rates into reference/rates.csv
 parco refresh all                             # run every refreshable source
 ```
 - **What "refresh" means here:** the source updates on its own schedule
@@ -2190,7 +2200,7 @@ parco refresh all                             # run every refreshable source
   need review; never triggered as a side effect of another command.
 - **`refresh rates`:** downloads the ECB historical file, recomputes
   monthly averages, and appends any new **complete months** not already
-  in `rates.csv` (existing rows are never rewritten). Unlike
+  in `reference/rates.csv` (existing rows are never rewritten). Unlike
   `refresh zotero`, this one is also triggered **automatically on
   demand** by `stats`, `build` and `query` when a needed rate is missing
   — see Currency conversion. `parco lint` never triggers it, staying
@@ -2279,7 +2289,7 @@ Checks: vocab conformance, `translations.csv` completeness against all profile
 section ids, date sanity, required fields non-blank, (warning) a
 `glossary:`-backed field's value with no matching `translations.csv`
 entry (see Translations), and (warning) money amounts whose month has
-no exchange rate in `rates.csv`.
+no exchange rate in `reference/rates.csv`.
 
 **Expected to pass silently almost always** — `add`/`edit` already
 validate at entry time, so lint failures should mainly come from paths

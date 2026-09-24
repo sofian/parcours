@@ -73,15 +73,15 @@ def test_publications_handler_is_wired_up(tmp_path):
 name: publications
 handler: publications
 options:
-  json: zotero/library.json
+  json: reference/library.json
 fields:
   - {name: id, generated: true}
   - {name: citekey, required: true}
 """)
     (tmp_path / "vocab.yaml").write_text("{}\n")
     (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
-    (tmp_path / "zotero").mkdir()
-    (tmp_path / "zotero" / "library.json").write_text(json.dumps([]))
+    (tmp_path / "reference").mkdir()
+    (tmp_path / "reference" / "library.json").write_text(json.dumps([]))
     (tmp_path / "publications.csv").write_text("id,citekey\npub-1,nonexistent-key\n")
 
     issues = run_lint(tmp_path)

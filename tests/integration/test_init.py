@@ -182,6 +182,30 @@ def test_check_git_identity_configured_raises_when_git_cannot_resolve_identity(m
         check_git_identity_configured()
 
 
+def test_scaffold_repo_leaves_default_citation_export_path_when_blank(tmp_path, monkeypatch):
+    _set_git_env(monkeypatch)
+    repo = tmp_path / "my-cv"
+
+    scaffold_repo(repo, _answers(citation_export_path=""))
+
+    for name in ("publications", "catalog", "review"):
+        content = (repo / "categories" / f"{name}.yaml").read_text(encoding="utf-8")
+        assert "json: reference/library.json" in content
+
+
+def test_scaffold_repo_writes_a_custom_citation_export_path(tmp_path, monkeypatch):
+    _set_git_env(monkeypatch)
+    repo = tmp_path / "my-cv"
+
+    scaffold_repo(repo, _answers(citation_export_path="/home/jane/Zotero/library.json"))
+
+    for name in ("publications", "catalog", "review"):
+        content = (repo / "categories" / f"{name}.yaml").read_text(encoding="utf-8")
+        assert "json: /home/jane/Zotero/library.json" in content
+        # The rest of the file's comments/formatting must survive untouched.
+        assert "bib:" in content
+
+
 def test_scaffold_repo_raises_git_identity_missing_and_writes_nothing(tmp_path, monkeypatch):
     def _fail_identity_check(cmd, *args, **kwargs):
         if cmd[:2] == ["git", "var"]:

@@ -1,8 +1,8 @@
 name: publications
 handler: publications
 options:
-  bib: zotero/library.bib        # Better BibTeX auto-exports; absolute or
-  json: zotero/library.json      # relative to the data repo
+  bib: reference/library.bib        # Better BibTeX auto-exports; absolute or
+  json: reference/library.json      # relative to the data repo
   type_map:                      # CSL type -> CV type; lint flags unmapped types
     article-journal: journal-article
     paper-conference: conference-paper

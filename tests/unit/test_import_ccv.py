@@ -858,7 +858,7 @@ def _add_publications_category(data_dir):
         name: publications
         handler: publications
         options:
-          json: zotero/library.json
+          json: reference/library.json
         fields:
           - {name: id, generated: true}
           - {name: weight, type: int}
@@ -874,9 +874,9 @@ def _add_publications_category(data_dir):
         "id,weight,citekey,status,refereed,invited,featured,note_en,note_fr\n",
         encoding="utf-8",
     )
-    zotero_dir = data_dir / "zotero"
-    zotero_dir.mkdir()
-    (zotero_dir / "library.json").write_text(json.dumps([
+    reference_dir = data_dir / "reference"
+    reference_dir.mkdir()
+    (reference_dir / "library.json").write_text(json.dumps([
         {"id": "smith2020article", "title": "A Widget Study", "issued": {"date-parts": [[2020]]}},
     ]), encoding="utf-8")
     return data_dir
@@ -910,7 +910,7 @@ def test_plan_import_dispatches_zotero_matched_records():
         assert report.to_write[0].fields["citekey"] == "smith2020article"
         assert len(report.flagged) == 1
         assert report.flagged[0].ccv_label == "Journal Articles"
-        assert "No confident Zotero match" in report.flagged[0].reason
+        assert "No confident match in your citation export" in report.flagged[0].reason
 
 
 def test_write_import_generates_distinct_ids_for_multiple_new_rows_same_category():

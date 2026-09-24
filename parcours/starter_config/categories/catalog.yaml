@@ -1,8 +1,8 @@
 name: catalog
 handler: publications
 options:
-  bib: zotero/library.bib
-  json: zotero/library.json
+  bib: reference/library.bib
+  json: reference/library.json
 fields:
   - {name: id,       generated: true}       # catalog-2026-004
   - {name: weight,   type: int}             # optional; higher = appears earlier, refines/overrides date-based ordering

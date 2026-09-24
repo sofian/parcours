@@ -5,6 +5,7 @@ one sanctioned exception to "core never shells out interactively" is the
 `git init`/`git add`/`git commit` sequence at the end, matching the same
 precedent as core/build.py's `rendercv` invocation."""
 
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -64,6 +65,7 @@ class InitAnswers:
     email: str = ""
     phone: str = ""
     homepage: str = ""
+    citation_export_path: str = ""
 
 
 def _starter_config_dir() -> Path:
@@ -91,6 +93,25 @@ def _copy_categories_and_csvs(path: Path, starter_dir: Path) -> None:
         csv_path = path / f"{schema.name}.csv"
         with open(csv_path, "w", encoding="utf-8", newline="") as fh:
             fh.write(",".join(schema.field_names()) + "\n")
+
+
+_CITATION_EXPORT_CATEGORIES = ("publications", "catalog", "review")
+
+
+def _set_citation_export_path(path: Path, export_path: str) -> None:
+    """Overwrites the `json:` option line in publications.yaml/catalog.yaml/
+    review.yaml with the user's real citation export path, as a targeted
+    text replace rather than a full YAML round-trip — re-dumping the whole
+    file would silently drop its hand-written comments. A blank
+    `export_path` leaves the starter default (`reference/library.json`)
+    untouched."""
+    if not export_path:
+        return
+    for name in _CITATION_EXPORT_CATEGORIES:
+        schema_path = path / "categories" / f"{name}.yaml"
+        content = schema_path.read_text(encoding="utf-8")
+        content = re.sub(r"(?m)^(\s*)json:.*$", rf"\1json: {export_path}", content, count=1)
+        schema_path.write_text(content, encoding="utf-8")
 
 
 def _write_identity_yaml(path: Path, answers: InitAnswers) -> None:
@@ -198,6 +219,7 @@ def scaffold_repo(path: Path, answers: InitAnswers) -> None:
 
     _write_parco_yaml(path, answers)
     _copy_categories_and_csvs(path, starter_dir)
+    _set_citation_export_path(path, answers.citation_export_path)
     shutil.copy2(starter_dir / "vocab.yaml", path / "vocab.yaml")
     shutil.copy2(starter_dir / "translations.csv", path / "translations.csv")
     shutil.copy2(starter_dir / "views.yaml", path / "views.yaml")
