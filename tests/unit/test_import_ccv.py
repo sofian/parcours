@@ -579,6 +579,7 @@ def test_map_grant_flags_multiple_funding_sources():
     assert row.fields["amount"] == "10000"
     assert row.flag is not None
     assert "Funding Sources" in row.flag
+    assert "Funder B" in row.flag
 
 
 def test_map_grant_flags_other_investigators_unparseable():

@@ -560,9 +560,13 @@ def _map_grant(record_el, lang, ctx) -> MappedRow:
         amount = x.field_text(first_source, "Total Funding")
         currency = x.field_lov(first_source, "Currency of Total Funding")
         if len(funding_sources) > 1:
+            extra_funders = [
+                (x.field_lov(src, "Funding Organization") or x.field_text(src, "Other Funding Organization"))
+                for src in funding_sources[1:]
+            ]
             flags.append(
                 f"{len(funding_sources)} Funding Sources found for this grant — "
-                f"using the first ({funder!r}); the rest need manual review"
+                f"using the first ({funder!r}); the rest need manual review: {', '.join(extra_funders)}"
             )
 
     other_investigators = x.sub_records(record_el, "Other Investigators")
