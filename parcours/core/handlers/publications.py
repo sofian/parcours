@@ -65,6 +65,24 @@ class PublicationsHandler(CategoryHandler):
 
         return matches
 
+    def match_citekey_by_title(self, title: str, year: int | None) -> str | None:
+        """Fuzzy-title(+year) match against the loaded CSL-JSON export —
+        used by the CCV importer to resolve a citekey for a record CCV
+        never gives one for (see SPECS.md, "Import"). Returns the
+        citekey on exactly one confident match, None on no match or an
+        ambiguous (more than one) match."""
+        candidates = []
+        for citekey, record in self._csl_by_key.items():
+            if not fuzzy_match(title, record.get("title", "")):
+                continue
+            record_year = _csl_year(record)
+            if year is not None and record_year is not None and record_year != year:
+                continue
+            candidates.append(citekey)
+        if len(candidates) == 1:
+            return candidates[0]
+        return None
+
 
 def _csl_year(record: dict) -> int | None:
     try:

@@ -603,3 +603,34 @@ def _map_grant(record_el, lang, ctx) -> MappedRow:
         },
         flag="; ".join(flags) or None,
     )
+
+
+@dataclass
+class ZoteroCandidate:
+    title: str
+    year: int | None
+    ccv_label: str
+
+
+_ZOTERO_CANDIDATE_FIELDS = {
+    "Journal Articles": ("Article Title", x.field_year, "Year"),
+    "Books": ("Book Title", x.field_year, "Year"),
+    "Book Chapters": ("Chapter Title", x.field_year, "Year"),
+    "Thesis/Dissertation": ("Dissertation Title", x.field_year, "Completion Year"),
+    "Magazine Entries": ("Article Title", x.field_year, "Year"),
+    "Reports": ("Report Title", x.field_year, "Year Submitted"),
+    "Online Resources": ("Title", x.field_year, "Year posted online"),
+    "Conference Publications": ("Publication Title", x.field_year, "Year"),
+    "Exhibition Catalogues": ("Catalogue Title", x.field_yearmonth, "Publication Date"),
+}
+
+ZOTERO_MATCHED_LABELS = frozenset(_ZOTERO_CANDIDATE_FIELDS)
+
+
+def extract_zotero_candidate(record_el, label: str, lang: str) -> ZoteroCandidate:
+    title_field, year_fn, year_label = _ZOTERO_CANDIDATE_FIELDS[label]
+    title_fr, title_en = x.field_single_language(record_el, title_field, lang)
+    title = title_en or title_fr
+    raw_year = year_fn(record_el, year_label)
+    year = int(raw_year[:4]) if raw_year else None
+    return ZoteroCandidate(title=title, year=year, ccv_label=label)

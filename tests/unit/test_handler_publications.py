@@ -111,3 +111,48 @@ def test_find_matches_no_false_positive_for_unrelated_publications(tmp_path):
     existing = [{"id": "old", "citekey": "key-b"}]
 
     assert handler.find_matches(entry, existing) == []
+
+
+def test_match_citekey_by_title_returns_confident_match(tmp_path):
+    json_path = _write_csl_json(tmp_path, [
+        {"id": "smith2020widget", "title": "A Widget Study", "issued": {"date-parts": [[2020]]}},
+    ])
+    handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
+
+    citekey = handler.match_citekey_by_title("A Widget Study", 2020)
+
+    assert citekey == "smith2020widget"
+
+
+def test_match_citekey_by_title_returns_none_when_no_match(tmp_path):
+    json_path = _write_csl_json(tmp_path, [
+        {"id": "smith2020widget", "title": "A Widget Study", "issued": {"date-parts": [[2020]]}},
+    ])
+    handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
+
+    citekey = handler.match_citekey_by_title("Completely Unrelated Title", 2020)
+
+    assert citekey is None
+
+
+def test_match_citekey_by_title_rejects_a_year_mismatch(tmp_path):
+    json_path = _write_csl_json(tmp_path, [
+        {"id": "smith2020widget", "title": "A Widget Study", "issued": {"date-parts": [[2020]]}},
+    ])
+    handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
+
+    citekey = handler.match_citekey_by_title("A Widget Study", 2019)
+
+    assert citekey is None
+
+
+def test_match_citekey_by_title_returns_none_when_ambiguous(tmp_path):
+    json_path = _write_csl_json(tmp_path, [
+        {"id": "smith2020widget", "title": "A Widget Study", "issued": {"date-parts": [[2020]]}},
+        {"id": "jones2020widget", "title": "A Widget Study II", "issued": {"date-parts": [[2020]]}},
+    ])
+    handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
+
+    citekey = handler.match_citekey_by_title("A Widget Study", 2020)
+
+    assert citekey is None

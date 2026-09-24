@@ -601,3 +601,57 @@ def test_map_grant_flags_other_investigators_unparseable():
     assert "co_investigators" in row.flag
     assert "Jane Smith" in row.flag
     assert "John Doe" in row.flag
+
+
+from parcours.core.import_ccv import extract_zotero_candidate
+
+
+def test_extract_zotero_candidate_journal_article():
+    el = _record("""
+    <section label="Journal Articles" recordId="p1">
+      <field label="Article Title"><value type="String">A Widget Study</value></field>
+      <field label="Year"><value type="Year">2020</value></field>
+    </section>
+    """)
+    candidate = extract_zotero_candidate(el, "Journal Articles", "en")
+    assert candidate.title == "A Widget Study"
+    assert candidate.year == 2020
+    assert candidate.ccv_label == "Journal Articles"
+
+
+def test_extract_zotero_candidate_book():
+    el = _record('<section label="Books" recordId="p2">'
+                 '<field label="Book Title"><value type="String">A Book</value></field>'
+                 '<field label="Year"><value type="Year">2018</value></field>'
+                 '</section>')
+    candidate = extract_zotero_candidate(el, "Books", "en")
+    assert candidate.title == "A Book"
+    assert candidate.year == 2018
+
+
+def test_extract_zotero_candidate_thesis_uses_completion_year():
+    el = _record('<section label="Thesis/Dissertation" recordId="p3">'
+                 '<field label="Dissertation Title"><value type="String">A Thesis</value></field>'
+                 '<field label="Completion Year"><value type="Year">2015</value></field>'
+                 '</section>')
+    candidate = extract_zotero_candidate(el, "Thesis/Dissertation", "en")
+    assert candidate.title == "A Thesis"
+    assert candidate.year == 2015
+
+
+def test_extract_zotero_candidate_exhibition_catalogue_uses_yearmonth():
+    el = _record('<section label="Exhibition Catalogues" recordId="p4">'
+                 '<field label="Catalogue Title"><value type="String">A Catalogue</value></field>'
+                 '<field label="Publication Date"><value type="YearMonth">2019/6</value></field>'
+                 '</section>')
+    candidate = extract_zotero_candidate(el, "Exhibition Catalogues", "en")
+    assert candidate.title == "A Catalogue"
+    assert candidate.year == 2019
+
+
+def test_extract_zotero_candidate_blank_year_is_none():
+    el = _record('<section label="Online Resources" recordId="p5">'
+                 '<field label="Title"><value type="String">A Resource</value></field>'
+                 '</section>')
+    candidate = extract_zotero_candidate(el, "Online Resources", "en")
+    assert candidate.year is None
