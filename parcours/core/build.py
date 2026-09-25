@@ -19,7 +19,7 @@ from .lint import run_lint
 from .profiles import Profile
 from .schema import load_all_schemas
 from .templating import resolve_template
-from .translations import load_translations
+from .translations import load_translations, translations_csv_path
 from .views import ViewSpec, load_views
 
 
@@ -128,7 +128,7 @@ def build_rendercv_data(data_dir: Path, profile: Profile) -> dict:
     invokes `rendercv render` separately."""
     schemas = load_all_schemas(data_dir / "categories")
     views = load_views(data_dir / "views.yaml")
-    translations = load_translations(data_dir / "translations.csv")
+    translations = load_translations(translations_csv_path(data_dir))
     identity = load_identity(data_dir / "identity.yaml")
 
     language = profile.meta["language"]

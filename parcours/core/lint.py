@@ -8,7 +8,7 @@ from .data import load_category_rows
 from .handlers import load_handler
 from .handlers.base import HandlerContext
 from .schema import CategorySchema, load_all_schemas
-from .translations import TranslationsTable, load_translations
+from .translations import TranslationsTable, load_translations, translations_csv_path
 from .validation import LintIssue, validate_common
 from .vocab import VocabError, load_vocab
 
@@ -22,7 +22,7 @@ class ConfigError(Exception):
 def _check_glossary_fields(
     schema: CategorySchema, row: dict, translations: TranslationsTable
 ) -> list[LintIssue]:
-    """A `glossary: <category>` field (e.g. `location`) is a soft,
+    """A `glossary: <category>` field (e.g. `city`) is a soft,
     non-blocking check: SPECS.md is explicit that an unmatched value
     never blocks entry — the glossary is an enhancement, not a
     requirement — so this always reports at "warning" severity, which
@@ -47,7 +47,7 @@ def run_lint(data_dir: Path, category_filter: str | None = None) -> list[LintIss
     try:
         schemas = load_all_schemas(data_dir / "categories")
         vocab = load_vocab(data_dir / "vocab.yaml")
-        translations = load_translations(data_dir / "translations.csv")
+        translations = load_translations(translations_csv_path(data_dir))
 
         for entry in translations.missing_translations():
             issues.append(LintIssue(
