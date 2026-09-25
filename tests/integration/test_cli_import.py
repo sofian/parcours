@@ -46,7 +46,8 @@ def _setup_data_repo(tmp_path):
     (tmp_path / "parco.yaml").write_text("currency:\n  default: CAD\n  report: CAD\n", encoding="utf-8")
     (tmp_path / "categories").mkdir()
     (tmp_path / "categories" / "education.yaml").write_text(_EDUCATION_SCHEMA, encoding="utf-8")
-    (tmp_path / "education.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "education.csv").write_text(
         "id,degree_type,degree_name_en,degree_name_fr,specialization_en,specialization_fr,"
         "organization,degree_status,start_date,end_date,thesis_title,advisor,note_en,note_fr\n",
         encoding="utf-8",
@@ -86,10 +87,10 @@ def test_import_ccv_confirm_writes_uncommitted(tmp_path, tmp_path_factory, monke
     result = runner.invoke(app, ["import", "ccv", "--file", str(xml_path)], input="y\n")
 
     assert result.exit_code == 0
-    content = (repo / "education.csv").read_text(encoding="utf-8")
+    content = (repo / "entries" / "education.csv").read_text(encoding="utf-8")
     assert "doctorate" in content
     status = subprocess.run(["git", "status", "--porcelain"], cwd=repo, check=True, capture_output=True, text=True)
-    assert "education.csv" in status.stdout
+    assert "entries/education.csv" in status.stdout
     assert "parco commit" in result.stdout
 
 
