@@ -17,8 +17,9 @@ fields:
   - {name: status, required: true, vocab: widget_status}
 """)
     (tmp_path / "vocab.yaml").write_text("widget_status: [draft, published]\n")
-    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
-    (tmp_path / "widgets.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "entries" / "widgets.csv").write_text(
         "id,title_en,status\nabc123,First Widget,draft\ndef456,Second Widget,published\n",
         encoding="utf-8",
     )
@@ -49,7 +50,7 @@ def test_list_filters_by_search_text(tmp_path, monkeypatch):
 
 def test_list_reports_no_entries_for_empty_category(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "widgets.csv").unlink()
+    (repo / "entries" / "widgets.csv").unlink()
     monkeypatch.chdir(repo)
 
     result = runner.invoke(app, ["list", "widgets"])
@@ -95,12 +96,12 @@ def test_list_with_no_category_shows_available_categories_not_an_error(tmp_path,
 def test_list_is_read_only_and_does_not_write_or_commit(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     monkeypatch.chdir(repo)
-    before = (repo / "widgets.csv").read_bytes()
+    before = (repo / "entries" / "widgets.csv").read_bytes()
 
     result = runner.invoke(app, ["list", "widgets"])
 
     assert result.exit_code == 0
-    assert (repo / "widgets.csv").read_bytes() == before
+    assert (repo / "entries" / "widgets.csv").read_bytes() == before
 
 
 def _setup_ordering_repo(tmp_path):
@@ -116,8 +117,9 @@ fields:
   - {name: weight, type: int}
 """)
     (tmp_path / "vocab.yaml").write_text("{}\n")
-    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
-    (tmp_path / "presentations.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "entries" / "presentations.csv").write_text(
         "id,title_en,event_date,weight\n"
         "a1,Middle Talk,2022,5\n"
         "b2,Oldest Talk,2019,\n"
@@ -208,9 +210,10 @@ fields:
   - {name: title_en, required: true}
 """)
     (tmp_path / "vocab.yaml").write_text("{}\n")
-    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
-    (tmp_path / "widgets.csv").write_text("id,title_en\nw1,A Widget\n", encoding="utf-8")
-    (tmp_path / "publications.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "entries" / "widgets.csv").write_text("id,title_en\nw1,A Widget\n", encoding="utf-8")
+    (tmp_path / "entries" / "publications.csv").write_text(
         "id,citekey\np1,doe2024widgets\np2,nonexistent-key\n", encoding="utf-8"
     )
     (tmp_path / "reference").mkdir()
@@ -300,7 +303,7 @@ def test_list_format_citation_handles_duplicate_citekeys_without_crashing(tmp_pa
     repo = _setup_publications_repo(tmp_path)
     monkeypatch.chdir(repo)
     # A second row citing the SAME resolvable citekey as an existing row.
-    with open(repo / "publications.csv", "a", encoding="utf-8") as fh:
+    with open(repo / "entries" / "publications.csv", "a", encoding="utf-8") as fh:
         fh.write("p3,doe2024widgets\n")
 
     result = runner.invoke(app, ["list", "publications", "--format", "citation"])
@@ -315,7 +318,7 @@ def test_list_format_citation_handles_duplicate_citekeys_without_crashing(tmp_pa
 def test_list_format_citation_blank_citekey_does_not_print_the_word_none(tmp_path, monkeypatch):
     repo = _setup_publications_repo(tmp_path)
     monkeypatch.chdir(repo)
-    with open(repo / "publications.csv", "a", encoding="utf-8") as fh:
+    with open(repo / "entries" / "publications.csv", "a", encoding="utf-8") as fh:
         fh.write("p4,\n")
 
     result = runner.invoke(app, ["list", "publications", "--format", "citation"])
@@ -363,8 +366,9 @@ fields:
   - {name: date, type: date, precision: year}
 """)
     (tmp_path / "vocab.yaml").write_text("{}\n")
-    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
-    (tmp_path / "presentations.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "entries" / "presentations.csv").write_text(
         "id,title_en,date\n"
         "a1,Middle Talk,2022\n"
         "b2,Oldest Talk,2019\n"
