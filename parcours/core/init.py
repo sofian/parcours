@@ -13,6 +13,7 @@ from pathlib import Path
 
 import yaml
 
+from .data import category_csv_path
 from .schema import CategorySchema, load_all_schemas, load_category_schema
 from .views import load_views
 
@@ -86,11 +87,12 @@ def _write_parco_yaml(path: Path, answers: InitAnswers) -> None:
 def _copy_categories_and_csvs(path: Path, starter_dir: Path) -> None:
     categories_dir = path / "categories"
     categories_dir.mkdir(parents=True, exist_ok=True)
+    (path / "entries").mkdir(parents=True, exist_ok=True)
     for schema_path in sorted((starter_dir / "categories").glob("*.yaml")):
         dest = categories_dir / schema_path.name
         shutil.copy2(schema_path, dest)
         schema = load_category_schema(dest)
-        csv_path = path / f"{schema.name}.csv"
+        csv_path = category_csv_path(path, schema.name)
         with open(csv_path, "w", encoding="utf-8", newline="") as fh:
             fh.write(",".join(schema.field_names()) + "\n")
 
@@ -221,7 +223,7 @@ def scaffold_repo(path: Path, answers: InitAnswers) -> None:
     _copy_categories_and_csvs(path, starter_dir)
     _set_citation_export_path(path, answers.citation_export_path)
     shutil.copy2(starter_dir / "vocab.yaml", path / "vocab.yaml")
-    shutil.copy2(starter_dir / "translations.csv", path / "translations.csv")
+    shutil.copy2(starter_dir / "translations.csv", path / "entries" / "translations.csv")
     shutil.copy2(starter_dir / "views.yaml", path / "views.yaml")
     _write_identity_yaml(path, answers)
     _write_profiles(path, answers)
