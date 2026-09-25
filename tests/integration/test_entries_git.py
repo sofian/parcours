@@ -49,9 +49,10 @@ def test_add_entry_commits_when_csv_was_already_tracked_and_clean(tmp_path):
     # called AFTER write_all_rows instead of before, this exact scenario
     # would wrongly see the write's own diff as "already dirty" and skip
     # the commit.
-    (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
-    subprocess.run(["git", "add", "widgets.csv"], cwd=tmp_path, check=True, capture_output=True)
-    subprocess.run(["git", "commit", "-m", "Add widgets.csv"], cwd=tmp_path, check=True, capture_output=True)
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
+    subprocess.run(["git", "add", "entries/widgets.csv"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Add entries/widgets.csv"], cwd=tmp_path, check=True, capture_output=True)
     commits_before = _commit_count(tmp_path)
 
     row = add_entry(tmp_path, schema, {"title_en": "A Widget"})
