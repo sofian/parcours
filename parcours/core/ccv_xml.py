@@ -2,6 +2,7 @@
 category knowledge here, just the wire format (see SPECS.md, "CCV
 export structure"). Category field mapping lives in `import_ccv.py`."""
 
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -151,3 +152,71 @@ def try_person_list(raw: str) -> str | None:
     except InvalidPersonListError:
         return None
     return raw
+
+
+_LIST_CONJUNCTION = re.compile(r"\s+(?:et|and)\s+", re.IGNORECASE)
+_TRAILING_PERIOD = re.compile(r"\.\s*$")
+
+
+def _invert_natural_order_name(name: str) -> str | None:
+    """"First [Middle] Last" -> "Last, First [Middle]", treating the last
+    whitespace-separated token as the surname — the same convention
+    BibTeX/citeproc tools use. Returns None (never guesses further) for
+    a single-token name with no given name to separate out."""
+    tokens = name.split()
+    if len(tokens) < 2:
+        return None
+    return f"{tokens[-1]}, {' '.join(tokens[:-1])}"
+
+
+def try_person_list_lenient(raw: str) -> str | None:
+    """A more forgiving fallback for CCV free-text name lists, tried only
+    after `try_person_list` already failed. CCV consistently gives names
+    in natural "First Last" order rather than parcours' canonical
+    "Last, First" — verified against a real export's Co-Presenters,
+    Other Investigators, and Contributors values, where this is the
+    dominant failure mode, not an edge case. This coerces three real
+    patterns into the canonical form: a trailing "." (a free-text
+    full stop, not part of a name); a natural-language final
+    conjunction ("A, B and C" / "A, B et C"); and each individual name
+    being in natural order with no comma at all. Returns None — falling
+    through to the existing manual-review flag, never a guess presented
+    as fact — if any single name can't be confidently inverted (e.g. a
+    lone single-token name)."""
+    if not raw or not raw.strip():
+        return None
+
+    text = _TRAILING_PERIOD.sub("", raw.strip())
+    text = _LIST_CONJUNCTION.sub(";", text)
+
+    # By this point `try_person_list` has already rejected the raw value
+    # as a whole, so it isn't a clean "Last, First; Last, First" list —
+    # comma and semicolon are then used interchangeably as the
+    # person-separator across real CCV exports (e.g. one list ending in
+    # "... et X" normalizes its last separator to ";" above while the
+    # earlier names are still comma-separated), so both are split on
+    # here without trying to also treat a comma as a Last/First inverter.
+    chunks = re.split(r"[;,]", text)
+
+    people = []
+    for chunk in chunks:
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        inverted = _invert_natural_order_name(chunk)
+        if inverted is None:
+            return None
+        people.append(inverted)
+
+    if not people:
+        return None
+
+    return try_person_list("; ".join(people))
+
+
+def try_person_list_any(raw: str) -> str | None:
+    """The strict format first (already-clean "Last, First; Last, First"
+    data should never go through the lenient coercion's extra work), then
+    the lenient fallback. Used everywhere a CCV person-list field is
+    read, instead of each call site trying both itself."""
+    return try_person_list(raw) or try_person_list_lenient(raw)

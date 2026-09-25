@@ -87,13 +87,26 @@ def test_map_presentation_flags_unparseable_co_presenters():
     <section label="Presentations" recordId="r3">
       <field label="Presentation Title"><value type="String">Another Talk</value></field>
       <field label="Presentation Year"><value type="Year">2022</value></field>
-      <field label="Co-Presenters"><value type="String">Jane Smith and John Doe</value></field>
+      <field label="Co-Presenters"><value type="String">Anonymous</value></field>
     </section>
     """)
     row = map_record(el, "Presentations", "en", _ctx())
     assert row.fields["co_presenters"] == ""
     assert row.flag is not None
     assert "co_presenters" in row.flag
+
+
+def test_map_presentation_coerces_natural_order_co_presenters():
+    el = _record("""
+    <section label="Presentations" recordId="r4">
+      <field label="Presentation Title"><value type="String">A Talk</value></field>
+      <field label="Presentation Year"><value type="Year">2022</value></field>
+      <field label="Co-Presenters"><value type="String">Edwige Armand; Camille Prunet; Nicolas Reeves</value></field>
+    </section>
+    """)
+    row = map_record(el, "Presentations", "en", _ctx())
+    assert row.fields["co_presenters"] == "Armand, Edwige; Prunet, Camille; Reeves, Nicolas"
+    assert row.flag is None
 
 
 def test_map_recognitions():
@@ -444,7 +457,7 @@ def test_map_visual_artwork_flags_unparseable_contributors():
       <field label="Artwork Title"><value type="String">Another Piece</value></field>
       <field label="Publication Date"><value type="YearMonth">2019/1</value></field>
       <field label="Contribution Role"><value type="String">Collaborator</value></field>
-      <field label="Contributors"><value type="String">John Smith and Jane Doe</value></field>
+      <field label="Contributors"><value type="String">Anonymous</value></field>
     </section>
     """)
     row = map_record(el, "Visual Artworks", "en", _ctx())
@@ -600,7 +613,7 @@ def test_map_artistic_exhibition_flags_unparseable_contributors():
       <field label="Title of Work"><value type="String">Another Group Show</value></field>
       <field label="Venue"><value type="String">A Gallery</value></field>
       <field label="Date of First Performance"><value type="Date">2021-01-01</value></field>
-      <field label="Contributors"><value type="String">John Smith and Jane Doe</value></field>
+      <field label="Contributors"><value type="String">Anonymous</value></field>
     </section>
     """)
     row = map_record(el, "Artistic Exhibitions", "en", _ctx())
@@ -714,16 +727,34 @@ def test_map_grant_flags_multiple_funding_sources():
     assert "Funder B" in row.flag
 
 
+def test_map_grant_coerces_natural_order_other_investigators():
+    el = _record("""
+    <section label="Research Funding History" recordId="g5">
+      <field label="Funding Title"><value type="String">Another Grant</value></field>
+      <field label="Funding Start Date"><value type="YearMonth">2018/1</value></field>
+      <section label="Other Investigators" recordId="g5i1">
+        <field label="Investigator Name"><value type="String">Manuelle Freire</value></field>
+      </section>
+      <section label="Other Investigators" recordId="g5i2">
+        <field label="Investigator Name"><value type="String">Sylvain Martet</value></field>
+      </section>
+    </section>
+    """)
+    row = map_record(el, "Research Funding History", "en", _ctx())
+    assert row.fields["co_investigators"] == "Freire, Manuelle; Martet, Sylvain"
+    assert row.flag is None
+
+
 def test_map_grant_flags_other_investigators_unparseable():
     el = _record("""
     <section label="Research Funding History" recordId="g4">
       <field label="Funding Title"><value type="String">Team Grant</value></field>
       <field label="Funding Start Date"><value type="YearMonth">2017/1</value></field>
       <section label="Other Investigators" recordId="g4i1">
-        <field label="Investigator Name"><value type="String">Jane Smith</value></field>
+        <field label="Investigator Name"><value type="String">Anonymous</value></field>
       </section>
       <section label="Other Investigators" recordId="g4i2">
-        <field label="Investigator Name"><value type="String">John Doe</value></field>
+        <field label="Investigator Name"><value type="String">N/A</value></field>
       </section>
     </section>
     """)
@@ -731,8 +762,8 @@ def test_map_grant_flags_other_investigators_unparseable():
     assert row.fields["co_investigators"] == ""
     assert row.flag is not None
     assert "co_investigators" in row.flag
-    assert "Jane Smith" in row.flag
-    assert "John Doe" in row.flag
+    assert "Anonymous" in row.flag
+    assert "N/A" in row.flag
 
 
 from parcours.core.import_ccv import extract_zotero_candidate

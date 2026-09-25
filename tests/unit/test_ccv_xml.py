@@ -14,6 +14,7 @@ from parcours.core.ccv_xml import (
     parse_ccv_export,
     sub_records,
     try_person_list,
+    try_person_list_lenient,
 )
 
 _SAMPLE = """<?xml version="1.0" encoding="UTF-8"?>
@@ -160,6 +161,60 @@ def test_try_person_list_returns_none_on_invalid_format():
 def test_try_person_list_returns_none_on_blank():
     assert try_person_list("") is None
     assert try_person_list("   ") is None
+
+
+def test_try_person_list_lenient_returns_none_on_blank():
+    assert try_person_list_lenient("") is None
+    assert try_person_list_lenient("   ") is None
+
+
+def test_try_person_list_lenient_inverts_a_single_natural_order_name():
+    assert try_person_list_lenient("Chris Salter") == "Salter, Chris"
+
+
+def test_try_person_list_lenient_inverts_a_middle_name_into_the_first_name_part():
+    assert try_person_list_lenient("Erin Marie Gee") == "Gee, Erin Marie"
+
+
+def test_try_person_list_lenient_returns_none_for_a_single_token_name():
+    assert try_person_list_lenient("Prince") is None
+
+
+def test_try_person_list_lenient_splits_a_semicolon_separated_natural_order_list():
+    assert (
+        try_person_list_lenient("Edwige Armand; Camille Prunet; Nicolas Reeves")
+        == "Armand, Edwige; Prunet, Camille; Reeves, Nicolas"
+    )
+
+
+def test_try_person_list_lenient_splits_a_comma_separated_natural_order_list():
+    assert (
+        try_person_list_lenient("Manuelle Freire, Sylvain Martet, Victor Drouin-Trempe")
+        == "Freire, Manuelle; Martet, Sylvain; Drouin-Trempe, Victor"
+    )
+
+
+def test_try_person_list_lenient_handles_a_trailing_and_before_the_last_name():
+    assert (
+        try_person_list_lenient("Ben Bogart, Stephanie Dinkins, Suzanne Kite et Stephen Kelly")
+        == "Bogart, Ben; Dinkins, Stephanie; Kite, Suzanne; Kelly, Stephen"
+    )
+    assert try_person_list_lenient("Alastair Summerlee and Matthew Kean") == "Summerlee, Alastair; Kean, Matthew"
+
+
+def test_try_person_list_lenient_strips_a_trailing_period():
+    assert try_person_list_lenient("Ben Bogart et Allison Parrish.") == "Bogart, Ben; Parrish, Allison"
+
+
+def test_try_person_list_lenient_preserves_a_hyphenated_surname_as_one_token():
+    assert try_person_list_lenient("Rosalie Dumont-Gagné") == "Dumont-Gagné, Rosalie"
+
+
+def test_try_person_list_lenient_returns_none_if_any_single_name_is_ambiguous():
+    # "Prince" has no given name to separate out, so the whole list is
+    # rejected rather than guessing — same "never guess" rule as everywhere
+    # else in this codebase.
+    assert try_person_list_lenient("Chris Salter; Prince") is None
 
 
 def test_field_date_passes_through_iso_date():

@@ -172,7 +172,7 @@ def _map_presentation(record_el, lang, ctx) -> MappedRow:
     description_fr, description_en = x.field_bilingual(record_el, "Description / Contribution Value", lang)
 
     raw_co_presenters = x.field_text(record_el, "Co-Presenters")
-    co_presenters = x.try_person_list(raw_co_presenters)
+    co_presenters = x.try_person_list_any(raw_co_presenters)
     flag = None
     if raw_co_presenters and co_presenters is None:
         flag = f"co_presenters could not be parsed as 'Last, First' from CCV's raw value: {raw_co_presenters!r}"
@@ -503,7 +503,7 @@ def _map_artwork_common(record_el, lang, ctx, title_label: str, date_field, date
 
     raw_contributors = x.field_text(record_el, "Contributors")
     filtered_contributors = _remove_self_from_contributors(raw_contributors, ctx.own_name)
-    co_authors = x.try_person_list(filtered_contributors)
+    co_authors = x.try_person_list_any(filtered_contributors)
     flag = None
     if filtered_contributors and co_authors is None:
         flag = f"co_authors could not be parsed as 'Last, First' from CCV's raw Contributors value: {raw_contributors!r}"
@@ -573,7 +573,7 @@ def _map_exhibition(record_el, lang, ctx) -> MappedRow:
 
     raw_contributors = x.field_text(record_el, "Contributors")
     filtered_contributors = _remove_self_from_contributors(raw_contributors, ctx.own_name)
-    co_authors = x.try_person_list(filtered_contributors)
+    co_authors = x.try_person_list_any(filtered_contributors)
     flag = None
     if filtered_contributors and co_authors is None:
         flag = f"co_authors could not be parsed as 'Last, First' from CCV's raw Contributors value: {raw_contributors!r}"
@@ -645,7 +645,7 @@ def _map_grant(record_el, lang, ctx) -> MappedRow:
         names = [x.field_text(inv, "Investigator Name") for inv in other_investigators]
         names = [n for n in names if n]
         joined = "; ".join(names)
-        parsed = x.try_person_list(joined)
+        parsed = x.try_person_list_any(joined)
         if parsed:
             co_investigators = parsed
         else:
