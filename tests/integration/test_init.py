@@ -42,7 +42,7 @@ def test_scaffold_repo_creates_every_expected_file(tmp_path, monkeypatch):
 
     assert (repo / "parco.yaml").is_file()
     assert (repo / "vocab.yaml").is_file()
-    assert (repo / "translations.csv").is_file()
+    assert (repo / "entries" / "translations.csv").is_file()
     assert (repo / "views.yaml").is_file()
     assert (repo / "identity.yaml").is_file()
     assert (repo / "profiles" / "academic-en.yaml").is_file()
@@ -50,7 +50,7 @@ def test_scaffold_repo_creates_every_expected_file(tmp_path, monkeypatch):
     schemas = load_all_schemas(repo / "categories")
     assert len(schemas) == 19
     for name, schema in schemas.items():
-        csv_path = repo / f"{name}.csv"
+        csv_path = repo / "entries" / f"{name}.csv"
         assert csv_path.is_file()
         header = csv_path.read_text(encoding="utf-8").splitlines()[0]
         assert header.split(",") == schema.field_names()
