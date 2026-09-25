@@ -15,6 +15,7 @@ from ..core.citations import UnknownCitationStyle, render_citations, resolve_sty
 from ..core.commit import commit_pending
 from ..core.data import (
     NotASelectQuery,
+    category_csv_path,
     format_table,
     load_category_rows,
     query_category_rows,
@@ -45,9 +46,12 @@ from ..core.translations import (
     delete_translation,
     edit_translation,
     load_translations,
+    translations_csv_path,
 )
 from ..core.vocab import VocabError, load_vocab
 from .wizard import (
+    ask_field_by_name,
+    ask_group_fields,
     collect_field_values,
     confirm_and_check_duplicates,
     order_rows,
@@ -73,7 +77,12 @@ def _find_repo_or_exit() -> Path:
 
 
 @app.command()
-def lint(category: str = typer.Argument(None, help="Only lint this category")):
+def lint(
+    category: str = typer.Argument(None, help="Only lint this category"),
+    fix_interactive: bool = typer.Option(
+        False, "--fix-interactive", help="Walk flagged rows one by one and fix them interactively"
+    ),
+):
     """Check category data against its schema, vocab, and translations."""
     data_dir = _find_repo_or_exit()
 
@@ -82,6 +91,10 @@ def lint(category: str = typer.Argument(None, help="Only lint this category")):
     except ConfigError as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=2)
+
+    if fix_interactive:
+        _run_lint_fix_interactive(data_dir, issues)
+        return
 
     if not issues:
         typer.echo("No lint issues found.")
@@ -97,6 +110,157 @@ def lint(category: str = typer.Argument(None, help="Only lint this category")):
 
     error_count = sum(1 for i in issues if i.severity == "error")
     raise typer.Exit(code=1 if error_count else 0)
+
+
+def _ask_fix_choice(default: str = "f") -> str:
+    prompt = "  [f]ix / [s]kip / [q]uit" if default == "f" else "  [a]dd translation / [s]kip / [q]uit"
+    return typer.prompt(prompt, default=default).strip().lower()[:1]
+
+
+def _run_lint_fix_interactive(data_dir: Path, issues: list) -> None:
+    """Walks lint issues one row at a time, prompting only for the
+    field(s) actually flagged rather than the whole schema (see SPECS.md-
+    adjacent design discussion: bulk-fixing 40+ rows through the full
+    add/edit wizard would mean re-confirming every untouched field too).
+    Glossary warnings get an inline `parco translation add`-equivalent
+    instead of a row edit, since the value itself isn't wrong — it just
+    has no translation yet. Repo-wide `translations.csv`-completeness
+    issues have no row to edit, so they're listed at the end instead."""
+    repo_wide = [i for i in issues if i.category == "translations"]
+    row_issues = [i for i in issues if i.category != "translations"]
+
+    if not row_issues and not repo_wide:
+        typer.echo("No lint issues found.")
+        return
+
+    if not row_issues:
+        typer.echo("No row-fixable issues found.")
+    else:
+        try:
+            vocab = load_vocab(data_dir / "vocab.yaml")
+        except (VocabError, FileNotFoundError, KeyError) as exc:
+            typer.echo(f"Config error: {exc}")
+            raise typer.Exit(code=2)
+
+        schemas = load_all_schemas(data_dir / "categories")
+        handlers: dict[str, CategoryHandler] = {}
+        rows_by_category: dict[str, list[dict]] = {}
+        groups: dict[tuple[str, str], list] = {}
+        order: list[tuple[str, str]] = []
+        for issue in row_issues:
+            key = (issue.category, issue.row_id)
+            if key not in groups:
+                groups[key] = []
+                order.append(key)
+            groups[key].append(issue)
+
+        fixed = 0
+        skipped = 0
+        translations_added = 0
+        quit_requested = False
+
+        for category, row_id in order:
+            if quit_requested:
+                break
+            schema = schemas.get(category)
+            if schema is None:
+                continue
+            if category not in handlers:
+                handlers[category] = load_handler(schema, HandlerContext(data_dir=data_dir))
+            if category not in rows_by_category:
+                rows_by_category[category] = load_category_rows(data_dir, category)
+            existing_rows = rows_by_category[category]
+            original_row = next((r for r in existing_rows if r.get("id") == row_id), None)
+            if original_row is None:
+                continue
+            row = dict(original_row)
+            row_changed = False
+
+            typer.echo(f"\n{category}[{row_id}]: {row_summary(schema, row)}")
+
+            for issue in groups[(category, row_id)]:
+                field_spec = schema.get_field(issue.field) if issue.field else None
+
+                if issue.severity == "warning" and field_spec is not None and field_spec.glossary:
+                    translations_path = translations_csv_path(data_dir)
+                    translations = load_translations(translations_path) if translations_path.is_file() else None
+                    value = row.get(issue.field, "")
+                    if translations is not None and translations.exists(field_spec.glossary, value):
+                        continue  # resolved earlier this session
+                    typer.echo(f"  {issue.message}")
+                    choice = _ask_fix_choice(default="a")
+                    if choice == "q":
+                        quit_requested = True
+                        break
+                    if choice == "s":
+                        skipped += 1
+                        continue
+                    en = typer.prompt("  en ([Enter] to skip)", default="", show_default=False)
+                    fr = typer.prompt("  fr ([Enter] to skip)", default="", show_default=False)
+                    try:
+                        add_translation(data_dir, field_spec.glossary, value, en, fr)
+                        translations_added += 1
+                        typer.echo(f"  Added translation {field_spec.glossary}:{value}.")
+                    except TranslationExists:
+                        typer.echo("  Already exists — skipping.")
+                    except CommitFailed as exc:
+                        typer.echo(f"  Translation written, but the commit failed: {exc}")
+                    continue
+
+                if issue.field is None:
+                    group = next(
+                        (g for g in schema.require_one_of if not any((row.get(n) or "").strip() for n in g)),
+                        None,
+                    )
+                    if group is None:
+                        continue  # already resolved by an earlier fix on this row
+                    typer.echo(f"  {issue.message}")
+                    choice = _ask_fix_choice()
+                    if choice == "q":
+                        quit_requested = True
+                        break
+                    if choice == "s":
+                        skipped += 1
+                        continue
+                    row.update(ask_group_fields(schema, vocab, group, prefill=row))
+                    row_changed = True
+                    continue
+
+                typer.echo(f"  {issue.message}")
+                choice = _ask_fix_choice()
+                if choice == "q":
+                    quit_requested = True
+                    break
+                if choice == "s":
+                    skipped += 1
+                    continue
+                row[issue.field] = ask_field_by_name(schema, vocab, issue.field, row.get(issue.field))
+                row_changed = True
+
+            if row_changed:
+                values = {
+                    name: row.get(name, "")
+                    for name in schema.field_names()
+                    if schema.get_field(name) and not schema.get_field(name).generated
+                }
+                if confirm_and_check_duplicates(handlers[category], values, existing_rows, self_id=row_id):
+                    try:
+                        edit_entry(data_dir, schema, row_id, values)
+                        fixed += 1
+                        rows_by_category[category] = load_category_rows(data_dir, category)
+                    except CommitFailed as exc:
+                        typer.echo(f"  Row written, but the commit failed: {exc}")
+                else:
+                    typer.echo("  Discarded, nothing written for this row.")
+
+        typer.echo(
+            f"\n{fixed} row(s) fixed, {skipped} issue(s) skipped, {translations_added} translation(s) added."
+        )
+
+    if repo_wide:
+        typer.echo(f"\n{len(repo_wide)} translation-completeness issue(s) need `parco translation edit ...`:")
+        for issue in repo_wide:
+            typer.echo(f"  {issue.category}[{issue.row_id}].{issue.field}: {issue.message}")
 
 
 @app.command()
@@ -409,7 +573,7 @@ def add(ctx: typer.Context, category: str = typer.Argument(None, help="Category 
         typer.echo("Aborted, nothing written.")
         raise typer.Exit(code=0)
 
-    filename = f"{category}.csv"
+    filename = category_csv_path(data_dir, category).relative_to(data_dir).as_posix()
     was_dirty_before = is_file_dirty(data_dir, filename)
     try:
         row = add_entry(data_dir, schema, values)
@@ -455,7 +619,7 @@ def edit(
         typer.echo("Aborted, nothing written.")
         raise typer.Exit(code=0)
 
-    filename = f"{category}.csv"
+    filename = category_csv_path(data_dir, category).relative_to(data_dir).as_posix()
     was_dirty_before = is_file_dirty(data_dir, filename)
     try:
         updated = edit_entry(data_dir, schema, row["id"], values)
@@ -495,7 +659,7 @@ def delete(
         typer.echo("Aborted, nothing deleted.")
         raise typer.Exit(code=0)
 
-    filename = f"{category}.csv"
+    filename = category_csv_path(data_dir, category).relative_to(data_dir).as_posix()
     was_dirty_before = is_file_dirty(data_dir, filename)
     try:
         delete_entry(data_dir, schema, row["id"])
@@ -519,6 +683,11 @@ def _print_import_report(report: ImportReport) -> None:
     by_category: dict[str, int] = {}
     for mapped in report.to_write:
         by_category[mapped.category] = by_category.get(mapped.category, 0) + 1
+
+    if report.warnings:
+        for warning in report.warnings:
+            typer.echo(f"Warning: {warning}")
+        typer.echo()
 
     typer.echo("Import plan:")
     for category, count in sorted(by_category.items()):
@@ -591,7 +760,7 @@ translation_app = typer.Typer(
 app.add_typer(translation_app, name="translation")
 
 _CATEGORY_HELP = (
-    "The translations.csv category this belongs to (e.g. 'section' or 'location') "
+    "The translations.csv category this belongs to (e.g. 'section' or 'city') "
     "— not a data category like 'publications'."
 )
 
@@ -611,7 +780,7 @@ def translation_add(
     if fr is None:
         fr = typer.prompt("fr ([Enter] to skip)", default="", show_default=False)
 
-    filename = "translations.csv"
+    filename = "entries/translations.csv"
     was_dirty_before = is_file_dirty(data_dir, filename)
     try:
         entry = add_translation(data_dir, category, entry_id, en, fr)
@@ -640,7 +809,7 @@ def translation_edit(
     """Edit an existing translation entry in translations.csv."""
     data_dir = _find_repo_or_exit()
 
-    translations_path = data_dir / "translations.csv"
+    translations_path = translations_csv_path(data_dir)
     current = load_translations(translations_path).get(category, entry_id) if translations_path.is_file() else None
     if current is None:
         typer.echo(f"No translation for category '{category}' id '{entry_id}'")
@@ -651,7 +820,7 @@ def translation_edit(
     if fr is None:
         fr = typer.prompt("fr", default=current.fr, show_default=bool(current.fr))
 
-    filename = "translations.csv"
+    filename = "entries/translations.csv"
     was_dirty_before = is_file_dirty(data_dir, filename)
     try:
         entry = edit_translation(data_dir, category, entry_id, en, fr)
@@ -678,7 +847,7 @@ def translation_delete(
     """Delete a translation entry from translations.csv after one confirmation."""
     data_dir = _find_repo_or_exit()
 
-    translations_path = data_dir / "translations.csv"
+    translations_path = translations_csv_path(data_dir)
     exists = translations_path.is_file() and load_translations(translations_path).exists(category, entry_id)
     if not exists:
         typer.echo(f"No translation for category '{category}' id '{entry_id}'")
@@ -691,7 +860,7 @@ def translation_delete(
         typer.echo("Aborted, nothing deleted.")
         raise typer.Exit(code=0)
 
-    filename = "translations.csv"
+    filename = "entries/translations.csv"
     was_dirty_before = is_file_dirty(data_dir, filename)
     try:
         delete_translation(data_dir, category, entry_id)
@@ -718,7 +887,7 @@ def translation_list(
     """List translation entries, optionally filtered by --category and/or --search."""
     data_dir = _find_repo_or_exit()
 
-    translations_path = data_dir / "translations.csv"
+    translations_path = translations_csv_path(data_dir)
     entries = load_translations(translations_path).all() if translations_path.is_file() else []
 
     if category:
