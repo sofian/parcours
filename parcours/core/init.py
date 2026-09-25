@@ -25,6 +25,42 @@ class RepoAlreadyExists(Exception):
     pieces" to an existing one."""
 
 
+class ScaffoldInsideSourceRepo(Exception):
+    """Raised when the target path sits inside the parcours source
+    checkout itself. This is the one thing CLAUDE.md's "Repo split"
+    absolutely forbids (code is public, real CV data must live in a
+    separate private repo) — and the most likely way a new user hits it
+    by accident is running `parco init .` right after cloning the code
+    repo, before `_git_init_and_commit`'s `git init` would silently
+    reuse the code repo's own `.git` instead of creating an isolated
+    one."""
+
+
+def _find_git_root(start: Path) -> Path | None:
+    for candidate in (start, *start.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def check_not_inside_source_repo(path: Path) -> None:
+    """Raises ScaffoldInsideSourceRepo if `path` is the parcours source
+    checkout itself, or nested inside it. Only fires for an editable/dev
+    install (where `parcours/`'s own files sit inside a real git
+    checkout) — a normal packaged install has no such checkout to
+    collide with, so this is a no-op there."""
+    source_root = _find_git_root(Path(__file__).resolve().parent.parent.parent)
+    if source_root is None:
+        return
+    resolved = Path(path).expanduser().resolve()
+    if resolved == source_root or source_root in resolved.parents:
+        raise ScaffoldInsideSourceRepo(
+            f"{path} is inside the parcours source repo itself ({source_root}) — "
+            "your data must live in a separate, private repository (see CLAUDE.md's "
+            "\"Repo split\"). Choose a different directory, e.g. `parco init ~/my-cv`."
+        )
+
+
 class GitInitFailed(Exception):
     """Raised when `git init`/`git add`/`git commit` fails while
     scaffolding a new repo."""
@@ -208,13 +244,16 @@ def _git_init_and_commit(path: Path) -> None:
 def scaffold_repo(path: Path, answers: InitAnswers) -> None:
     """Scaffolds a brand-new parco data repo at `path` and commits it.
     Raises RepoAlreadyExists (writing nothing) if `path/parco.yaml`
-    already exists, GitIdentityMissing (writing nothing) if git can't
-    resolve an author identity, or GitInitFailed if the final git
-    init/commit fails for some other reason."""
+    already exists, ScaffoldInsideSourceRepo (writing nothing) if `path`
+    is inside the parcours source checkout itself, GitIdentityMissing
+    (writing nothing) if git can't resolve an author identity, or
+    GitInitFailed if the final git init/commit fails for some other
+    reason."""
     path = Path(path)
     if (path / "parco.yaml").is_file():
         raise RepoAlreadyExists(f"A parco data repo already exists at {path}")
 
+    check_not_inside_source_repo(path)
     check_git_identity_configured()
 
     path.mkdir(parents=True, exist_ok=True)

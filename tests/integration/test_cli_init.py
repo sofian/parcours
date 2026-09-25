@@ -74,6 +74,21 @@ def test_init_refuses_before_prompting_if_repo_already_exists(tmp_path, monkeypa
     assert "already exists" in result.stdout
 
 
+def test_init_refuses_before_prompting_if_target_is_inside_the_source_checkout(tmp_path, monkeypatch):
+    fake_source_root = tmp_path / "parcours-checkout"
+    fake_source_root.mkdir()
+    (fake_source_root / ".git").mkdir()
+    monkeypatch.setattr("parcours.core.init._find_git_root", lambda start: fake_source_root)
+    target = fake_source_root / "my-cv"
+
+    # No input supplied at all — proves the refusal happens before any prompt is reached.
+    result = runner.invoke(app, ["init", str(target)])
+
+    assert result.exit_code == 1
+    assert "source repo itself" in result.stdout
+    assert not target.exists()
+
+
 def test_init_phone_prompt_hints_international_format(tmp_path, monkeypatch):
     _git_env(monkeypatch)
     target = tmp_path / "my-cv"

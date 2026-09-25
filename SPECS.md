@@ -1902,7 +1902,16 @@ parco init [path]                          # defaults to cwd; wizard-driven
 Scaffolds a brand-new parco data repo. Refuses if `path/parco.yaml`
 already exists — re-running `init` to "add missing pieces" to an
 existing repo isn't supported in v1; start fresh in a new directory or
-edit files by hand. Runs as a wizard (the same field-by-field,
+edit files by hand. Also refuses (before any prompt) if `path` is the
+parcours source checkout itself, or nested inside it — for an
+editable/dev install, `parcours/`'s own files sit inside a real git
+checkout, and `parco init .` run there would silently reuse that
+checkout's own `.git` (see "Repo split" in CLAUDE.md: the code is
+public, real CV data must live in a separate private repo). Detected
+by walking up from the running package's own file location to find its
+nearest `.git`, then checking whether the requested `path` is that
+directory or below it; a normal packaged install has no such checkout
+to collide with, so the check is a no-op there. Runs as a wizard (the same field-by-field,
 confirm-before-write pattern as `add`/`edit` — see Data entry), asking
 for:
 - your name (first/last)

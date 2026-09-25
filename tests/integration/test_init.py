@@ -8,6 +8,7 @@ from parcours.core.init import (
     GitInitFailed,
     InitAnswers,
     RepoAlreadyExists,
+    ScaffoldInsideSourceRepo,
     check_git_identity_configured,
     scaffold_repo,
 )
@@ -204,6 +205,34 @@ def test_scaffold_repo_writes_a_custom_citation_export_path(tmp_path, monkeypatc
         assert "json: /home/jane/Zotero/library.json" in content
         # The rest of the file's comments/formatting must survive untouched.
         assert "bib:" in content
+
+
+def test_scaffold_repo_refuses_a_target_inside_the_source_checkout(tmp_path, monkeypatch):
+    fake_source_root = tmp_path / "parcours-checkout"
+    fake_source_root.mkdir()
+    (fake_source_root / ".git").mkdir()
+    monkeypatch.setattr("parcours.core.init._find_git_root", lambda start: fake_source_root)
+
+    target = fake_source_root / "my-cv"
+
+    with pytest.raises(ScaffoldInsideSourceRepo, match=str(fake_source_root)):
+        scaffold_repo(target, _answers())
+
+    assert not (target / "parco.yaml").exists()
+
+
+def test_scaffold_repo_allows_a_target_outside_the_source_checkout(tmp_path, monkeypatch):
+    fake_source_root = tmp_path / "parcours-checkout"
+    fake_source_root.mkdir()
+    (fake_source_root / ".git").mkdir()
+    monkeypatch.setattr("parcours.core.init._find_git_root", lambda start: fake_source_root)
+    _set_git_env(monkeypatch)
+
+    target = tmp_path / "my-cv"
+
+    scaffold_repo(target, _answers())
+
+    assert (target / "parco.yaml").is_file()
 
 
 def test_scaffold_repo_raises_git_identity_missing_and_writes_nothing(tmp_path, monkeypatch):

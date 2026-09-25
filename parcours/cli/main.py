@@ -31,7 +31,9 @@ from ..core.init import (
     GitInitFailed,
     InitAnswers,
     RepoAlreadyExists,
+    ScaffoldInsideSourceRepo,
     check_git_identity_configured,
+    check_not_inside_source_repo,
     scaffold_repo,
 )
 from ..core.lint import ConfigError, run_lint
@@ -967,6 +969,12 @@ def init(
         raise typer.Exit(code=1)
 
     try:
+        check_not_inside_source_repo(target)
+    except ScaffoldInsideSourceRepo as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+
+    try:
         check_git_identity_configured()
     except GitIdentityMissing as exc:
         typer.echo(str(exc))
@@ -1043,6 +1051,9 @@ def init(
     try:
         scaffold_repo(target, answers)
     except RepoAlreadyExists as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+    except ScaffoldInsideSourceRepo as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=1)
     except GitIdentityMissing as exc:
