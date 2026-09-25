@@ -6,10 +6,11 @@ A personal, portable system for maintaining academic and artistic CV data as str
 
 ## Why
 
-Academic and artistic CVs get rebuilt from scratch for every grant, job, and institution, each wanting a different length, language, and format. Parcours keeps the data in one place as plain CSV files and treats each CV as a *view* over that data.
+Academic and artistic CVs get rebuilt from scratch for every grant, job, and institution, each wanting a different length, language, and format — or a specific number or list rather than a CV at all: total funding since a given year for a tenure file, first-author publications for a grant panel, service hours for an evaluation. Parcours keeps the data in one place as plain CSV files and treats each CV — or extract — as a *view* over that data.
 
 - **Plain text, git-tracked:** every change is diffable, and git history is the undo mechanism.
 - **Multiple CVs from one dataset:** a long academic CV, a short one, English, French — each defined by a small YAML profile, sharing whatever isn't language-specific via `extends`.
+- **Extracts on demand:** `parco query` and `parco stats` pull the specific figures a grant application, tenure committee, or job posting asks for, straight from the same data, without building a whole extra CV variant for a one-off question.
 - **Bilingual by design:** every UI-facing string comes from a translation table, and a missing translation fails loudly instead of silently falling back.
 - **Reusable:** built for one user, but categories, vocabularies, translations, and profiles are all configuration, so other academics can use it with their own data.
 
