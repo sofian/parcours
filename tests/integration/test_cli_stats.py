@@ -18,8 +18,9 @@ fields:
   - {name: start_date, type: date, precision: year}
 """)
     (tmp_path / "vocab.yaml").write_text("{}\n")
-    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
-    (tmp_path / "widgets.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "entries" / "widgets.csv").write_text(
         "id,title_en,status,start_date\n"
         "p1,First,published,2020\n"
         "p2,Second,published,2020\n"
@@ -164,8 +165,9 @@ fields:
   - {name: citekey, required: true}
 """)
     (repo / "vocab.yaml").write_text("{}\n")
-    (repo / "translations.csv").write_text("id,category,en,fr\n")
-    (repo / "publications.csv").write_text("id,citekey\np1,doe2024\n", encoding="utf-8")
+    (repo / "entries").mkdir()
+    (repo / "entries" / "translations.csv").write_text("id,category,en,fr\n")
+    (repo / "entries" / "publications.csv").write_text("id,citekey\np1,doe2024\n", encoding="utf-8")
     monkeypatch.chdir(repo)
 
     result = runner.invoke(app, ["stats", "publications", "--by", "year"])

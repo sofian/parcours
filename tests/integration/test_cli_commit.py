@@ -19,8 +19,9 @@ fields:
   - {name: status, required: true, vocab: widget_status}
 """)
     (tmp_path / "vocab.yaml").write_text("widget_status: [draft, published]\n")
-    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
-    (tmp_path / "widgets.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "entries" / "widgets.csv").write_text(
         "id,title_en,status\nabc123,First Widget,draft\ndef456,Second Widget,published\n",
         encoding="utf-8",
     )
@@ -40,7 +41,7 @@ def test_commit_stages_and_commits_pending_changes(tmp_path, monkeypatch):
     _init_git_repo(repo)
     monkeypatch.chdir(repo)
 
-    (repo / "widgets.csv").write_text(
+    (repo / "entries" / "widgets.csv").write_text(
         "id,title_en,status\nabc123,First Widget,draft\ndef456,Second Widget,published\nghi789,Third Widget,draft\n",
         encoding="utf-8",
     )
@@ -69,7 +70,7 @@ def test_commit_accepts_custom_message(tmp_path, monkeypatch):
     _init_git_repo(repo)
     monkeypatch.chdir(repo)
 
-    (repo / "widgets.csv").write_text(
+    (repo / "entries" / "widgets.csv").write_text(
         "id,title_en,status\nabc123,First Widget,draft\ndef456,Second Widget,published\nghi789,Third Widget,draft\n",
         encoding="utf-8",
     )

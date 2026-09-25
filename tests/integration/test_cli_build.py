@@ -21,7 +21,8 @@ fields:
   - {name: end_date, type: date, precision: month}
 """)
     (tmp_path / "vocab.yaml").write_text("{}\n")
-    (tmp_path / "translations.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text(
         "id,category,en,fr\ngrants,section,Grants,Subventions\n"
     )
     (tmp_path / "identity.yaml").write_text("""
@@ -58,7 +59,7 @@ sections:
 
 def test_build_writes_the_rendered_file(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date\n"
         "g1,Big Grant,Grande subvention,FRQSC,PI,2020-01,2022-01\n"
     )
@@ -79,7 +80,7 @@ def test_build_writes_the_rendered_file(tmp_path, monkeypatch):
 
 def test_build_refuses_on_lint_error_without_force(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date\n"
         "g1,,,,,2020-01,2022-01\n"
     )
@@ -93,7 +94,7 @@ def test_build_refuses_on_lint_error_without_force(tmp_path, monkeypatch):
 
 def test_build_force_bypasses_lint_gate(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date\n"
         "g1,,,,,2020-01,2022-01\n"
     )
@@ -112,7 +113,7 @@ def test_build_force_bypasses_lint_gate(tmp_path, monkeypatch):
 
 def test_build_rejects_docx(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date\n"
         "g1,Big Grant,Grande subvention,FRQSC,PI,2020-01,2022-01\n"
     )
@@ -136,7 +137,7 @@ def test_build_unknown_profile_exits_cleanly(tmp_path, monkeypatch):
 
 def test_build_respects_custom_output_dir(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date\n"
         "g1,Big Grant,Grande subvention,FRQSC,PI,2020-01,2022-01\n"
     )

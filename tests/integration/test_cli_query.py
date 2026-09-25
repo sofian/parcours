@@ -7,7 +7,8 @@ runner = CliRunner()
 
 def _setup_data_repo(tmp_path):
     (tmp_path / "parco.yaml").write_text("name: test-repo\n")
-    (tmp_path / "widgets.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "widgets.csv").write_text(
         "id,title_en,status\nw1,First,draft\nw2,Second,published\n", encoding="utf-8"
     )
     return tmp_path
