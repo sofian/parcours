@@ -7,9 +7,19 @@ from pathlib import Path
 
 import duckdb
 
+CATEGORY_ENTRIES_DIR = "entries"
+
+
+def category_csv_path(data_dir: Path, category_name: str) -> Path:
+    """The single source of truth for where a category's CSV lives (see
+    SPECS.md, "Data layer" — every category CSV plus translations.csv
+    lives under `entries/`, grouped apart from repo-root config and the
+    `categories/` schema definitions)."""
+    return data_dir / CATEGORY_ENTRIES_DIR / f"{category_name}.csv"
+
 
 def load_category_rows(data_dir: Path, category_name: str) -> list[dict]:
-    csv_path = data_dir / f"{category_name}.csv"
+    csv_path = category_csv_path(data_dir, category_name)
     if not csv_path.is_file():
         return []
 
@@ -32,7 +42,7 @@ def query_category_rows(
     limit: int | None = None,
     date_range: tuple[str, str | None, str | None] | None = None,
 ) -> list[dict]:
-    csv_path = data_dir / f"{category_name}.csv"
+    csv_path = category_csv_path(data_dir, category_name)
     if not csv_path.is_file():
         return []
 
@@ -138,7 +148,7 @@ def run_select_query(data_dir: Path, sql: str) -> tuple[list[str], list[dict]]:
                 f"{statements[0].type} statement"
             )
 
-        for csv_path in sorted(data_dir.glob("*.csv")):
+        for csv_path in sorted((data_dir / CATEGORY_ENTRIES_DIR).glob("*.csv")):
             category_name = csv_path.stem.replace('"', '""')
             escaped_path = str(csv_path).replace("'", "''")
             connection.execute(
