@@ -8,7 +8,7 @@ import secrets
 import subprocess
 from pathlib import Path
 
-from .data import load_category_rows
+from .data import category_csv_path, load_category_rows
 from .schema import CategorySchema
 
 _ID_BYTES = 3  # secrets.token_hex(3) -> 6 hex characters
@@ -34,11 +34,8 @@ def generate_id(data_dir: Path, category_name: str) -> str:
             return candidate
 
 
-def _csv_path(data_dir: Path, category_name: str) -> Path:
-    return data_dir / f"{category_name}.csv"
-
-
 def write_all_rows(csv_path: Path, fieldnames: list[str], rows: list[dict]) -> None:
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
     with open(csv_path, "w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
@@ -94,12 +91,12 @@ def git_commit(data_dir: Path, filename: str, message: str, was_already_dirty: b
 def add_entry(data_dir: Path, schema: CategorySchema, values: dict) -> dict:
     row_id = generate_id(data_dir, schema.name)
     row = {"id": row_id, **values}
-    filename = f"{schema.name}.csv"
+    filename = category_csv_path(data_dir, schema.name).relative_to(data_dir).as_posix()
 
     rows = load_category_rows(data_dir, schema.name)
     rows.append(row)
     was_already_dirty = is_file_dirty(data_dir, filename)
-    write_all_rows(_csv_path(data_dir, schema.name), schema.field_names(), rows)
+    write_all_rows(category_csv_path(data_dir, schema.name), schema.field_names(), rows)
     git_commit(data_dir, filename, f"Added {schema.name} entry {row_id}", was_already_dirty)
     return row
 
@@ -109,11 +106,11 @@ def edit_entry(data_dir: Path, schema: CategorySchema, row_id: str, values: dict
     if not any(row.get("id") == row_id for row in rows):
         raise EntryNotFound(f"No {schema.name} entry with id '{row_id}'")
 
-    filename = f"{schema.name}.csv"
+    filename = category_csv_path(data_dir, schema.name).relative_to(data_dir).as_posix()
     updated_row = {"id": row_id, **values}
     new_rows = [updated_row if row.get("id") == row_id else row for row in rows]
     was_already_dirty = is_file_dirty(data_dir, filename)
-    write_all_rows(_csv_path(data_dir, schema.name), schema.field_names(), new_rows)
+    write_all_rows(category_csv_path(data_dir, schema.name), schema.field_names(), new_rows)
     git_commit(data_dir, filename, f"Edited {schema.name} entry {row_id}", was_already_dirty)
     return updated_row
 
@@ -123,8 +120,8 @@ def delete_entry(data_dir: Path, schema: CategorySchema, row_id: str) -> None:
     if not any(row.get("id") == row_id for row in rows):
         raise EntryNotFound(f"No {schema.name} entry with id '{row_id}'")
 
-    filename = f"{schema.name}.csv"
+    filename = category_csv_path(data_dir, schema.name).relative_to(data_dir).as_posix()
     new_rows = [row for row in rows if row.get("id") != row_id]
     was_already_dirty = is_file_dirty(data_dir, filename)
-    write_all_rows(_csv_path(data_dir, schema.name), schema.field_names(), new_rows)
+    write_all_rows(category_csv_path(data_dir, schema.name), schema.field_names(), new_rows)
     git_commit(data_dir, filename, f"Deleted {schema.name} entry {row_id}", was_already_dirty)
