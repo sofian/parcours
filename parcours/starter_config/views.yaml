@@ -114,7 +114,7 @@ presentations:
     date: date
     summary: "{event}"
     highlights:
-      - "{location}"
+      - "{city}, {country}"
       - "{co_presenters}"
 
 press:
@@ -171,11 +171,12 @@ exhibitions:
     name: "{title}"
     start_date: start_date
     end_date: end_date
-    location: "{location}"
+    location: "{city}, {country}"
     highlights:
       - "{event}"
       - "{venue}"
       - "{curator}"
+      - "{co_authors}"
 
 curatorship:
   source: curatorship
@@ -184,7 +185,7 @@ curatorship:
     name: "{title}"
     start_date: start_date
     end_date: end_date
-    location: "{location}"
+    location: "{city}, {country}"
     highlights:
       - "{event}"
       - "{venue}"
@@ -195,7 +196,7 @@ residencies:
   entry_type: NormalEntry
   fields:
     name: "{organization}"
-    location: "{location}"
+    location: "{city}, {country}"
     start_date: start_date
     end_date: end_date
 

@@ -7,8 +7,10 @@ fields:
   - {name: title_fr}                                                # usually only one filled
   - {name: event}                                                    # free text — festival/series, e.g. "MUTEK Forum"
   - {name: venue}                                                    # free text — hosting institution, e.g. "National Gallery"
-  - {name: location,     required: true, glossary: location}                             # city + country as one glossary-backed value
+  - {name: city,         required: true, glossary: city}
+  - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — credited curator(s)
+  - {name: co_authors,   type: person_list}                          # other exhibiting artists (not you) — "Last, First; Last, First"
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}              # blank = single-day event or unknown
 require_one_of:

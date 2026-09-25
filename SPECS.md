@@ -328,12 +328,15 @@ shapes across its four real sub-types (in a reference export: 43 Artistic
 Exhibitions, 9 Visual Artworks, 3 Exhibition Catalogues, 1 Audio
 Recording) showed three genuinely different shapes:
 - **Artistic Exhibitions** (`Title of Work`, `Venue`, `Date of First
-  Performance`, `Contribution Role`) is date-and-venue-shaped, describing
-  a work *exhibited/performed somewhere* — this is `exhibitions`, not
-  `artworks`, and by record count is the single largest chain in a real
-  export, not a marginal case. `exhibitions`' own `city`/`country`/
-  `event`/`curator` (required or glossary-backed) have no CCV source at
-  all, so every imported row needs manual completion of those fields.
+  Performance`, `Contribution Role`, `Contributors`) is date-and-venue-shaped,
+  describing a work *exhibited/performed somewhere* — this is `exhibitions`,
+  not `artworks`, and by record count is the single largest chain in a real
+  export, not a marginal case. `exhibitions`' own `event`/`curator` have
+  no CCV source at all, so every imported row needs manual completion of
+  those two; `city`/`country` (split back out of the single `Venue`
+  value) and `co_authors` (from `Contributors`, same as `artworks`) *do*
+  get populated from CCV, just not from a dedicated field of their own
+  — see the `exhibitions` schema section below for both.
 - **Visual Artworks** and **Audio Recordings** (`Artwork/Piece Title`,
   `Publication/Release Date`, `Contribution Role`, `Contributors`) are
   authorship-shaped and match `artworks` as originally mapped — just a
@@ -1050,9 +1053,10 @@ dedup:
 
 Maps from CCV's Artistic Exhibitions (see CCV export structure, above)
 — the single largest record chain in a real export (43 records) — with
-`city`/`country`/`event`/`curator` left blank on import (no CCV source
-for any of them; see CCV export structure) for manual completion
-afterward.
+`event`/`curator` left blank on import (no CCV source for either) for
+manual completion afterward. `city`/`country` and `co_authors` *do*
+have a CCV source, despite CCV having no dedicated fields for them —
+see the two bullets below.
 
 ```yaml
 name: exhibitions
@@ -1067,6 +1071,7 @@ fields:
   - {name: city,         required: true, glossary: city}
   - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — credited curator(s)
+  - {name: co_authors,   type: person_list}                          # other exhibiting artists (not you) — "Last, First; Last, First"
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}              # blank = single-day event or unknown
 require_one_of:
@@ -1079,14 +1084,30 @@ dedup:
 
 - `city`/`country` are each their own glossary-backed field (see
   Translations) — `country`'s translations are pre-populated
-  automatically at `init`, `city`'s stay manual.
+  automatically at `init`, `city`'s stay manual. CCV itself has no
+  separate City/Country field for exhibitions (unlike `presentations`),
+  so both arrive baked into the single free-text `Venue` value — import
+  splits them back out (see the `_split_venue_city_country` note under
+  Import) when the raw value follows one of a few known conventions
+  ("Venue, City, Country", "Venue (City, Country)", "Venue; City,
+  Country"), verified against a real ~43-record export (27 matched the
+  comma form outright; the other 16 are left as a single `venue` string
+  with `city`/`country` blank, same as any other required-field gap
+  `parco lint` catches afterward).
+- `co_authors` maps CCV's `Contributors` field exactly like `artworks`
+  does (see that section's notes) — same `person_list` parsing, same
+  self-name filtering via `identity.yaml`, same manual-review flag on an
+  unparseable value. Verified against the real export: 40/43 records'
+  `Contributors` value already parses cleanly as `"Last, First; Last,
+  First"`, the other 3 get flagged.
 - Scoped strictly to exhibitions **you exhibited in** — no `role`
   field; a separate `curatorship` category below covers when you were
   the curator instead.
 - Modeled as a **date range** (`start_date`/`end_date`), not a single
   point in time like `artworks` — the LaTeX source's own comments show
   real multi-month exhibition runs (e.g. a show spanning several
-  months), unlike a single performance date.
+  months), unlike a single performance date. CCV has no end-date field
+  for exhibitions at all, so `end_date` is always blank on import.
 - `event`/`venue` are kept separate (a festival like MUTEK is not the
   same thing as the gallery hosting a given show within it) but neither
   is individually required — `require_one_of` covers the common case

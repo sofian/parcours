@@ -3,6 +3,7 @@ dedup, and the plan/write orchestration for `parco import ccv` (see
 SPECS.md, "Import" and "CCV export structure"). Core layer: no
 prompting/printing — see `cli/main.py`'s `import_app` for that."""
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -535,9 +536,48 @@ def _map_audio_recording(record_el, lang, ctx) -> MappedRow:
     return _map_artwork_common(record_el, lang, ctx, "Piece Title", x.field_date, "Release Date", "Audio Recordings")
 
 
+_VENUE_CITY_COUNTRY_PATTERNS = [
+    # "Venue (City, Country)"
+    re.compile(r"^(?P<venue>.+?)\s*\((?P<city>[^,()]+),\s*(?P<country>[^,()]+)\)$"),
+    # "Venue; City, Country"
+    re.compile(r"^(?P<venue>[^;]+);\s*(?P<city>[^,;]+),\s*(?P<country>[^,;]+)$"),
+]
+
+
+def _split_venue_city_country(raw_venue: str) -> tuple[str, str, str]:
+    """CCV has no separate City/Country field for exhibitions, so venue,
+    city, and country all arrive baked into one free-text `Venue` value.
+    Real-world exports mix a few conventions for packing all three into
+    that one field — "Venue, City, Country", "Venue (City, Country)",
+    "Venue; City, Country" — each tried in turn as long as it's an
+    unambiguous shape (the parenthetical/semicolon forms are structurally
+    distinct from a plain comma list, so trying them first never
+    misreads a "Venue, City, Country" string). A raw value matching none
+    of them — no separator, or something too ambiguous to guess right,
+    like a venue name that itself contains a comma — is left whole as
+    the venue rather than risk a wrong split."""
+    for pattern in _VENUE_CITY_COUNTRY_PATTERNS:
+        match = pattern.match(raw_venue)
+        if match:
+            return match["venue"].strip(), match["city"].strip(), match["country"].strip()
+    parts = [part.strip() for part in raw_venue.split(",")]
+    if len(parts) == 3:
+        return parts[0], parts[1], parts[2]
+    return raw_venue, "", ""
+
+
 @_register("Artistic Exhibitions")
 def _map_exhibition(record_el, lang, ctx) -> MappedRow:
     title_fr, title_en = x.field_single_language(record_el, "Title of Work", lang)
+    venue, city, country = _split_venue_city_country(x.field_text(record_el, "Venue"))
+
+    raw_contributors = x.field_text(record_el, "Contributors")
+    filtered_contributors = _remove_self_from_contributors(raw_contributors, ctx.own_name)
+    co_authors = x.try_person_list(filtered_contributors)
+    flag = None
+    if filtered_contributors and co_authors is None:
+        flag = f"co_authors could not be parsed as 'Last, First' from CCV's raw Contributors value: {raw_contributors!r}"
+
     return MappedRow(
         category="exhibitions",
         ccv_label="Artistic Exhibitions",
@@ -545,13 +585,15 @@ def _map_exhibition(record_el, lang, ctx) -> MappedRow:
             "title_en": title_en,
             "title_fr": title_fr,
             "event": "",
-            "venue": x.field_text(record_el, "Venue"),
-            "city": "",
-            "country": "",
+            "venue": venue,
+            "city": city,
+            "country": country,
             "curator": "",
+            "co_authors": co_authors or "",
             "start_date": x.field_date(record_el, "Date of First Performance"),
             "end_date": "",
         },
+        flag=flag,
     )
 
 

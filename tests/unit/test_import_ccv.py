@@ -510,6 +510,132 @@ def test_map_artistic_exhibition():
     assert row.fields["curator"] == ""
 
 
+def test_map_artistic_exhibition_splits_venue_city_country_on_exactly_two_commas():
+    el = _record("""
+    <section label="Artistic Exhibitions" recordId="e2">
+      <field label="Title of Work"><value type="String">Another Show</value></field>
+      <field label="Venue"><value type="String">Muffathalle, Munich, Germany</value></field>
+      <field label="Date of First Performance"><value type="Date">2022-09-01</value></field>
+    </section>
+    """)
+    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
+    assert row.fields["venue"] == "Muffathalle"
+    assert row.fields["city"] == "Munich"
+    assert row.fields["country"] == "Germany"
+
+
+def test_map_artistic_exhibition_leaves_venue_whole_with_one_comma():
+    el = _record("""
+    <section label="Artistic Exhibitions" recordId="e3">
+      <field label="Title of Work"><value type="String">Yet Another Show</value></field>
+      <field label="Venue"><value type="String">Smith, John Gallery</value></field>
+      <field label="Date of First Performance"><value type="Date">2020-01-01</value></field>
+    </section>
+    """)
+    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
+    assert row.fields["venue"] == "Smith, John Gallery"
+    assert row.fields["city"] == ""
+    assert row.fields["country"] == ""
+
+
+def test_map_artistic_exhibition_splits_venue_with_parenthetical_city_country():
+    el = _record("""
+    <section label="Artistic Exhibitions" recordId="e5">
+      <field label="Title of Work"><value type="String">A Fifth Show</value></field>
+      <field label="Venue"><value type="String">Muffathalle (Munich, Germany)</value></field>
+      <field label="Date of First Performance"><value type="Date">2022-09-01</value></field>
+    </section>
+    """)
+    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
+    assert row.fields["venue"] == "Muffathalle"
+    assert row.fields["city"] == "Munich"
+    assert row.fields["country"] == "Germany"
+
+
+def test_map_artistic_exhibition_splits_venue_with_semicolon_city_country():
+    el = _record("""
+    <section label="Artistic Exhibitions" recordId="e6">
+      <field label="Title of Work"><value type="String">A Sixth Show</value></field>
+      <field label="Venue"><value type="String">Muffathalle; Munich, Germany</value></field>
+      <field label="Date of First Performance"><value type="Date">2022-09-01</value></field>
+    </section>
+    """)
+    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
+    assert row.fields["venue"] == "Muffathalle"
+    assert row.fields["city"] == "Munich"
+    assert row.fields["country"] == "Germany"
+
+
+def test_map_artistic_exhibition_leaves_venue_whole_with_ambiguous_parenthetical():
+    el = _record("""
+    <section label="Artistic Exhibitions" recordId="e7">
+      <field label="Title of Work"><value type="String">A Seventh Show</value></field>
+      <field label="Venue"><value type="String">Muffathalle (Munich)</value></field>
+      <field label="Date of First Performance"><value type="Date">2022-09-01</value></field>
+    </section>
+    """)
+    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
+    assert row.fields["venue"] == "Muffathalle (Munich)"
+    assert row.fields["city"] == ""
+    assert row.fields["country"] == ""
+
+
+def test_map_artistic_exhibition_contributors_parses_and_filters_self():
+    el = _record("""
+    <section label="Artistic Exhibitions" recordId="e8">
+      <field label="Title of Work"><value type="String">A Group Show</value></field>
+      <field label="Venue"><value type="String">A Gallery</value></field>
+      <field label="Date of First Performance"><value type="Date">2022-01-01</value></field>
+      <field label="Contributors"><value type="String">Doe, Jane; Smith, John</value></field>
+    </section>
+    """)
+    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
+    assert row.fields["co_authors"] == "Smith, John"
+    assert row.flag is None
+
+
+def test_map_artistic_exhibition_flags_unparseable_contributors():
+    el = _record("""
+    <section label="Artistic Exhibitions" recordId="e9">
+      <field label="Title of Work"><value type="String">Another Group Show</value></field>
+      <field label="Venue"><value type="String">A Gallery</value></field>
+      <field label="Date of First Performance"><value type="Date">2021-01-01</value></field>
+      <field label="Contributors"><value type="String">John Smith and Jane Doe</value></field>
+    </section>
+    """)
+    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
+    assert row.fields["co_authors"] == ""
+    assert row.flag is not None
+
+
+def test_map_artistic_exhibition_contributors_all_self_leaves_co_authors_blank_no_flag():
+    el = _record("""
+    <section label="Artistic Exhibitions" recordId="e10">
+      <field label="Title of Work"><value type="String">Solo Show</value></field>
+      <field label="Venue"><value type="String">A Gallery</value></field>
+      <field label="Date of First Performance"><value type="Date">2020-01-01</value></field>
+      <field label="Contributors"><value type="String">Doe, Jane</value></field>
+    </section>
+    """)
+    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
+    assert row.fields["co_authors"] == ""
+    assert row.flag is None
+
+
+def test_map_artistic_exhibition_leaves_venue_whole_with_three_commas():
+    el = _record("""
+    <section label="Artistic Exhibitions" recordId="e4">
+      <field label="Title of Work"><value type="String">A Fourth Show</value></field>
+      <field label="Venue"><value type="String">Gallery A, B and C, Toronto, Ontario, Canada</value></field>
+      <field label="Date of First Performance"><value type="Date">2019-01-01</value></field>
+    </section>
+    """)
+    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
+    assert row.fields["venue"] == "Gallery A, B and C, Toronto, Ontario, Canada"
+    assert row.fields["city"] == ""
+    assert row.fields["country"] == ""
+
+
 def test_map_grant_single_funding_source():
     el = _record("""
     <section label="Research Funding History" recordId="g1">
