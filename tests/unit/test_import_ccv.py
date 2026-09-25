@@ -60,6 +60,8 @@ def test_map_presentation_with_valid_co_presenters():
     <section label="Presentations" recordId="r2">
       <field label="Presentation Title"><value type="String">My Talk</value></field>
       <field label="Conference / Event Name"><value type="String">Some Conference</value></field>
+      <field label="City"><value type="String">Berlin</value></field>
+      <field label="Location"><lov id="3">Germany</lov></field>
       <field label="Invited?"><lov id="1">Yes</lov></field>
       <field label="Keynote?"><lov id="2">No</lov></field>
       <field label="Presentation Year"><value type="Year">2023</value></field>
@@ -71,6 +73,8 @@ def test_map_presentation_with_valid_co_presenters():
     assert row.fields["title_en"] == "My Talk"
     assert row.fields["title_fr"] == ""
     assert row.fields["event_en"] == "Some Conference"
+    assert row.fields["city"] == "Berlin"
+    assert row.fields["country"] == "Germany"
     assert row.fields["invited"] == "true"
     assert row.fields["keynote"] == "false"
     assert row.fields["date"] == "2023"
@@ -501,7 +505,8 @@ def test_map_artistic_exhibition():
     assert row.fields["venue"] == "A Gallery"
     assert row.fields["start_date"] == "2021-04-10"
     assert row.fields["event"] == ""
-    assert row.fields["location"] == ""
+    assert row.fields["city"] == ""
+    assert row.fields["country"] == ""
     assert row.fields["curator"] == ""
 
 
@@ -912,6 +917,33 @@ def test_plan_import_dispatches_zotero_matched_records():
         assert len(report.flagged) == 1
         assert report.flagged[0].ccv_label == "Journal Articles"
         assert "No confident match in your citation export" in report.flagged[0].reason
+
+
+def test_plan_import_warns_once_when_citation_export_file_is_missing():
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        data_dir = _minimal_data_dir(Path(d))
+        (data_dir / "categories" / "publications.yaml").write_text(textwrap.dedent("""
+            name: publications
+            handler: publications
+            options:
+              json: reference/library.json
+            fields:
+              - {name: id, generated: true}
+              - {name: citekey, required: true}
+        """), encoding="utf-8")
+        (data_dir / "entries" / "publications.csv").write_text("id,citekey\n", encoding="utf-8")
+        xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+          <section label="Contributions"/>
+        </generic-cv:generic-cv>
+        """)
+
+        report = plan_import(data_dir, xml_path)
+
+        assert len(report.warnings) == 1
+        assert "reference/library.json" in report.warnings[0]
 
 
 def test_write_import_generates_distinct_ids_for_multiple_new_rows_same_category():
