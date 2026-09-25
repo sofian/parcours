@@ -29,7 +29,8 @@ def _no_commit(monkeypatch):
 def _write_translations(tmp_path, rows):
     import csv
     from io import StringIO
-    path = tmp_path / "translations.csv"
+    (tmp_path / "entries").mkdir(exist_ok=True)
+    path = tmp_path / "entries" / "translations.csv"
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow(["id", "category", "en", "fr"])
@@ -62,7 +63,8 @@ def test_resolve_or_literal_falls_back_to_the_id(tmp_path):
 
 
 def test_load_translations_tolerates_utf8_bom(tmp_path):
-    path = tmp_path / "translations.csv"
+    (tmp_path / "entries").mkdir()
+    path = tmp_path / "entries" / "translations.csv"
     content = "id,category,en,fr\npublications,section,Publications,Publications\n"
     path.write_text(content, encoding="utf-8-sig")
 
@@ -72,7 +74,8 @@ def test_load_translations_tolerates_utf8_bom(tmp_path):
 
 
 def test_missing_translations_does_not_crash_on_a_ragged_row(tmp_path):
-    path = tmp_path / "translations.csv"
+    (tmp_path / "entries").mkdir()
+    path = tmp_path / "entries" / "translations.csv"
     # Fewer columns than the header: csv.DictReader fills missing trailing
     # keys with None (its `restval`), not "".
     path.write_text("id,category,en,fr\nragged,section,OnlyEnglish\n", encoding="utf-8")
@@ -103,10 +106,10 @@ def test_add_translation_creates_translations_csv_with_header_and_row(tmp_path, 
     entry = add_translation(tmp_path, "location", "montreal", "Montreal", "Montréal")
 
     assert entry.id == "montreal"
-    content = (tmp_path / "translations.csv").read_text(encoding="utf-8")
+    content = (tmp_path / "entries" / "translations.csv").read_text(encoding="utf-8")
     assert content.splitlines()[0] == "id,category,en,fr"
     assert "montreal,location,Montreal,Montréal" in content
-    assert calls == [(tmp_path, "translations.csv", "Added translation location:montreal", False)]
+    assert calls == [(tmp_path, "entries/translations.csv", "Added translation location:montreal", False)]
 
 
 def test_add_translation_appends_to_existing_translations_csv(tmp_path, monkeypatch):
@@ -115,7 +118,7 @@ def test_add_translation_appends_to_existing_translations_csv(tmp_path, monkeypa
 
     add_translation(tmp_path, "location", "montreal", "Montreal", "Montréal")
 
-    table = load_translations(tmp_path / "translations.csv")
+    table = load_translations(tmp_path / "entries" / "translations.csv")
     assert table.lookup("section", "publications", "en") == "Publications"
     assert table.lookup("location", "montreal", "fr") == "Montréal"
 
@@ -138,10 +141,10 @@ def test_edit_translation_updates_matching_pair_and_keeps_others(tmp_path, monke
     updated = edit_translation(tmp_path, "location", "montreal", "Montreal", "Montréal")
 
     assert updated.fr == "Montréal"
-    table = load_translations(tmp_path / "translations.csv")
+    table = load_translations(tmp_path / "entries" / "translations.csv")
     assert table.lookup("section", "publications", "en") == "Publications"
     assert table.lookup("location", "montreal", "fr") == "Montréal"
-    assert calls == [(tmp_path, "translations.csv", "Edited translation location:montreal", False)]
+    assert calls == [(tmp_path, "entries/translations.csv", "Edited translation location:montreal", False)]
 
 
 def test_edit_translation_raises_for_unknown_pair(tmp_path, monkeypatch):
@@ -161,10 +164,10 @@ def test_delete_translation_removes_matching_pair(tmp_path, monkeypatch):
 
     delete_translation(tmp_path, "location", "montreal")
 
-    table = load_translations(tmp_path / "translations.csv")
+    table = load_translations(tmp_path / "entries" / "translations.csv")
     assert table.lookup("section", "publications", "en") == "Publications"
     assert not table.exists("location", "montreal")
-    assert calls == [(tmp_path, "translations.csv", "Deleted translation location:montreal", False)]
+    assert calls == [(tmp_path, "entries/translations.csv", "Deleted translation location:montreal", False)]
 
 
 def test_delete_translation_raises_for_unknown_pair(tmp_path, monkeypatch):
@@ -200,7 +203,7 @@ def test_edit_translation_matches_case_insensitively_and_preserves_stored_casing
     updated = edit_translation(tmp_path, "location", "Montreal", "Montreal", "Montréal")
 
     assert updated.id == "montreal"
-    table = load_translations(tmp_path / "translations.csv")
+    table = load_translations(tmp_path / "entries" / "translations.csv")
     assert table.lookup("location", "montreal", "fr") == "Montréal"
     entries = table.all()
     assert len(entries) == 1
@@ -213,5 +216,5 @@ def test_delete_translation_matches_case_insensitively(tmp_path, monkeypatch):
 
     delete_translation(tmp_path, "location", "MONTREAL")
 
-    table = load_translations(tmp_path / "translations.csv")
+    table = load_translations(tmp_path / "entries" / "translations.csv")
     assert table.all() == []
