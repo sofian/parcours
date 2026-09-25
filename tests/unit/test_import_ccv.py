@@ -1058,6 +1058,7 @@ def test_plan_import_dispatches_zotero_matched_records():
               <section label="Journal Articles" recordId="p1">
                 <field label="Article Title"><value type="String">A Widget Study</value></field>
                 <field label="Year"><value type="Year">2020</value></field>
+                <field label="Publishing Status"><lov id="1">Published</lov></field>
               </section>
               <section label="Journal Articles" recordId="p2">
                 <field label="Article Title"><value type="String">Totally Unrelated Nonexistent Title</value></field>
@@ -1071,9 +1072,78 @@ def test_plan_import_dispatches_zotero_matched_records():
         assert len(report.to_write) == 1
         assert report.to_write[0].category == "publications"
         assert report.to_write[0].fields["citekey"] == "smith2020article"
+        assert report.to_write[0].fields["status"] == "published"
         assert len(report.flagged) == 1
         assert report.flagged[0].ccv_label == "Journal Articles"
         assert "No confident match in your citation export" in report.flagged[0].reason
+
+
+def test_plan_import_maps_accepted_publishing_status():
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        data_dir = _minimal_data_dir(Path(d))
+        _add_publications_category(data_dir)
+        xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+          <section label="Contributions">
+            <section label="Publications">
+              <section label="Journal Articles" recordId="p3">
+                <field label="Article Title"><value type="String">A Widget Study</value></field>
+                <field label="Year"><value type="Year">2020</value></field>
+                <field label="Publishing Status"><lov id="2">Accepted</lov></field>
+              </section>
+            </section>
+          </section>
+        </generic-cv:generic-cv>
+        """)
+        report = plan_import(data_dir, xml_path)
+        assert report.to_write[0].fields["status"] == "accepted"
+
+
+def test_plan_import_leaves_status_blank_for_an_unrecognized_publishing_status():
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        data_dir = _minimal_data_dir(Path(d))
+        _add_publications_category(data_dir)
+        xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+          <section label="Contributions">
+            <section label="Publications">
+              <section label="Journal Articles" recordId="p4">
+                <field label="Article Title"><value type="String">A Widget Study</value></field>
+                <field label="Year"><value type="Year">2020</value></field>
+                <field label="Publishing Status"><lov id="3">Submitted</lov></field>
+              </section>
+            </section>
+          </section>
+        </generic-cv:generic-cv>
+        """)
+        report = plan_import(data_dir, xml_path)
+        assert report.to_write[0].fields["status"] == ""
+
+
+def test_plan_import_leaves_status_blank_when_publishing_status_is_missing():
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        data_dir = _minimal_data_dir(Path(d))
+        _add_publications_category(data_dir)
+        xml_path = _write_xml(data_dir, """<?xml version="1.0"?>
+        <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+          <section label="Contributions">
+            <section label="Publications">
+              <section label="Journal Articles" recordId="p5">
+                <field label="Article Title"><value type="String">A Widget Study</value></field>
+                <field label="Year"><value type="Year">2020</value></field>
+              </section>
+            </section>
+          </section>
+        </generic-cv:generic-cv>
+        """)
+        report = plan_import(data_dir, xml_path)
+        assert report.to_write[0].fields["status"] == ""
 
 
 def test_plan_import_warns_once_when_citation_export_file_is_missing():

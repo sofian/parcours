@@ -611,6 +611,18 @@ _GRANT_STATUS = {
     "Declined": "declined",
 }
 
+_PUBLICATION_STATUS = {
+    # Confirmed set from a real ~24-record export (22 "Published", 2
+    # "Accepted") — CCV's own "Publishing Status" field genuinely exists
+    # on every publication record type (Journal Articles, Books, Book
+    # Chapters, Conference Publications, ...), it just wasn't being read.
+    # An unmapped/blank CCV value (or a value not yet seen, e.g.
+    # "Submitted") falls through to blank, same as every other
+    # confirmed-subset mapping in this file — never guessed.
+    "Published": "published",
+    "Accepted": "accepted",
+}
+
 
 @_register("Research Funding History")
 def _map_grant(record_el, lang, ctx) -> MappedRow:
@@ -749,11 +761,11 @@ def plan_import(data_dir: Path, xml_path: Path) -> ImportReport:
                 ))
                 continue
             schema = schemas[category]
-            mapped = MappedRow(
-                category=category,
-                ccv_label=label,
-                fields={name: "" for name in schema.field_names() if name != "id"} | {"citekey": citekey},
-            )
+            fields = {name: "" for name in schema.field_names() if name != "id"} | {"citekey": citekey}
+            if "status" in fields:
+                status_raw = x.field_lov(record.element, "Publishing Status")
+                fields["status"] = _PUBLICATION_STATUS.get(status_raw, "")
+            mapped = MappedRow(category=category, ccv_label=label, fields=fields)
         elif label in MAPPERS:
             mapped = map_record(record.element, label, lang, ctx)
         else:

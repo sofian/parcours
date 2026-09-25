@@ -499,7 +499,13 @@ fields:
 - **Every row's citekey must resolve in the export** — no local fallback
   fields. In-progress work is added to your citation manager first
   (manuscript/preprint item types); `status` tracks the stage. `lint`
-  flags unresolved keys.
+  flags unresolved keys. `parco import ccv` populates `status`
+  automatically when it can: CCV's own "Publishing Status" field exists
+  on every publication record type and maps directly (`Published` →
+  `published`, `Accepted` → `accepted`, confirmed against a real ~24-
+  record export) — any other/blank CCV value leaves `status` blank for
+  manual completion, same as any other required-field gap `lint`
+  catches, never guessed.
 - For Zotero specifically, Better BibTeX keeps a pair of files in sync
   (BibTeX for citekeys, CSL-JSON for full metadata) — `parco` only
   reads the CSL-JSON one. No live connection to Zotero (or any other
