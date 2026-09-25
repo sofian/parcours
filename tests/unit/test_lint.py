@@ -19,20 +19,21 @@ dedup:
     as: duplicate
 """)
     (tmp_path / "vocab.yaml").write_text("widget_status: [draft, published]\n")
-    (tmp_path / "translations.csv").write_text("id,category,en,fr\nwidgets,section,Widgets,Widgets\n")
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text("id,category,en,fr\nwidgets,section,Widgets,Widgets\n")
     return tmp_path
 
 
 def test_no_issues_for_valid_data(tmp_path):
     repo = _setup_data_repo(tmp_path)
-    (repo / "widgets.csv").write_text("id,title_en,status\nwidget-1,A Widget,draft\n")
+    (repo / "entries" / "widgets.csv").write_text("id,title_en,status\nwidget-1,A Widget,draft\n")
 
     assert run_lint(repo) == []
 
 
 def test_flags_a_missing_required_field(tmp_path):
     repo = _setup_data_repo(tmp_path)
-    (repo / "widgets.csv").write_text("id,title_en,status\nwidget-1,,draft\n")
+    (repo / "entries" / "widgets.csv").write_text("id,title_en,status\nwidget-1,,draft\n")
 
     issues = run_lint(repo)
 
@@ -41,8 +42,8 @@ def test_flags_a_missing_required_field(tmp_path):
 
 def test_flags_a_missing_translation(tmp_path):
     repo = _setup_data_repo(tmp_path)
-    (repo / "translations.csv").write_text("id,category,en,fr\nwidgets,section,Widgets,\n")
-    (repo / "widgets.csv").write_text("id,title_en,status\nwidget-1,A Widget,draft\n")
+    (repo / "entries" / "translations.csv").write_text("id,category,en,fr\nwidgets,section,Widgets,\n")
+    (repo / "entries" / "widgets.csv").write_text("id,title_en,status\nwidget-1,A Widget,draft\n")
 
     issues = run_lint(repo)
 
@@ -58,8 +59,8 @@ fields:
   - {name: id, generated: true}
   - {name: title_en, required: true}
 """)
-    (repo / "widgets.csv").write_text("id,title_en,status\nwidget-1,,draft\n")
-    (repo / "gadgets.csv").write_text("id,title_en\ngadget-1,,\n")
+    (repo / "entries" / "widgets.csv").write_text("id,title_en,status\nwidget-1,,draft\n")
+    (repo / "entries" / "gadgets.csv").write_text("id,title_en\ngadget-1,,\n")
 
     issues = run_lint(repo, category_filter="widgets")
 
@@ -79,10 +80,11 @@ fields:
   - {name: citekey, required: true}
 """)
     (tmp_path / "vocab.yaml").write_text("{}\n")
-    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text("id,category,en,fr\n")
     (tmp_path / "reference").mkdir()
     (tmp_path / "reference" / "library.json").write_text(json.dumps([]))
-    (tmp_path / "publications.csv").write_text("id,citekey\npub-1,nonexistent-key\n")
+    (tmp_path / "entries" / "publications.csv").write_text("id,citekey\npub-1,nonexistent-key\n")
 
     issues = run_lint(tmp_path)
 
@@ -100,7 +102,7 @@ fields:
   - {name: status, required: true, vocab: widget_status}
   - {name: location, glossary: location}
 """)
-    (repo / "widgets.csv").write_text(
+    (repo / "entries" / "widgets.csv").write_text(
         "id,title_en,status,location\nwidget-1,A Widget,draft,Montreal\n"
     )
 
@@ -123,10 +125,10 @@ fields:
   - {name: status, required: true, vocab: widget_status}
   - {name: location, glossary: location}
 """)
-    (repo / "translations.csv").write_text(
+    (repo / "entries" / "translations.csv").write_text(
         "id,category,en,fr\nwidgets,section,Widgets,Widgets\nMontreal,location,Montreal,Montréal\n"
     )
-    (repo / "widgets.csv").write_text(
+    (repo / "entries" / "widgets.csv").write_text(
         "id,title_en,status,location\nwidget-1,A Widget,draft,Montreal\n"
     )
 
@@ -146,7 +148,7 @@ fields:
   - {name: status, required: true, vocab: widget_status}
   - {name: location, glossary: location}
 """)
-    (repo / "widgets.csv").write_text(
+    (repo / "entries" / "widgets.csv").write_text(
         "id,title_en,status,location\nwidget-1,A Widget,draft,Montreal\n"
     )
 
@@ -166,7 +168,7 @@ fields:
   - {name: title_en, required: true}
   - {name: status, required: true, vocab: nope}
 """)
-    (repo / "widgets.csv").write_text("id,title_en,status\nwidget-1,A Widget,draft\n")
+    (repo / "entries" / "widgets.csv").write_text("id,title_en,status\nwidget-1,A Widget,draft\n")
 
     with pytest.raises(ConfigError, match="nope"):
         run_lint(repo)
