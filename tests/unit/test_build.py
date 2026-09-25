@@ -30,7 +30,8 @@ fields:
   - {name: id, generated: true}
   - {name: citekey, required: true}
 """)
-    (tmp_path / "translations.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text(
         "id,category,en,fr\n"
         "grants,section,Grants,Subventions\n"
         "publications,section,Publications,Publications\n"
@@ -90,7 +91,7 @@ def test_build_resolves_identity_into_cv_block(tmp_path, monkeypatch):
 
 def test_build_resolves_a_section_title_from_translations(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date,amount,currency,co_investigators\n"
         "g1,Big Grant,Grande subvention,FRQSC,PI,2020-01,2022-01,50000,CAD,\n"
     )
@@ -108,7 +109,7 @@ def test_build_resolves_a_section_title_from_translations(tmp_path, monkeypatch)
 
 def test_build_omits_a_section_entirely_when_its_category_has_no_rows(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date,amount,currency,co_investigators\n"
         "g1,Big Grant,Grande subvention,FRQSC,PI,2020-01,2022-01,50000,CAD,\n"
     )
@@ -134,7 +135,7 @@ def test_build_omits_a_section_entirely_when_its_category_has_no_rows(tmp_path, 
 
 def test_build_maps_grant_rows_into_normal_entries(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date,amount,currency,co_investigators\n"
         "g1,Big Grant,Grande subvention,FRQSC,PI,2020-01,2022-01,50000,CAD,\n"
     )
@@ -156,7 +157,7 @@ def test_build_maps_grant_rows_into_normal_entries(tmp_path, monkeypatch):
 
 def test_build_respects_section_filter_order_by_and_limit(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date,amount,currency,co_investigators\n"
         "g1,First,Premier,FRQSC,PI,2020-01,2021-01,,,\n"
         "g2,Second,Deuxieme,SSHRC,co-PI,2019-01,2020-06,,,\n"
@@ -185,7 +186,7 @@ def test_build_merges_zotero_fields_for_publications_backed_handler(tmp_path, mo
             "issued": {"date-parts": [[2024, 3]]},
         }
     ]))
-    (repo / "publications.csv").write_text("id,citekey\np1,doe2024widgets\n")
+    (repo / "entries" / "publications.csv").write_text("id,citekey\np1,doe2024widgets\n")
     profile = Profile(
         meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},
         sections=[{"id": "publications", "source": "publications"}],
@@ -207,7 +208,7 @@ def test_build_leaves_zotero_fields_absent_for_an_unresolved_citekey(tmp_path, m
     repo = _setup_data_repo(tmp_path)
     (repo / "reference").mkdir()
     (repo / "reference" / "library.json").write_text(json.dumps([]))
-    (repo / "publications.csv").write_text("id,citekey\np1,nonexistent-key\n")
+    (repo / "entries" / "publications.csv").write_text("id,citekey\np1,nonexistent-key\n")
     profile = Profile(
         meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},
         sections=[{"id": "publications", "source": "publications"}],
@@ -234,7 +235,7 @@ def test_run_build_refuses_when_a_referenced_category_has_a_lint_error(tmp_path,
     (repo / "vocab.yaml").write_text("{}\n")
     (repo / "views.yaml").write_text("")
     # A grant missing its required `funder` — a real lint error.
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date,amount,currency,co_investigators\n"
         "g1,Big Grant,Grande subvention,,PI,2020-01,2022-01,,,\n"
     )
@@ -252,7 +253,7 @@ def test_run_build_force_skips_the_lint_gate(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     (repo / "vocab.yaml").write_text("{}\n")
     (repo / "views.yaml").write_text("")
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date,amount,currency,co_investigators\n"
         "g1,Big Grant,Grande subvention,,PI,2020-01,2022-01,,,\n"
     )
@@ -348,7 +349,7 @@ def test_lint_gate_uses_the_views_underlying_category_not_the_view_name(tmp_path
     (repo / "vocab.yaml").write_text("{}\n")
     (repo / "views.yaml").write_text("")
     # A grant missing its required `funder` — a real lint error.
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date,amount,currency,co_investigators\n"
         "g1,Big Grant,Grande subvention,,PI,2020-01,2022-01,,,\n"
     )
@@ -369,7 +370,7 @@ def test_lint_gate_uses_the_views_underlying_category_not_the_view_name(tmp_path
 
 def test_build_rendercv_data_resolves_the_schema_via_the_views_source(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "grants.csv").write_text(
+    (repo / "entries" / "grants.csv").write_text(
         "id,title_en,title_fr,funder,role,start_date,end_date,amount,currency,co_investigators\n"
         "g1,Big Grant,Grande subvention,FRQSC,PI,2020-01,2022-01,,,\n"
     )
@@ -401,12 +402,12 @@ fields:
   - {name: title_en}
   - {name: location, glossary: location}
 """)
-    (repo / "translations.csv").write_text(
+    (repo / "entries" / "translations.csv").write_text(
         "id,category,en,fr\n"
         "exhibitions,section,Exhibitions,Expositions\n"
         "montreal,location,\"Montreal, Canada\",\"Montréal, Canada\"\n"
     )
-    (repo / "exhibitions.csv").write_text("id,title_en,location\ne1,A Show,montreal\n")
+    (repo / "entries" / "exhibitions.csv").write_text("id,title_en,location\ne1,A Show,montreal\n")
     view = ViewSpec(
         name="exhibitions", source="exhibitions", entry_type="NormalEntry",
         fields={"name": "{title}", "location": "{location}"},
@@ -442,7 +443,7 @@ fields:
   - {name: title_en}
   - {name: location, glossary: location}
 """)
-    (repo / "exhibitions.csv").write_text("id,title_en,location\ne1,A Show,Reykjavik Iceland\n")
+    (repo / "entries" / "exhibitions.csv").write_text("id,title_en,location\ne1,A Show,Reykjavik Iceland\n")
     view = ViewSpec(
         name="exhibitions", source="exhibitions", entry_type="NormalEntry",
         fields={"name": "{title}", "location": "{location}"},
