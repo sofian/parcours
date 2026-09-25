@@ -697,7 +697,8 @@ def _minimal_data_dir(tmp_path):
           - when: [{exact: organization}, {exact: degree_type}, {same_year: start_date}]
             as: duplicate
     """), encoding="utf-8")
-    (tmp_path / "education.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "education.csv").write_text(
         "id,degree_type,degree_name_en,degree_name_fr,specialization_en,specialization_fr,"
         "organization,degree_status,start_date,end_date,thesis_title,advisor,note_en,note_fr\n",
         encoding="utf-8",
@@ -791,7 +792,7 @@ def test_plan_import_flags_dedup_duplicate_but_still_writes_it():
         data_dir = _minimal_data_dir(Path(d))
         # Seed an existing row that will collide via the dedup rule
         # (exact organization, exact degree_type, same_year start_date).
-        (data_dir / "education.csv").write_text(
+        (data_dir / "entries" / "education.csv").write_text(
             "id,degree_type,degree_name_en,degree_name_fr,specialization_en,specialization_fr,"
             "organization,degree_status,start_date,end_date,thesis_title,advisor,note_en,note_fr\n"
             "exist1,doctorate,,,,,Test University,completed,2018-09,,,,,\n",
@@ -845,12 +846,12 @@ def test_write_import_writes_rows_and_never_commits():
         report = plan_import(data_dir, xml_path)
         touched = write_import(data_dir, report)
 
-        assert touched == ["education.csv"]
-        content = (data_dir / "education.csv").read_text(encoding="utf-8")
+        assert touched == ["entries/education.csv"]
+        content = (data_dir / "entries" / "education.csv").read_text(encoding="utf-8")
         assert "doctorate" in content
 
         status = subprocess.run(["git", "status", "--porcelain"], cwd=data_dir, check=True, capture_output=True, text=True)
-        assert "education.csv" in status.stdout  # uncommitted
+        assert "entries/education.csv" in status.stdout  # uncommitted
 
 
 def _add_publications_category(data_dir):
@@ -870,7 +871,7 @@ def _add_publications_category(data_dir):
           - {name: note_en}
           - {name: note_fr}
     """), encoding="utf-8")
-    (data_dir / "publications.csv").write_text(
+    (data_dir / "entries" / "publications.csv").write_text(
         "id,weight,citekey,status,refereed,invited,featured,note_en,note_fr\n",
         encoding="utf-8",
     )
@@ -946,7 +947,7 @@ def test_write_import_generates_distinct_ids_for_multiple_new_rows_same_category
 
         write_import(data_dir, report)
 
-        rows = (data_dir / "education.csv").read_text(encoding="utf-8").splitlines()[1:]
+        rows = (data_dir / "entries" / "education.csv").read_text(encoding="utf-8").splitlines()[1:]
         ids = [row.split(",")[0] for row in rows]
         assert len(ids) == 2
         assert len(set(ids)) == 2  # distinct, no collision
