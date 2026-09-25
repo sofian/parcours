@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Callable
 
 from . import ccv_xml as x
-from .data import load_category_rows
+from .data import category_csv_path, load_category_rows
 from .entries import generate_id, write_all_rows
 from .handlers import load_handler
 from .handlers.base import HandlerContext
@@ -71,6 +71,7 @@ class ImportReport:
     notes: list[FlaggedRecord] = field(default_factory=list)
     skipped_labels: dict[str, int] = field(default_factory=dict)
     dedup_matches: dict[int, list] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
 
 
 _DEGREE_TYPE = {
@@ -183,7 +184,8 @@ def _map_presentation(record_el, lang, ctx) -> MappedRow:
             "title_fr": title_fr,
             "event_en": event_en,
             "event_fr": event_fr,
-            "location": "",
+            "city": x.field_text(record_el, "City"),
+            "country": x.field_lov(record_el, "Location"),
             "invited": _YES_NO.get(x.field_lov(record_el, "Invited?"), ""),
             "keynote": _YES_NO.get(x.field_lov(record_el, "Keynote?"), ""),
             "date": x.field_year(record_el, "Presentation Year"),
@@ -544,7 +546,8 @@ def _map_exhibition(record_el, lang, ctx) -> MappedRow:
             "title_fr": title_fr,
             "event": "",
             "venue": x.field_text(record_el, "Venue"),
-            "location": "",
+            "city": "",
+            "country": "",
             "curator": "",
             "start_date": x.field_date(record_el, "Date of First Performance"),
             "end_date": "",
@@ -684,6 +687,8 @@ def plan_import(data_dir: Path, xml_path: Path) -> ImportReport:
     }
 
     report = ImportReport()
+    for handler in handlers.values():
+        report.warnings.extend(handler.setup_warnings())
 
     for record in records:
         label = record.label
@@ -738,7 +743,8 @@ def write_import(data_dir: Path, report: ImportReport) -> list[str]:
         rows = load_category_rows(data_dir, mapped.category)
         row_id = generate_id(data_dir, mapped.category)
         rows.append({"id": row_id, **mapped.fields})
-        write_all_rows(data_dir / f"{mapped.category}.csv", schema.field_names(), rows)
-        touched.add(f"{mapped.category}.csv")
+        csv_path = category_csv_path(data_dir, mapped.category)
+        write_all_rows(csv_path, schema.field_names(), rows)
+        touched.add(csv_path.relative_to(data_dir).as_posix())
 
     return sorted(touched)
