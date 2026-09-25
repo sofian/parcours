@@ -20,7 +20,8 @@ dedup:
     as: duplicate
 """)
     (tmp_path / "vocab.yaml").write_text("widget_status: [draft, published]\n")
-    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text("id,category,en,fr\n")
     return tmp_path
 
 
@@ -35,7 +36,7 @@ def test_add_writes_a_new_row_and_commits(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.stdout
     assert "Added widgets entry" in result.stdout
-    content = (repo / "widgets.csv").read_text(encoding="utf-8")
+    content = (repo / "entries" / "widgets.csv").read_text(encoding="utf-8")
     assert "A Widget" in content
     assert ",draft" in content
 
@@ -50,12 +51,12 @@ def test_add_aborts_when_confirm_declined(tmp_path, monkeypatch):
 
     assert result.exit_code == 0
     assert "Aborted" in result.stdout
-    assert not (repo / "widgets.csv").exists()
+    assert not (repo / "entries" / "widgets.csv").exists()
 
 
 def test_add_warns_on_duplicate_and_can_proceed_anyway(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
-    (repo / "widgets.csv").write_text("id,title_en,status\nabc123,A Widget,draft\n", encoding="utf-8")
+    (repo / "entries" / "widgets.csv").write_text("id,title_en,status\nabc123,A Widget,draft\n", encoding="utf-8")
     monkeypatch.chdir(repo)
     monkeypatch.setattr("parcours.core.entries.git_commit", lambda *a, **k: None)
     monkeypatch.setattr("parcours.core.entries.is_file_dirty", lambda *a, **k: False)
@@ -65,7 +66,7 @@ def test_add_warns_on_duplicate_and_can_proceed_anyway(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.stdout
     assert "Possible duplicates found" in result.stdout
-    content = (repo / "widgets.csv").read_text(encoding="utf-8")
+    content = (repo / "entries" / "widgets.csv").read_text(encoding="utf-8")
     assert content.count("A Widget") == 2
 
 
@@ -81,7 +82,7 @@ def test_add_prefill_flags_are_used_as_wizard_defaults(tmp_path, monkeypatch):
     )
 
     assert result.exit_code == 0, result.stdout
-    content = (repo / "widgets.csv").read_text(encoding="utf-8")
+    content = (repo / "entries" / "widgets.csv").read_text(encoding="utf-8")
     assert "Prefilled Widget" in content
 
 

@@ -16,8 +16,9 @@ fields:
   - {name: title_en, required: true}
 """)
     (tmp_path / "vocab.yaml").write_text("{}\n")
-    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
-    (tmp_path / "widgets.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "entries" / "widgets.csv").write_text(
         "id,title_en\nabc123,First Widget\ndef456,Second Widget\n", encoding="utf-8"
     )
     return tmp_path
@@ -33,7 +34,7 @@ def test_delete_confirms_and_removes_the_row(tmp_path, monkeypatch):
     result = runner.invoke(app, ["delete", "widgets", "--search", "First"], input="1\ny\n")
 
     assert result.exit_code == 0, result.stdout
-    content = (repo / "widgets.csv").read_text(encoding="utf-8")
+    content = (repo / "entries" / "widgets.csv").read_text(encoding="utf-8")
     assert "First Widget" not in content
     assert "Second Widget" in content
 
@@ -46,7 +47,7 @@ def test_delete_aborts_when_confirm_declined(tmp_path, monkeypatch):
 
     assert result.exit_code == 0
     assert "Aborted" in result.stdout
-    content = (repo / "widgets.csv").read_text(encoding="utf-8")
+    content = (repo / "entries" / "widgets.csv").read_text(encoding="utf-8")
     assert "First Widget" in content
 
 

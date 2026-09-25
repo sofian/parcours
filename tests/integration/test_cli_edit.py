@@ -17,8 +17,9 @@ fields:
   - {name: status, required: true, vocab: widget_status}
 """)
     (tmp_path / "vocab.yaml").write_text("widget_status: [draft, published]\n")
-    (tmp_path / "translations.csv").write_text("id,category,en,fr\n")
-    (tmp_path / "widgets.csv").write_text(
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "translations.csv").write_text("id,category,en,fr\n")
+    (tmp_path / "entries" / "widgets.csv").write_text(
         "id,title_en,status\nabc123,First Widget,draft\ndef456,Second Widget,draft\n",
         encoding="utf-8",
     )
@@ -37,7 +38,7 @@ def test_edit_finds_by_search_and_updates(tmp_path, monkeypatch):
     )
 
     assert result.exit_code == 0, result.stdout
-    content = (repo / "widgets.csv").read_text(encoding="utf-8")
+    content = (repo / "entries" / "widgets.csv").read_text(encoding="utf-8")
     assert "First Widget (revised)" in content
     assert ",published" in content
     assert "abc123" in content
@@ -55,7 +56,7 @@ def test_edit_prefills_wizard_with_existing_values(tmp_path, monkeypatch):
     )
 
     assert result.exit_code == 0, result.stdout
-    content = (repo / "widgets.csv").read_text(encoding="utf-8")
+    content = (repo / "entries" / "widgets.csv").read_text(encoding="utf-8")
     assert "First Widget" in content
     assert ",draft" in content
 
