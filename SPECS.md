@@ -57,6 +57,25 @@ plus CV-specific fields the export doesn't track.
   `publications.csv`, `grants.csv`, `artworks.csv`, `students.csv`).
   Chosen over YAML/ODS for portability, git-diffability, and native
   spreadsheet-app editability.
+- **Location:** every category CSV, plus `translations.csv`, lives under
+  `entries/` in the data repo (`entries/publications.csv`,
+  `entries/translations.csv`, ...) — grouped together because both are
+  literal CSVs the tool reads/writes as rows, as opposed to the
+  structured config living at the repo root (`parco.yaml`, `vocab.yaml`,
+  `views.yaml`, `identity.yaml`) or the schema definitions under
+  `categories/`. `reference/` (citation export, future `rates.csv`) is
+  deliberately separate: fetched/derived reference data the tool
+  consults, not entries the user authors. The folder name matches
+  `core/entries.py`'s existing add/edit/delete vocabulary and every
+  auto-commit message's own wording ("Added `<category>` entry
+  `<id>`"). One canonical path helper per file kind (`core/data.py`'s
+  `category_csv_path()`, `core/translations.py`'s
+  `translations_csv_path()`) is the single source of truth for this
+  location — every reader/writer (including `parco query`'s raw-SQL
+  view registration, which just globs `entries/*.csv`) goes through it
+  rather than rebuilding the path locally. No migration tooling for
+  pre-existing repos in the old layout — pre-1.0, no real data repo
+  exists yet; move the files by hand.
 - **No cross-references between tables for v1** (explicit decision — no
   foreign keys, no relational joins between e.g. publications and grants).
 - **IDs:** a bare 6-hex-character random token (e.g. `a3f9c2`), generated
@@ -1907,17 +1926,21 @@ for:
 ("Initialized parco data repo"):
 - `parco.yaml` (the repo marker + `currency` config)
 - all 19 categories, always, regardless of which you'll actually use:
-  an empty (header-only) CSV plus a `categories/<name>.yaml` schema for
-  each — an unused category costs nothing: `lint` has nothing to flag
-  on an empty category, though `build` currently still emits an
-  (empty) section heading for it rather than omitting it; that's a
-  cosmetic gap in `build`'s own section-assembly step, tracked as a
-  follow-up, not something `init` needs to work around
-- `vocab.yaml`, `translations.csv` — copied verbatim from the tool's
-  bundled starter config, not wizard-generated (these are broad,
+  an empty (header-only) CSV under `entries/<name>.csv` plus a
+  `categories/<name>.yaml` schema for each — an unused category costs
+  nothing: `lint` has nothing to flag on an empty category, though
+  `build` currently still emits an (empty) section heading for it
+  rather than omitting it; that's a cosmetic gap in `build`'s own
+  section-assembly step, tracked as a follow-up, not something `init`
+  needs to work around
+- `vocab.yaml`, `entries/translations.csv` — copied verbatim from the
+  tool's bundled starter config, not wizard-generated (these are broad,
   reusable defaults, not personal to any one user); `translations.csv`
-  additionally ships pre-populated with ~195 `category: country`
-  glossary rows (see Translations) so `city`/`country`-backed fields on
+  additionally ships pre-populated with 209 `category: country`
+  glossary rows (see Translations) — the ~195 sovereign states, plus a
+  handful of official ISO long-form names and common acronyms (USA,
+  UK, UAE, ...) that real-world data sources use in place of the short
+  form — so `city`/`country`-backed fields on
   `presentations`/`exhibitions`/`curatorship`/`residencies` mostly
   resolve correctly with no manual translation work
 - `views.yaml` — copied verbatim from the already-built
@@ -2190,7 +2213,7 @@ blocking the whole run).
 
 ### Auto-commit (per-write, not the same thing as `sync`) — conditional on a clean file
 Every `add`/`edit`/`delete` that reaches a write commits it to the data
-repo immediately — `git add <category>.csv && git commit -m "..."` —
+repo immediately — `git add entries/<category>.csv && git commit -m "..."` —
 because git history *is* the undo mechanism (see Behavioral requirements
 in CLAUDE.md; no soft-delete exists anywhere in this tool). This is a
 plain local commit with no remote interaction, owned by `entries.py`
@@ -2218,7 +2241,8 @@ parco commit -m "<message>"     # same, with a custom commit message
 ```
 A thin wrapper: `git add -A && git commit -m "<message>"` scoped to the
 data repo. With no `-m`, the message is generated from the changed
-filenames (e.g. `"Updated education.csv, grants.csv"`). This is the
+filenames, exactly as `git status` reports them (e.g. `"Updated
+entries/education.csv, entries/grants.csv"`). This is the
 general-purpose "make it official" step for anything that was written
 without an immediate auto-commit: a hand-edit to a CSV made outside
 `parco` entirely, or (the main case) finishing a review pass after
@@ -2227,7 +2251,7 @@ error) if the working tree is already clean.
 
 ### Refresh (catch up with an external source that updates on its own)
 ```
-parco refresh zotero --collection "<name>"   # sync publications.csv against a Zotero collection
+parco refresh zotero --collection "<name>"   # sync entries/publications.csv against a Zotero collection
 parco refresh rates                           # (re-)fetch monthly exchange rates into reference/rates.csv
 parco refresh all                             # run every refreshable source
 ```
