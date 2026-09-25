@@ -79,9 +79,9 @@ Your data lives in a **separate, private repository** (grant amounts and student
 |------|---------|
 | `parco.yaml` | Marker file: `parco` finds your data by searching upward from the current directory for it (falling back to `~/.config/parco/config.yaml`; `--data-dir` / `PARCO_DATA_DIR` override) |
 | `categories/*.yaml` | One schema per category — all 19: publications, grants, artworks, students, teaching, service, outreach, presentations, press, review, catalog, education, positions, recognitions, exhibitions, curatorship, residencies, software, skills |
-| `*.csv` (one per category) | The actual entries, one row per record |
+| `entries/*.csv` (one per category) | The actual entries, one row per record |
 | `vocab.yaml` | Controlled vocabularies (publication type, grant role, …), enforced on write and by `parco lint` |
-| `translations.csv` | Translations (`id, category, en, fr`) for section titles and content glossaries (e.g. place names) |
+| `entries/translations.csv` | Translations (`id, category, en, fr`) for section titles and content glossaries (e.g. place names) |
 | `identity.yaml` | Your name and one or more identity variants (e.g. "academic") — email, phone, headline per variant |
 | `views.yaml` | Named views that profiles draw from: table, field mapping, and RenderCV entry type |
 | `profiles/*.yaml` | One file per CV variant/language: metadata, theme, and an ordered list of sections — a base profile can hold everything a language doesn't need to repeat, via `extends` |

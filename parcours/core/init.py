@@ -15,6 +15,7 @@ import yaml
 
 from .data import category_csv_path
 from .schema import CategorySchema, load_all_schemas, load_category_schema
+from .translations import translations_csv_path
 from .views import load_views
 
 
@@ -223,7 +224,7 @@ def scaffold_repo(path: Path, answers: InitAnswers) -> None:
     _copy_categories_and_csvs(path, starter_dir)
     _set_citation_export_path(path, answers.citation_export_path)
     shutil.copy2(starter_dir / "vocab.yaml", path / "vocab.yaml")
-    shutil.copy2(starter_dir / "translations.csv", path / "entries" / "translations.csv")
+    shutil.copy2(starter_dir / "translations.csv", translations_csv_path(path))
     shutil.copy2(starter_dir / "views.yaml", path / "views.yaml")
     _write_identity_yaml(path, answers)
     _write_profiles(path, answers)
