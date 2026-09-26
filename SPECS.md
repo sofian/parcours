@@ -331,12 +331,14 @@ Recording) showed three genuinely different shapes:
   Performance`, `Contribution Role`, `Contributors`) is date-and-venue-shaped,
   describing a work *exhibited/performed somewhere* — this is `exhibitions`,
   not `artworks`, and by record count is the single largest chain in a real
-  export, not a marginal case. `exhibitions`' own `event`/`curator` have
-  no CCV source at all, so every imported row needs manual completion of
-  those two; `city`/`country` (split back out of the single `Venue`
-  value) and `co_authors` (from `Contributors`, same as `artworks`) *do*
-  get populated from CCV, just not from a dedicated field of their own
-  — see the `exhibitions` schema section below for both.
+  export, not a marginal case. `exhibitions`' own `title_en`/`title_fr`,
+  `event`, and `curator` have no CCV source at all — `Title of Work` and
+  `Contributors` name the *artwork* shown, which is already `artworks.csv`'s
+  own data, so importing them again under an exhibition's own title/
+  co_authors would misrepresent what the data means — so every imported row
+  needs manual completion of title/event/curator; only `city`/`country`
+  (split back out of the single `Venue` value) get populated from CCV — see
+  the `exhibitions` schema section below.
 - **Visual Artworks** and **Audio Recordings** (`Artwork/Piece Title`,
   `Publication/Release Date`, `Contribution Role`, `Contributors`) are
   authorship-shaped and match `artworks` as originally mapped — just a
@@ -1059,10 +1061,10 @@ dedup:
 
 Maps from CCV's Artistic Exhibitions (see CCV export structure, above)
 — the single largest record chain in a real export (43 records) — with
-`event`/`curator` left blank on import (no CCV source for either) for
-manual completion afterward. `city`/`country` and `co_authors` *do*
-have a CCV source, despite CCV having no dedicated fields for them —
-see the two bullets below.
+`title_en`/`title_fr`, `event`, and `curator` left blank on import for
+manual completion afterward. Only `city`/`country` have an effective
+CCV source, despite CCV having no dedicated fields for them either —
+see the bullet below.
 
 ```yaml
 name: exhibitions
@@ -1077,7 +1079,6 @@ fields:
   - {name: city,         required: true, glossary: city}
   - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — credited curator(s)
-  - {name: co_authors,   type: person_list}                          # other exhibiting artists (not you) — "Last, First; Last, First"
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}              # blank = single-day event or unknown
 require_one_of:
@@ -1100,12 +1101,14 @@ dedup:
   comma form outright; the other 16 are left as a single `venue` string
   with `city`/`country` blank, same as any other required-field gap
   `parco lint` catches afterward).
-- `co_authors` maps CCV's `Contributors` field exactly like `artworks`
-  does (see that section's notes) — same `person_list` parsing, same
-  self-name filtering via `identity.yaml`, same manual-review flag on an
-  unparseable value. Verified against the real export: 40/43 records'
-  `Contributors` value already parses cleanly as `"Last, First; Last,
-  First"`, the other 3 get flagged.
+- `title_en`/`title_fr` are always left blank on import, deliberately:
+  CCV's "Title of Work" and "Contributors" name the *artwork* shown, not
+  the exhibition itself, and that's already `artworks.csv`'s own data —
+  importing it again here under an exhibition's own title (or a
+  `co_authors` field) would duplicate `artworks.csv` under a label that
+  misrepresents what the data means. CCV has no field for an
+  exhibition's own name at all, so this is genuinely manual, same as
+  `event`/`curator`.
 - Scoped strictly to exhibitions **you exhibited in** — no `role`
   field; a separate `curatorship` category below covers when you were
   the curator instead.

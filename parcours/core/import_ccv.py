@@ -568,32 +568,29 @@ def _split_venue_city_country(raw_venue: str) -> tuple[str, str, str]:
 
 @_register("Artistic Exhibitions")
 def _map_exhibition(record_el, lang, ctx) -> MappedRow:
-    title_fr, title_en = x.field_single_language(record_el, "Title of Work", lang)
     venue, city, country = _split_venue_city_country(x.field_text(record_el, "Venue"))
-
-    raw_contributors = x.field_text(record_el, "Contributors")
-    filtered_contributors = _remove_self_from_contributors(raw_contributors, ctx.own_name)
-    co_authors = x.try_person_list_any(filtered_contributors)
-    flag = None
-    if filtered_contributors and co_authors is None:
-        flag = f"co_authors could not be parsed as 'Last, First' from CCV's raw Contributors value: {raw_contributors!r}"
 
     return MappedRow(
         category="exhibitions",
         ccv_label="Artistic Exhibitions",
         fields={
-            "title_en": title_en,
-            "title_fr": title_fr,
+            # CCV's "Title of Work" and "Contributors" name the artwork
+            # shown, not the exhibition itself — that's already artworks.csv's
+            # job, and duplicating it here under an "exhibition title"/
+            # "co_authors" label would misrepresent what the data means.
+            # CCV has no field for the exhibition's own name at all, so
+            # title_en/title_fr are left blank for manual entry, same as
+            # event/curator below.
+            "title_en": "",
+            "title_fr": "",
             "event": "",
             "venue": venue,
             "city": city,
             "country": country,
             "curator": "",
-            "co_authors": co_authors or "",
             "start_date": x.field_date(record_el, "Date of First Performance"),
             "end_date": "",
         },
-        flag=flag,
     )
 
 

@@ -514,7 +514,7 @@ def test_map_artistic_exhibition():
     """)
     row = map_record(el, "Artistic Exhibitions", "en", _ctx())
     assert row.category == "exhibitions"
-    assert row.fields["title_en"] == "A Show"
+    assert row.fields["title_en"] == ""
     assert row.fields["venue"] == "A Gallery"
     assert row.fields["start_date"] == "2021-04-10"
     assert row.fields["event"] == ""
@@ -591,48 +591,6 @@ def test_map_artistic_exhibition_leaves_venue_whole_with_ambiguous_parenthetical
     assert row.fields["venue"] == "Muffathalle (Munich)"
     assert row.fields["city"] == ""
     assert row.fields["country"] == ""
-
-
-def test_map_artistic_exhibition_contributors_parses_and_filters_self():
-    el = _record("""
-    <section label="Artistic Exhibitions" recordId="e8">
-      <field label="Title of Work"><value type="String">A Group Show</value></field>
-      <field label="Venue"><value type="String">A Gallery</value></field>
-      <field label="Date of First Performance"><value type="Date">2022-01-01</value></field>
-      <field label="Contributors"><value type="String">Doe, Jane; Smith, John</value></field>
-    </section>
-    """)
-    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
-    assert row.fields["co_authors"] == "Smith, John"
-    assert row.flag is None
-
-
-def test_map_artistic_exhibition_flags_unparseable_contributors():
-    el = _record("""
-    <section label="Artistic Exhibitions" recordId="e9">
-      <field label="Title of Work"><value type="String">Another Group Show</value></field>
-      <field label="Venue"><value type="String">A Gallery</value></field>
-      <field label="Date of First Performance"><value type="Date">2021-01-01</value></field>
-      <field label="Contributors"><value type="String">Anonymous</value></field>
-    </section>
-    """)
-    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
-    assert row.fields["co_authors"] == ""
-    assert row.flag is not None
-
-
-def test_map_artistic_exhibition_contributors_all_self_leaves_co_authors_blank_no_flag():
-    el = _record("""
-    <section label="Artistic Exhibitions" recordId="e10">
-      <field label="Title of Work"><value type="String">Solo Show</value></field>
-      <field label="Venue"><value type="String">A Gallery</value></field>
-      <field label="Date of First Performance"><value type="Date">2020-01-01</value></field>
-      <field label="Contributors"><value type="String">Doe, Jane</value></field>
-    </section>
-    """)
-    row = map_record(el, "Artistic Exhibitions", "en", _ctx())
-    assert row.fields["co_authors"] == ""
-    assert row.flag is None
 
 
 def test_map_artistic_exhibition_leaves_venue_whole_with_three_commas():

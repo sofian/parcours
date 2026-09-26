@@ -176,7 +176,6 @@ exhibitions:
       - "{event}"
       - "{venue}"
       - "{curator}"
-      - "{co_authors}"
 
 curatorship:
   source: curatorship
