@@ -7,7 +7,8 @@ fields:
   - {name: title_fr}                                                    # usually only one filled
   - {name: event_en}
   - {name: event_fr}                                                    # Conference / Event Name — usually only one filled (e.g. "Colloque ACFAS" has no English name)
-  - {name: location,  required: true, glossary: location}                                   # city + country as one glossary-backed value, e.g. "Berlin, Germany"
+  - {name: city,      required: true, glossary: city}                                        # e.g. "The Hague"
+  - {name: country,   required: true, glossary: country}                                     # e.g. "Netherlands" — pre-populated in translations.csv at `init`, see Translations
   - {name: invited,   type: bool}
   - {name: keynote,   type: bool}
   - {name: date,      type: date, precision: month, required: true}     # at least year+month, like grants.start_date
