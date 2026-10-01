@@ -77,3 +77,18 @@ def test_resolve_template_list_resolves_each_item_and_drops_blanks():
 
 def test_resolve_template_non_string_non_list_passes_through():
     assert resolve_template(None, {"x": "y"}, "en") is None
+
+
+def test_resolve_template_pipe_falls_back_to_the_next_field_when_blank():
+    row = {"title_en": "", "title_fr": "", "event": "MUTEK", "venue": "SAT"}
+    assert resolve_template("{title|event|venue}", row, "en") == "MUTEK"
+
+
+def test_resolve_template_pipe_uses_the_first_field_when_present():
+    row = {"title_en": "Show", "event": "MUTEK"}
+    assert resolve_template("{title|event}", row, "en") == "Show"
+
+
+def test_resolve_template_pipe_works_inside_a_compound_string():
+    row = {"title_en": "", "event_fr": "Festival", "city": "Paris"}
+    assert resolve_template("{title|event} ({city})", row, "en") == "Festival (Paris)"

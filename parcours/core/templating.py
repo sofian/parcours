@@ -5,7 +5,7 @@ plain dicts — no file I/O, no category/schema knowledge."""
 
 import re
 
-_PLACEHOLDER = re.compile(r"\{(\w+)\}")
+_PLACEHOLDER = re.compile(r"\{(\w+(?:\|\w+)*)\}")
 
 
 def resolve_field(row: dict, field_name: str, language: str):
@@ -30,6 +30,18 @@ def resolve_field(row: dict, field_name: str, language: str):
     return row.get(field_name)
 
 
+def _resolve_alternatives(row: dict, spec: str, language: str):
+    """`{a|b|c}`: the first of the listed fields with a non-blank value
+    (each resolved bilingually), e.g. an untitled festival entry falling
+    back to its event name."""
+    value = None
+    for field_name in spec.split("|"):
+        value = resolve_field(row, field_name, language)
+        if value:
+            return value
+    return value
+
+
 def resolve_template(template, row: dict, language: str):
     """`template` is a plain field name with no braces at all (direct
     copy, any type), a bare `"{field}"` (bilingual-resolved via
@@ -37,7 +49,8 @@ def resolve_template(template, row: dict, language: str):
     already a list — needed for `PublicationEntry.authors`), a compound
     string mixing `{field}`s and literal text (always stringified), or a
     list of any of the above (each resolved independently, blank/falsy
-    results dropped — used for `highlights`)."""
+    results dropped — used for `highlights`). A placeholder may list
+    fallbacks, `{title|event}`, taking the first non-blank one."""
     if isinstance(template, list):
         resolved = [resolve_template(item, row, language) for item in template]
         return [value for value in resolved if value]
@@ -50,10 +63,10 @@ def resolve_template(template, row: dict, language: str):
 
     bare_match = _PLACEHOLDER.fullmatch(template)
     if bare_match:
-        return resolve_field(row, bare_match.group(1), language)
+        return _resolve_alternatives(row, bare_match.group(1), language)
 
     def _substitute(match):
-        value = resolve_field(row, match.group(1), language)
+        value = _resolve_alternatives(row, match.group(1), language)
         return str(value) if value else ""
 
     return _PLACEHOLDER.sub(_substitute, template)

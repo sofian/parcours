@@ -1648,6 +1648,9 @@ populate `PublicationEntry.authors: list[str]` directly. Every other
 template shape (a compound string mixing multiple `{field}`s and/or
 literal text, or a value that isn't a list) always produces a string,
 same as `highlights`' own list-of-separately-resolved-strings shape.
+A placeholder can list fallbacks separated by `|` — `"{title|event|venue}"`
+resolves to the first non-blank one — so a view can still name an entry
+whose optional title is blank (a festival appearance listed by festival).
 
 **Zotero-backed views (`publications`, `review`, `catalog`):** these
 categories' `fields` templates reference the *resolved Zotero CSL-JSON
