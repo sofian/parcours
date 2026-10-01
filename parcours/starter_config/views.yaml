@@ -110,7 +110,7 @@ presentations:
   source: presentations
   entry_type: NormalEntry
   fields:
-    name: "{title}"
+    name: "{title|event}"
     date: date
     summary: "{event}"
     highlights:
@@ -169,7 +169,7 @@ exhibitions:
   source: exhibitions
   entry_type: NormalEntry
   fields:
-    name: "{title}"
+    name: "{title|event|venue}"
     start_date: start_date
     end_date: end_date
     location: "{city}, {country}"
@@ -182,7 +182,7 @@ curatorship:
   source: curatorship
   entry_type: NormalEntry
   fields:
-    name: "{title}"
+    name: "{title|event|venue}"
     start_date: start_date
     end_date: end_date
     location: "{city}, {country}"

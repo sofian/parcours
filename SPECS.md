@@ -801,8 +801,7 @@ fields:
   - {name: co_presenters,   type: person_list}                            # "Last, First; Last, First"
   - {name: url}
 require_one_of:
-  - [title_en, title_fr]
-  - [event_en, event_fr]
+  - [event_en, event_fr]                                               # title is optional: a panel/festival may only have an event name
 dedup:
   - when: [{fuzzy: [title_en, title_fr]}, {same_year: date}]
     as: duplicate
@@ -820,8 +819,10 @@ dedup:
   month identifies the term).
 - `title` follows the artworks pattern: CCV's single `Presentation
   Title` splits to `title_en`/`title_fr`, import fills the matching side
-  and leaves the other blank — `require_one_of` covers the common case
-  where only one language is ever given.
+  and leaves the other blank. Unlike artworks, a title isn't required at
+  all — a real CV lists panels and festival appearances by event only —
+  so only `event` is under `require_one_of`, and the view names the entry
+  `"{title|event}"`.
 - **`location` split back into `city` + `country`** (see Translations
   for the full mechanism). This was tried both ways: originally two
   fields matching CCV's own split, then collapsed into one combined
@@ -1109,8 +1110,7 @@ fields:
   - {name: start_date,   type: date, precision: year, required: true}
   - {name: end_date,     type: date, precision: year}              # blank = single-day event or unknown
 require_one_of:
-  - [title_en, title_fr]
-  - [event, venue]
+  - [event, venue]                                                   # title is optional: festival appearances are named by event
 dedup:
   - when: [{fuzzy: [title_en, title_fr]}, {fuzzy: [event, venue]}, {same_year: start_date}]
     as: duplicate
@@ -1148,8 +1148,10 @@ dedup:
   same thing as the gallery hosting a given show within it) but neither
   is individually required — `require_one_of` covers the common case
   where historically only one was tracked.
-- `title_en`/`title_fr` use the same `require_one_of` treatment as the
-  (now-corrected) `artworks` schema, for the same reason.
+- `title_en`/`title_fr` are optional (only one side is usually filled,
+  and festival participations often have no exhibition title at all — a
+  real CV had 14 such entries); the view names the entry
+  `"{title|event|venue}"`, so it always has a heading.
 
 ### curatorship (handler: generic)
 
@@ -1174,8 +1176,7 @@ fields:
   - {name: start_date,   type: date, precision: year, required: true}
   - {name: end_date,     type: date, precision: year}
 require_one_of:
-  - [title_en, title_fr]
-  - [event, venue]
+  - [event, venue]                                                   # title is optional: festival appearances are named by event
 dedup:
   - when: [{fuzzy: [title_en, title_fr]}, {fuzzy: [event, venue]}, {same_year: start_date}]
     as: duplicate
