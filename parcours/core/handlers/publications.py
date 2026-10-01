@@ -13,15 +13,23 @@ from .base import CategoryHandler, Match
 class PublicationsHandler(CategoryHandler):
     def __init__(self, schema, context):
         super().__init__(schema, context)
+        self._json_path = self.context.data_dir / self.schema.options["json"]
         self._csl_by_key = self._load_csl_json()
 
     def _load_csl_json(self) -> dict:
-        json_path = self.context.data_dir / self.schema.options["json"]
-        if not json_path.is_file():
+        if not self._json_path.is_file():
             return {}
-        with open(json_path, "r", encoding="utf-8") as fh:
+        with open(self._json_path, "r", encoding="utf-8") as fh:
             records = json.load(fh)
         return {record["id"]: record for record in records}
+
+    def setup_warnings(self) -> list[str]:
+        if self._json_path.is_file():
+            return []
+        return [
+            f"No citation export found at {self._json_path} for '{self.schema.name}' "
+            "— every entry needing a citekey will fail to match until this is fixed."
+        ]
 
     def resolve(self, citekey: str) -> dict | None:
         return self._csl_by_key.get(citekey)

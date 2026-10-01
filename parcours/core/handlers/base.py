@@ -33,6 +33,14 @@ class CategoryHandler(ABC):
         already gets from `core.validation.validate_common`."""
         return []
 
+    def setup_warnings(self) -> list[str]:
+        """One-time, repo-wide configuration problems (e.g. a citation
+        export file that doesn't exist) — distinct from per-entry
+        `validate()` issues. Surfaced once by `parco import`/`lint`
+        callers instead of manifesting as a wall of identical per-row
+        failures with no obvious common cause."""
+        return []
+
     @abstractmethod
     def find_matches(self, entry: dict, existing: list[dict]) -> list[Match]:
         """Check `entry` against `existing` rows per the schema's own

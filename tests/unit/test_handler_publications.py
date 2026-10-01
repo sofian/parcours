@@ -40,6 +40,22 @@ def test_resolve_returns_none_for_unknown_citekey(tmp_path):
     assert handler.resolve("nonexistent") is None
 
 
+def test_setup_warnings_empty_when_export_file_exists(tmp_path):
+    json_path = _write_csl_json(tmp_path, [])
+    handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
+    assert handler.setup_warnings() == []
+
+
+def test_setup_warnings_flags_a_missing_export_file(tmp_path):
+    handler = PublicationsHandler(_schema("reference/library.json"), HandlerContext(data_dir=tmp_path))
+
+    warnings = handler.setup_warnings()
+
+    assert len(warnings) == 1
+    assert "reference/library.json" in warnings[0]
+    assert "publications" in warnings[0]
+
+
 def test_validate_flags_unresolved_citekey(tmp_path):
     json_path = _write_csl_json(tmp_path, [])
     handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
