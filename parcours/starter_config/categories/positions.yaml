@@ -12,6 +12,8 @@ fields:
   - {name: position_status,  vocab: position_status}                  # e.g. full-time / part-time / casual
   - {name: start_date,       type: date, precision: month, required: true}
   - {name: end_date,         type: date, precision: month}            # blank = ongoing
+  - {name: description_en}
+  - {name: description_fr}                                            # free-form, e.g. the research project a research-assistant post was for
 require_one_of:
   - [title_en, title_fr]
 dedup:

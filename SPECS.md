@@ -983,6 +983,8 @@ fields:
   - {name: position_status,  vocab: position_status}                  # e.g. full-time / part-time / casual
   - {name: start_date,       type: date, precision: month, required: true}
   - {name: end_date,         type: date, precision: month}            # blank = ongoing
+  - {name: description_en}
+  - {name: description_fr}                                            # free-form, e.g. the research project a research-assistant post was for
 require_one_of:
   - [title_en, title_fr]
 dedup:
@@ -1005,13 +1007,15 @@ dedup:
   *simultaneously* in the same academic records (11/11 and 7/11), so
   merging would lose information genuinely present at once, the same
   reasoning as `outreach`'s outcome/evidence fields.
-- **Dropped:** `Academic Rank`, `Tenure Status` and tenure dates, and
-  `Work Description`/`Activity Description` (bilingual highlights) —
-  the latter is 0% filled across all 26 reference records regardless of
-  type, meaning CCV never carries this text even though the LaTeX CV's
-  professional-experience entries are full of it; that text would need
-  manual entry either way, so it isn't a CCV-import gap, just a field
-  this schema doesn't track.
+- **Dropped:** `Academic Rank`, `Tenure Status` and tenure dates.
+- `description_en`/`description_fr` hold the free-form text a real
+  LaTeX CV attaches to positions (the research project behind a
+  research-assistant post, a founding role at a cooperative). CCV's own
+  `Work Description`/`Activity Description` would map here but is 0%
+  filled across all 26 reference records regardless of type, so import
+  leaves it blank and the text is entered by hand. Teaching and service
+  lines that a LaTeX CV often folds into a position's text belong in
+  `teaching`/`service` instead.
 - `title` is bilingual (`title_en`/`title_fr`), even though CCV's
   academic/non-academic subtypes use a single string (`Affiliations`
   is already bilingual in CCV). Unlike `education`'s
