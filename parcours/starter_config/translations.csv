@@ -17,3 +17,212 @@ exhibitions,section,Exhibitions,Expositions
 curatorship,section,Curatorship,Commissariat
 residencies,section,Residencies,Résidences
 software,section,Software,Logiciels
+Afghanistan,country,Afghanistan,Afghanistan
+Albania,country,Albania,Albanie
+Algeria,country,Algeria,Algérie
+Andorra,country,Andorra,Andorre
+Angola,country,Angola,Angola
+Antigua and Barbuda,country,Antigua and Barbuda,Antigua-et-Barbuda
+Argentina,country,Argentina,Argentine
+Armenia,country,Armenia,Arménie
+Australia,country,Australia,Australie
+Austria,country,Austria,Autriche
+Azerbaijan,country,Azerbaijan,Azerbaïdjan
+Bahamas,country,Bahamas,Bahamas
+Bahrain,country,Bahrain,Bahreïn
+Bangladesh,country,Bangladesh,Bangladesh
+Barbados,country,Barbados,Barbade
+Belarus,country,Belarus,Biélorussie
+Belgium,country,Belgium,Belgique
+Belize,country,Belize,Belize
+Benin,country,Benin,Bénin
+Bhutan,country,Bhutan,Bhoutan
+Bolivia,country,Bolivia,Bolivie
+Bosnia and Herzegovina,country,Bosnia and Herzegovina,Bosnie-Herzégovine
+Botswana,country,Botswana,Botswana
+Brazil,country,Brazil,Brésil
+Brunei,country,Brunei,Brunei
+Bulgaria,country,Bulgaria,Bulgarie
+Burkina Faso,country,Burkina Faso,Burkina Faso
+Burundi,country,Burundi,Burundi
+Cabo Verde,country,Cabo Verde,Cap-Vert
+Cambodia,country,Cambodia,Cambodge
+Cameroon,country,Cameroon,Cameroun
+Canada,country,Canada,Canada
+CAR,country,Central African Republic,République centrafricaine
+Central African Republic,country,Central African Republic,République centrafricaine
+Chad,country,Chad,Tchad
+Chile,country,Chile,Chili
+China,country,China,Chine
+PRC,country,China,Chine
+Colombia,country,Colombia,Colombie
+Comoros,country,Comoros,Comores
+Costa Rica,country,Costa Rica,Costa Rica
+Croatia,country,Croatia,Croatie
+Cuba,country,Cuba,Cuba
+Cyprus,country,Cyprus,Chypre
+Czechia,country,Czechia,Tchéquie
+Côte d’Ivoire,country,Côte d’Ivoire,Côte d’Ivoire
+Democratic Republic of the Congo,country,Democratic Republic of the Congo,République démocratique du Congo
+DRC,country,Democratic Republic of the Congo,République démocratique du Congo
+Denmark,country,Denmark,Danemark
+Djibouti,country,Djibouti,Djibouti
+Dominica,country,Dominica,Dominique
+Dominican Republic,country,Dominican Republic,République dominicaine
+Ecuador,country,Ecuador,Équateur
+Egypt,country,Egypt,Égypte
+El Salvador,country,El Salvador,Salvador
+Equatorial Guinea,country,Equatorial Guinea,Guinée équatoriale
+Eritrea,country,Eritrea,Érythrée
+Estonia,country,Estonia,Estonie
+Eswatini,country,Eswatini,Eswatini
+Ethiopia,country,Ethiopia,Éthiopie
+Fiji,country,Fiji,Fidji
+Finland,country,Finland,Finlande
+France,country,France,France
+Gabon,country,Gabon,Gabon
+Gambia,country,Gambia,Gambie
+Georgia,country,Georgia,Géorgie
+Germany,country,Germany,Allemagne
+Ghana,country,Ghana,Ghana
+Greece,country,Greece,Grèce
+Grenada,country,Grenada,Grenade
+Guatemala,country,Guatemala,Guatemala
+Guinea,country,Guinea,Guinée
+Guinea-Bissau,country,Guinea-Bissau,Guinée-Bissau
+Guyana,country,Guyana,Guyana
+Haiti,country,Haiti,Haïti
+Honduras,country,Honduras,Honduras
+Hungary,country,Hungary,Hongrie
+Iceland,country,Iceland,Islande
+India,country,India,Inde
+Indonesia,country,Indonesia,Indonésie
+Iran,country,Iran,Iran
+Iraq,country,Iraq,Irak
+Ireland,country,Ireland,Irlande
+Israel,country,Israel,Israël
+Italy,country,Italy,Italie
+Jamaica,country,Jamaica,Jamaïque
+Japan,country,Japan,Japon
+Jordan,country,Jordan,Jordanie
+Kazakhstan,country,Kazakhstan,Kazakhstan
+Kenya,country,Kenya,Kenya
+Kiribati,country,Kiribati,Kiribati
+Kuwait,country,Kuwait,Koweït
+Kyrgyzstan,country,Kyrgyzstan,Kirghizstan
+Laos,country,Laos,Laos
+Latvia,country,Latvia,Lettonie
+Lebanon,country,Lebanon,Liban
+Lesotho,country,Lesotho,Lesotho
+Liberia,country,Liberia,Liberia
+Libya,country,Libya,Libye
+Liechtenstein,country,Liechtenstein,Liechtenstein
+Lithuania,country,Lithuania,Lituanie
+Luxembourg,country,Luxembourg,Luxembourg
+Madagascar,country,Madagascar,Madagascar
+Malawi,country,Malawi,Malawi
+Malaysia,country,Malaysia,Malaisie
+Maldives,country,Maldives,Maldives
+Mali,country,Mali,Mali
+Malta,country,Malta,Malte
+Marshall Islands,country,Marshall Islands,Îles Marshall
+Mauritania,country,Mauritania,Mauritanie
+Mauritius,country,Mauritius,Maurice
+Mexico,country,Mexico,Mexique
+Micronesia,country,Micronesia,Micronésie
+Moldova,country,Moldova,Moldavie
+Monaco,country,Monaco,Monaco
+Mongolia,country,Mongolia,Mongolie
+Montenegro,country,Montenegro,Monténégro
+Morocco,country,Morocco,Maroc
+Mozambique,country,Mozambique,Mozambique
+Myanmar,country,Myanmar,Myanmar
+Namibia,country,Namibia,Namibie
+Nauru,country,Nauru,Nauru
+Nepal,country,Nepal,Népal
+Netherlands,country,Netherlands,Pays-Bas
+New Zealand,country,New Zealand,Nouvelle-Zélande
+NZ,country,New Zealand,Nouvelle-Zélande
+Nicaragua,country,Nicaragua,Nicaragua
+Niger,country,Niger,Niger
+Nigeria,country,Nigeria,Nigeria
+DPRK,country,North Korea,Corée du Nord
+North Korea,country,North Korea,Corée du Nord
+North Macedonia,country,North Macedonia,Macédoine du Nord
+Norway,country,Norway,Norvège
+Oman,country,Oman,Oman
+Pakistan,country,Pakistan,Pakistan
+Palau,country,Palau,Palaos
+Palestine,country,Palestine,Palestine
+Panama,country,Panama,Panama
+Papua New Guinea,country,Papua New Guinea,Papouasie-Nouvelle-Guinée
+PNG,country,Papua New Guinea,Papouasie-Nouvelle-Guinée
+Paraguay,country,Paraguay,Paraguay
+Peru,country,Peru,Pérou
+Philippines,country,Philippines,Philippines
+Poland,country,Poland,Pologne
+Portugal,country,Portugal,Portugal
+Qatar,country,Qatar,Qatar
+Republic of the Congo,country,Republic of the Congo,République du Congo
+Romania,country,Romania,Roumanie
+Russia,country,Russia,Russie
+Rwanda,country,Rwanda,Rwanda
+Saint Kitts and Nevis,country,Saint Kitts and Nevis,Saint-Christophe-et-Niévès
+Saint Lucia,country,Saint Lucia,Sainte-Lucie
+Saint Vincent and the Grenadines,country,Saint Vincent and the Grenadines,Saint-Vincent-et-les Grenadines
+Samoa,country,Samoa,Samoa
+San Marino,country,San Marino,Saint-Marin
+Sao Tome and Principe,country,Sao Tome and Principe,Sao Tomé-et-Principe
+KSA,country,Saudi Arabia,Arabie saoudite
+Saudi Arabia,country,Saudi Arabia,Arabie saoudite
+Senegal,country,Senegal,Sénégal
+Serbia,country,Serbia,Serbie
+Seychelles,country,Seychelles,Seychelles
+Sierra Leone,country,Sierra Leone,Sierra Leone
+Singapore,country,Singapore,Singapour
+Slovakia,country,Slovakia,Slovaquie
+Slovenia,country,Slovenia,Slovénie
+Solomon Islands,country,Solomon Islands,Îles Salomon
+Somalia,country,Somalia,Somalie
+South Africa,country,South Africa,Afrique du Sud
+"South Africa, Republic of",country,South Africa,Afrique du Sud
+ROK,country,South Korea,Corée du Sud
+South Korea,country,South Korea,Corée du Sud
+South Sudan,country,South Sudan,Soudan du Sud
+Spain,country,Spain,Espagne
+Sri Lanka,country,Sri Lanka,Sri Lanka
+Sudan,country,Sudan,Soudan
+Suriname,country,Suriname,Suriname
+Sweden,country,Sweden,Suède
+Switzerland,country,Switzerland,Suisse
+Syria,country,Syria,Syrie
+Tajikistan,country,Tajikistan,Tadjikistan
+Tanzania,country,Tanzania,Tanzanie
+Thailand,country,Thailand,Thaïlande
+Timor-Leste,country,Timor-Leste,Timor oriental
+Togo,country,Togo,Togo
+Tonga,country,Tonga,Tonga
+Trinidad and Tobago,country,Trinidad and Tobago,Trinité-et-Tobago
+Tunisia,country,Tunisia,Tunisie
+Turkey,country,Turkey,Turquie
+Turkmenistan,country,Turkmenistan,Turkménistan
+Tuvalu,country,Tuvalu,Tuvalu
+Uganda,country,Uganda,Ouganda
+Ukraine,country,Ukraine,Ukraine
+UAE,country,United Arab Emirates,Émirats arabes unis
+United Arab Emirates,country,United Arab Emirates,Émirats arabes unis
+UK,country,United Kingdom,Royaume-Uni
+United Kingdom,country,United Kingdom,Royaume-Uni
+US,country,United States,États-Unis
+USA,country,United States,États-Unis
+United States,country,United States,États-Unis
+United States of America,country,United States,États-Unis
+Uruguay,country,Uruguay,Uruguay
+Uzbekistan,country,Uzbekistan,Ouzbékistan
+Vanuatu,country,Vanuatu,Vanuatu
+Vatican City,country,Vatican City,État de la Cité du Vatican
+Venezuela,country,Venezuela,Venezuela
+Vietnam,country,Vietnam,Viêt Nam
+Yemen,country,Yemen,Yémen
+Zambia,country,Zambia,Zambie
+Zimbabwe,country,Zimbabwe,Zimbabwe

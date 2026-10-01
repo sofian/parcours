@@ -57,10 +57,25 @@ def test_degree_type_and_degree_status_are_shared_between_students_and_education
 
 def test_starter_translations_has_exactly_the_18_non_skills_section_rows():
     table = load_translations(_STARTER_DIR / "translations.csv")
-    entries = table.all()
+    entries = [e for e in table.all() if e.category == "section"]
     assert len(entries) == 18
     assert {e.id for e in entries} == _EXPECTED_CATEGORIES - {"skills"}
-    assert all(e.category == "section" for e in entries)
+
+
+def test_starter_translations_has_195_pre_populated_country_rows_plus_official_aliases():
+    table = load_translations(_STARTER_DIR / "translations.csv")
+    entries = [e for e in table.all() if e.category == "country"]
+    assert len(entries) == 209
+    assert table.lookup("country", "France", "fr") == "France"
+    assert table.lookup("country", "Canada", "fr") == "Canada"
+    # Official ISO long-form names some data sources (e.g. CCV) use in place
+    # of the common short form we key most rows on.
+    assert table.lookup("country", "United States of America", "en") == "United States"
+    assert table.lookup("country", "South Africa, Republic of", "en") == "South Africa"
+    # Common acronyms people actually type.
+    assert table.lookup("country", "USA", "fr") == "États-Unis"
+    assert table.lookup("country", "UK", "en") == "United Kingdom"
+    assert table.lookup("country", "UAE", "en") == "United Arab Emirates"
 
 
 def test_starter_translations_has_no_missing_translations():
