@@ -12,7 +12,7 @@ fields:
   - {name: invited,   type: bool}
   - {name: keynote,   type: bool}
   - {name: format,    vocab: presentation_format}                     # talk / panel / round-table / workshop / poster / special-session
-  - {name: date,      type: date, precision: month, required: true}     # at least year+month, like grants.start_date
+  - {name: date,      type: date, precision: year, required: true}      # a year is enough; add month/day when known
   - {name: description_en}
   - {name: description_fr}
   - {name: co_presenters,   type: person_list}                            # "Last, First; Last, First"

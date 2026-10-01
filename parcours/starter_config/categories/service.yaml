@@ -8,8 +8,8 @@ fields:
                                                                   # service types and free text for others, so a merged vocab
                                                                   # wouldn't correspond to any single real list
   - {name: organization, required: true, glossary: organization}  # free text — no vocab, too many distinct values
-  - {name: start_date,   type: date, precision: month, required: true}
-  - {name: end_date,     type: date, precision: month}          # blank = ongoing
+  - {name: start_date,   type: date, precision: year, required: true}
+  - {name: end_date,     type: date, precision: year}          # blank = ongoing
   - {name: detail_en}
   - {name: detail_fr}                                            # student name (graduate-examination) / committee name
                                                                   # (funding-review) / which committee, e.g. "Hiring

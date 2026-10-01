@@ -575,8 +575,8 @@ fields:
                                                                   # service types and free text for others, so a merged vocab
                                                                   # wouldn't correspond to any single real list
   - {name: organization, required: true, glossary: organization}  # free text — no vocab, too many distinct values
-  - {name: start_date,   type: date, precision: month, required: true}
-  - {name: end_date,     type: date, precision: month}          # blank = ongoing
+  - {name: start_date,   type: date, precision: year, required: true}
+  - {name: end_date,     type: date, precision: year}          # blank = ongoing
   - {name: detail_en}
   - {name: detail_fr}                                            # student name (graduate-examination) / committee name
                                                                   # (funding-review) / which committee, e.g. "Hiring
@@ -795,7 +795,7 @@ fields:
   - {name: invited,   type: bool}
   - {name: keynote,   type: bool}
   - {name: format,    vocab: presentation_format}                     # talk / panel / round-table / workshop / poster / special-session
-  - {name: date,      type: date, precision: month, required: true}     # at least year+month, like grants.start_date
+  - {name: date,      type: date, precision: year, required: true}      # a year is enough; add month/day when known
   - {name: description_en}
   - {name: description_fr}
   - {name: co_presenters,   type: person_list}                            # "Last, First; Last, First"
@@ -808,13 +808,16 @@ dedup:
     as: duplicate
 ```
 
-- `date`'s `precision: month` requires at least year+month (a bare year
-  is rejected), matching `grants.start_date` — a floor, not a ceiling
-  (see Category schemas above), so a full day is still fine if you know
-  it. CCV's own `Presentation Year` field is year-only, so import writes
-  a value below this floor; those rows need the month filled in by hand
-  (flagged by `lint`, same treatment as any other required-field gap
-  from a path that bypasses the wizard).
+- `date`'s `precision: year` — a floor, not a ceiling (see Category
+  schemas above), so a month or full day is still fine when known. It
+  was `month` (matching `grants.start_date`) until a real import: CCV's
+  own `Presentation Year` is year-only and a real LaTeX CV dates talks by
+  year, so ~90 of ~95 imported talks failed a month floor with no source
+  to fix them from — permanent lint noise drowning out real gaps. The
+  same reasoning lowered `exhibitions`, `curatorship`, `residencies`,
+  `software` and `service` dates to `year`. `grants` keeps `month`
+  (currency conversion needs a start month) and so does `teaching` (the
+  month identifies the term).
 - `title` follows the artworks pattern: CCV's single `Presentation
   Title` splits to `title_en`/`title_fr`, import fills the matching side
   and leaves the other blank — `require_one_of` covers the common case
@@ -1103,8 +1106,8 @@ fields:
   - {name: city,         required: true, glossary: city}
   - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — credited curator(s)
-  - {name: start_date,   type: date, precision: month, required: true}
-  - {name: end_date,     type: date, precision: month}              # blank = single-day event or unknown
+  - {name: start_date,   type: date, precision: year, required: true}
+  - {name: end_date,     type: date, precision: year}              # blank = single-day event or unknown
 require_one_of:
   - [title_en, title_fr]
   - [event, venue]
@@ -1168,8 +1171,8 @@ fields:
   - {name: city,         required: true, glossary: city}
   - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — co-curator(s), if any (your own curatorial role is implicit)
-  - {name: start_date,   type: date, precision: month, required: true}
-  - {name: end_date,     type: date, precision: month}
+  - {name: start_date,   type: date, precision: year, required: true}
+  - {name: end_date,     type: date, precision: year}
 require_one_of:
   - [title_en, title_fr]
   - [event, venue]
@@ -1193,8 +1196,8 @@ fields:
   - {name: organization, required: true, glossary: organization}  # free text — e.g. "Hexagram", "LABoral"
   - {name: city,         required: true, glossary: city}
   - {name: country,      required: true, glossary: country}                          # pre-populated in translations.csv at `init`, see Translations
-  - {name: start_date,   type: date, precision: month, required: true}
-  - {name: end_date,     type: date, precision: month}           # blank = short/undated residency
+  - {name: start_date,   type: date, precision: year, required: true}
+  - {name: end_date,     type: date, precision: year}           # blank = short/undated residency
 dedup:
   - when: [{exact: organization}, {overlap: [start_date, end_date]}]
     as: duplicate
@@ -1215,8 +1218,8 @@ fields:
   - {name: title,          required: true}                         # project name, e.g. "Plaquette" — a proper noun, no translation
   - {name: description_en, required: true}
   - {name: description_fr, required: true}                         # e.g. "open source framework for creative physical computing" / French
-  - {name: start_date,     type: date, precision: month, required: true}
-  - {name: end_date,       type: date, precision: month}           # blank = ongoing
+  - {name: start_date,     type: date, precision: year, required: true}
+  - {name: end_date,       type: date, precision: year}           # blank = ongoing
   - {name: url}
 dedup:
   - when: [{fuzzy: title}, {overlap: [start_date, end_date]}]

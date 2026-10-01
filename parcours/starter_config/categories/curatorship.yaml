@@ -10,8 +10,8 @@ fields:
   - {name: city,         required: true, glossary: city}
   - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — co-curator(s), if any (your own curatorial role is implicit)
-  - {name: start_date,   type: date, precision: month, required: true}
-  - {name: end_date,     type: date, precision: month}
+  - {name: start_date,   type: date, precision: year, required: true}
+  - {name: end_date,     type: date, precision: year}
 require_one_of:
   - [title_en, title_fr]
   - [event, venue]

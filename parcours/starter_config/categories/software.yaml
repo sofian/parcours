@@ -7,8 +7,8 @@ fields:
   - {name: title,          required: true}                         # project name, e.g. "Plaquette" — a proper noun, no translation
   - {name: description_en, required: true}
   - {name: description_fr, required: true}                         # e.g. "open source framework for creative physical computing" / French
-  - {name: start_date,     type: date, precision: month, required: true}
-  - {name: end_date,       type: date, precision: month}           # blank = ongoing
+  - {name: start_date,     type: date, precision: year, required: true}
+  - {name: end_date,       type: date, precision: year}           # blank = ongoing
   - {name: url}
 dedup:
   - when: [{fuzzy: title}, {overlap: [start_date, end_date]}]

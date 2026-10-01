@@ -6,8 +6,8 @@ fields:
   - {name: organization, required: true, glossary: organization}  # free text — e.g. "Hexagram", "LABoral"
   - {name: city,         required: true, glossary: city}
   - {name: country,      required: true, glossary: country}                          # pre-populated in translations.csv at `init`, see Translations
-  - {name: start_date,   type: date, precision: month, required: true}
-  - {name: end_date,     type: date, precision: month}           # blank = short/undated residency
+  - {name: start_date,   type: date, precision: year, required: true}
+  - {name: end_date,     type: date, precision: year}           # blank = short/undated residency
 dedup:
   - when: [{exact: organization}, {overlap: [start_date, end_date]}]
     as: duplicate
