@@ -6,7 +6,7 @@ fields:
   - {name: activity_type,      required: true, vocab: outreach_activity_type} # community-engagement / consulting-for-industry / ...
   - {name: target_stakeholder, vocab: outreach_stakeholder}                   # general-public / industry / ...
   - {name: organization,       required: true, glossary: organization}  # free text — "Group/Organization/Business Serviced"
-  - {name: role}                                                              # free text
+  - {name: role, glossary: role}                                              # free text
   - {name: start_date,         type: date, precision: month, required: true}
   - {name: end_date,           type: date, precision: month}                 # blank = ongoing
   - {name: description_en}

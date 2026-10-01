@@ -4,7 +4,7 @@ fields:
   - {name: id,           generated: true}                       # svc-2026-004
   - {name: weight,       type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: type,         required: true, vocab: service_type}   # graduate-examination / funding-review / manuscript-review / volunteer / membership / committee / program-development
-  - {name: role,         required: true}                        # free text — CCV's own Role field is a controlled list for some
+  - {name: role,         required: true, glossary: role}        # free text — CCV's own Role field is a controlled list for some
                                                                   # service types and free text for others, so a merged vocab
                                                                   # wouldn't correspond to any single real list
   - {name: organization, required: true, glossary: organization}  # free text — no vocab, too many distinct values

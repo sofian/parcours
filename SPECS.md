@@ -534,7 +534,7 @@ fields:
   - {name: title_en}
   - {name: title_fr}
   - {name: funder,       required: true, glossary: organization}  # free text
-  - {name: program}
+  - {name: program,      glossary: program}                  # e.g. "Concept to Realization"
   - {name: role,         required: true, vocab: grant_role}     # PI / co-PI / collaborator
   - {name: status,       required: true, vocab: grant_status}   # submitted / awarded / declined
   - {name: start_date,   type: date, precision: month, required: true}
@@ -571,7 +571,7 @@ fields:
   - {name: id,           generated: true}                       # svc-2026-004
   - {name: weight,       type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: type,         required: true, vocab: service_type}   # graduate-examination / funding-review / manuscript-review / volunteer / membership / committee / program-development
-  - {name: role,         required: true}                        # free text — CCV's own Role field is a controlled list for some
+  - {name: role,         required: true, glossary: role}        # free text — CCV's own Role field is a controlled list for some
                                                                   # service types and free text for others, so a merged vocab
                                                                   # wouldn't correspond to any single real list
   - {name: organization, required: true, glossary: organization}  # free text — no vocab, too many distinct values
@@ -623,7 +623,7 @@ fields:
   - {name: activity_type,      required: true, vocab: outreach_activity_type} # community-engagement / consulting-for-industry / ...
   - {name: target_stakeholder, vocab: outreach_stakeholder}                   # general-public / industry / ...
   - {name: organization,       required: true, glossary: organization}  # free text — "Group/Organization/Business Serviced"
-  - {name: role}                                                              # free text
+  - {name: role, glossary: role}                                              # free text
   - {name: start_date,         type: date, precision: month, required: true}
   - {name: end_date,           type: date, precision: month}                 # blank = ongoing
   - {name: description_en}
@@ -751,7 +751,7 @@ fields:
   - {name: course_label, required: true}                 # e.g. EDM1600, COM1001 — CCV has no equivalent, filled in manually
   - {name: title_en}
   - {name: title_fr}
-  - {name: role}                                          # free text, e.g. Professor
+  - {name: role, glossary: role}                          # free text, e.g. Professor
   - {name: organization, required: true, glossary: organization}  # resolved from CCV's refTable (see CCV export structure)
   - {name: department, glossary: organization}
   - {name: date,         type: date, precision: month, required: true}  # term/year of this specific offering
@@ -1390,6 +1390,13 @@ Amounts can be converted to a reporting currency, mainly for statistics.
   pre-populated, same as `city`: the stored value is whatever name you
   type (conventionally the institution's own official name), and only
   names whose form differs between languages need a row.
+- **`category: program` and `category: role`** cover the other short,
+  repeated free-text values a bilingual CV renders in both languages:
+  `grants.program` ("Concept to Realization" / "Du concept à la
+  réalisation"), and `role` on `teaching`, `service` and `outreach`
+  ("Evaluation committee" / "Comité d'évaluation"). They stay free text
+  rather than `vocab:` lists for the reasons in each schema's notes;
+  the glossary only supplies the other language's wording.
 - **Managing translations:** `translations.csv` has no `categories/*.yaml`
   schema (it's a fixed shape: `id, category, en, fr`), so it gets its own
   small command group rather than reusing `add`/`edit`/`delete`/`list`:
