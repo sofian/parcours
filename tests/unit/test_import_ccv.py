@@ -149,6 +149,55 @@ def test_map_recognitions_defaults_currency_when_ccv_gives_none():
     assert row.fields["currency"] == ""
 
 
+def test_map_recognitions_converts_ccv_currency_name_to_iso_code():
+    el = _record("""
+    <section label="Recognitions" recordId="r6">
+      <field label="Recognition Type"><lov id="1">Prize / Award</lov></field>
+      <field label="Recognition Name"><value type="String">Award</value></field>
+      <field label="Effective Date"><value type="YearMonth">2020/1</value></field>
+      <field label="Amount"><value type="Number">15000</value></field>
+      <field label="Currency"><lov id="2">Canadian dollar</lov></field>
+    </section>
+    """)
+    row = map_record(el, "Recognitions", "en", _ctx())
+    assert row.fields["currency"] == "CAD"
+    assert row.flag is None
+
+
+def test_map_grant_converts_ccv_currency_name_to_iso_code():
+    el = _record("""
+    <section label="Research Funding History" recordId="g9">
+      <field label="Funding Title"><value type="String">A Grant</value></field>
+      <field label="Funding Start Date"><value type="YearMonth">2019/1</value></field>
+      <section label="Funding Sources" recordId="g9f1">
+        <field label="Funding Organization"><lov id="3">Some Foundation</lov></field>
+        <field label="Total Funding"><value type="Number">350000</value></field>
+        <field label="Currency of Total Funding"><lov id="4">United States dollar</lov></field>
+      </section>
+    </section>
+    """)
+    row = map_record(el, "Research Funding History", "en", _ctx())
+    assert row.fields["currency"] == "USD"
+    assert row.flag is None
+
+
+def test_map_grant_flags_unknown_ccv_currency_name_and_keeps_it_verbatim():
+    el = _record("""
+    <section label="Research Funding History" recordId="g10">
+      <field label="Funding Title"><value type="String">A Grant</value></field>
+      <field label="Funding Start Date"><value type="YearMonth">2019/1</value></field>
+      <section label="Funding Sources" recordId="g10f1">
+        <field label="Funding Organization"><lov id="3">Some Foundation</lov></field>
+        <field label="Total Funding"><value type="Number">1000</value></field>
+        <field label="Currency of Total Funding"><lov id="4">Martian credit</lov></field>
+      </section>
+    </section>
+    """)
+    row = map_record(el, "Research Funding History", "en", _ctx())
+    assert row.fields["currency"] == "Martian credit"
+    assert "Martian credit" in row.flag
+
+
 def test_map_teaching_course_development():
     el = _record("""
     <section label="Course Development" recordId="r6">

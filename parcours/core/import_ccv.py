@@ -127,6 +127,34 @@ _OUTREACH_STAKEHOLDER = {
 }
 
 
+# CCV's currency LOVs are spelled-out names, but `currency` holds an
+# ISO 4217 code — the currency-conversion join matches rates on it (see
+# SPECS.md, "Currency conversion"), so "Canadian dollar" would never find
+# a rate. A value that's already a 3-letter code passes through; an
+# unknown name is kept verbatim and flagged rather than guessed.
+_CURRENCY_CODE = {
+    "Canadian dollar": "CAD",
+    "United States dollar": "USD",
+    "Euro": "EUR",
+    "Pound sterling": "GBP",
+    "British pound": "GBP",
+    "Swiss franc": "CHF",
+    "Australian dollar": "AUD",
+    "Japanese yen": "JPY",
+}
+
+
+def _currency_code(raw: str) -> tuple[str, str | None]:
+    """Returns (code, flag) — flag is set only for an unrecognized name."""
+    if not raw:
+        return "", None
+    if raw in _CURRENCY_CODE:
+        return _CURRENCY_CODE[raw], None
+    if re.fullmatch(r"[A-Z]{3}", raw):
+        return raw, None
+    return raw, f"currency {raw!r} isn't a known CCV currency name — kept verbatim, needs an ISO code"
+
+
 def _normalize_apostrophe(text: str) -> str:
     return text.replace("’", "'")
 
@@ -203,6 +231,7 @@ def _map_presentation(record_el, lang, ctx) -> MappedRow:
 def _map_recognitions(record_el, lang, ctx) -> MappedRow:
     recognition_type_raw = x.field_lov(record_el, "Recognition Type")
     description_fr, description_en = x.field_bilingual(record_el, "Description", lang)
+    currency, currency_flag = _currency_code(x.field_lov(record_el, "Currency"))
 
     return MappedRow(
         category="recognitions",
@@ -215,10 +244,11 @@ def _map_recognitions(record_el, lang, ctx) -> MappedRow:
             "date": x.field_yearmonth(record_el, "Effective Date"),
             "end_date": x.field_yearmonth(record_el, "End Date"),
             "amount": x.field_text(record_el, "Amount"),
-            "currency": x.field_lov(record_el, "Currency"),
+            "currency": currency,
             "description_en": description_en,
             "description_fr": description_fr,
         },
+        flag=currency_flag,
     )
 
 
@@ -637,7 +667,9 @@ def _map_grant(record_el, lang, ctx) -> MappedRow:
         funder = x.field_lov(first_source, "Funding Organization") or x.field_text(first_source, "Other Funding Organization")
         program = x.field_text(first_source, "Program Name")
         amount = x.field_text(first_source, "Total Funding")
-        currency = x.field_lov(first_source, "Currency of Total Funding")
+        currency, currency_flag = _currency_code(x.field_lov(first_source, "Currency of Total Funding"))
+        if currency_flag:
+            flags.append(currency_flag)
         if len(funding_sources) > 1:
             extra_funders = [
                 (x.field_lov(src, "Funding Organization") or x.field_text(src, "Other Funding Organization"))
