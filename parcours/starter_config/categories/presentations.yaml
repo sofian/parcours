@@ -11,6 +11,7 @@ fields:
   - {name: country,   required: true, glossary: country}                                     # e.g. "Netherlands" — pre-populated in translations.csv at `init`, see Translations
   - {name: invited,   type: bool}
   - {name: keynote,   type: bool}
+  - {name: format,    vocab: presentation_format}                     # talk / panel / round-table / workshop / poster / special-session
   - {name: date,      type: date, precision: month, required: true}     # at least year+month, like grants.start_date
   - {name: description_en}
   - {name: description_fr}

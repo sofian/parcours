@@ -6,6 +6,8 @@ grant_status: [submitted, awarded, declined]
 
 artwork_role: [author, collaborator]
 
+presentation_format: [talk, panel, round-table, workshop, poster, special-session]
+
 student_role: [principal-supervisor, co-supervisor]
 degree_type: [bachelors, bachelors-honours, masters, doctorate, postdoc]        # shared: students, education
 degree_status: [completed, in-progress, withdrawn, all-but-degree]              # shared: students, education

@@ -789,6 +789,7 @@ fields:
   - {name: country,   required: true, glossary: country}                                     # e.g. "Netherlands" — pre-populated in translations.csv at `init`, see Translations
   - {name: invited,   type: bool}
   - {name: keynote,   type: bool}
+  - {name: format,    vocab: presentation_format}                     # talk / panel / round-table / workshop / poster / special-session
   - {name: date,      type: date, precision: month, required: true}     # at least year+month, like grants.start_date
   - {name: description_en}
   - {name: description_fr}
@@ -833,6 +834,12 @@ dedup:
   list) writes into `city` as-is; `country` comes back blank from CCV
   for these rows, same as any other missing-required-field gap `parco
   lint` catches afterward — nothing import-side needs to special-case.
+- `format` records what kind of session it was — a real CV tags
+  nearly every entry this way ("Panel", "Round table", "Workshop"…),
+  and it has no CCV equivalent, so import leaves it blank. A keynote is
+  a `talk` with `keynote: true` rather than its own format value, and
+  a lecture or contributed paper is also just a `talk`. Moderators and
+  organizers, when worth recording, go in `description_en`/`_fr`.
 - `Competitive?` is dropped — blank in 44 of 45 reference records.
 - `Main Audience` (CCV's `researcher`/`knowledge-user`/`general-public`
   list) is dropped — not tracked here.
@@ -1403,6 +1410,8 @@ grant_status: [submitted, awarded, declined]
 
 artwork_role: [author, collaborator]
 
+presentation_format: [talk, panel, round-table, workshop, poster, special-session]
+
 student_role: [principal-supervisor, co-supervisor]
 degree_type: [bachelors, bachelors-honours, masters, doctorate, postdoc]        # shared: students, education
 degree_status: [completed, in-progress, withdrawn, all-but-degree]              # shared: students, education
@@ -1443,6 +1452,8 @@ Notes on values not directly lifted from a CCV `lov` list:
   observed, so none is guessed here. `parco lint`/`vocab.yaml` are
   meant to be edited by hand as real gaps show up, so adding a value
   later (e.g. `casual`) is a one-line change, not a schema change.
+- `presentation_format` has no CCV source; it's lifted from the
+  session types a real LaTeX CV uses (see `presentations`).
 - `recognition_type`'s `prize` collapses CCV's own `"Prize / Award"`
   label to one slug.
 - `service_type`'s `manuscript-review` and `committee`'s `program-development`

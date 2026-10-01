@@ -46,6 +46,9 @@ def test_starter_vocab_has_the_expected_lists():
     assert vocab["skill_category"] == [
         "expertise", "programming", "framework", "platform", "software", "spoken-language", "other",
     ]
+    assert vocab["presentation_format"] == [
+        "talk", "panel", "round-table", "workshop", "poster", "special-session",
+    ]
 
 
 def test_degree_type_and_degree_status_are_shared_between_students_and_education():
