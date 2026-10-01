@@ -74,6 +74,32 @@ def _ask_field(field: FieldSpec, vocab: dict, current: str | None) -> str:
     return _ask_plain_field(field, current)
 
 
+def ask_field_by_name(schema: CategorySchema, vocab: dict, field_name: str, current: str | None) -> str:
+    """Prompts for a single named field, reusing the same vocab/date/plain
+    logic as the full wizard. Used by `parco lint --fix-interactive` to
+    correct just the field(s) lint flagged, without walking the whole row."""
+    field = schema.get_field(field_name)
+    return _ask_field(field, vocab, current)
+
+
+def ask_group_fields(
+    schema: CategorySchema, vocab: dict, group: list[str], prefill: dict[str, str] | None = None
+) -> dict[str, str]:
+    """Prompts for every field in a `require_one_of` group, re-looping
+    until at least one is filled in. Shared by the full wizard
+    (`collect_field_values`) and `parco lint --fix-interactive`, which
+    targets just this group when a require_one_of issue is flagged."""
+    prefill = prefill or {}
+    values: dict[str, str] = {}
+    while True:
+        for name in group:
+            field = schema.get_field(name)
+            values[name] = _ask_field(field, vocab, prefill.get(name))
+        if any(values[name].strip() for name in group):
+            return values
+        typer.echo(f"At least one of {group} must be filled in.")
+
+
 def collect_field_values(
     schema: CategorySchema, vocab: dict, prefill: dict[str, str] | None = None
 ) -> dict[str, str]:
@@ -97,14 +123,7 @@ def collect_field_values(
             if group_key in handled_groups:
                 continue
             handled_groups.add(group_key)
-
-            while True:
-                for name in group:
-                    group_field = schema.get_field(name)
-                    values[name] = _ask_field(group_field, vocab, prefill.get(name))
-                if any(values[name].strip() for name in group):
-                    break
-                typer.echo(f"At least one of {group} must be filled in.")
+            values.update(ask_group_fields(schema, vocab, group, prefill))
             continue
 
         values[field.name] = _ask_field(field, vocab, prefill.get(field.name))
