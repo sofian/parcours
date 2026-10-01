@@ -204,6 +204,31 @@ def test_build_merges_zotero_fields_for_publications_backed_handler(tmp_path, mo
     assert entries[0]["date"] == "2024-03"
 
 
+def test_build_handles_string_typed_csl_date_parts(tmp_path, monkeypatch):
+    # Real Better BibTeX CSL-JSON exports mix int and numeric-string
+    # date-parts within the same file (e.g. [["2018", 1, 8]]).
+    repo = _setup_data_repo(tmp_path)
+    (repo / "reference").mkdir()
+    (repo / "reference" / "library.json").write_text(json.dumps([
+        {"id": "a2018", "title": "A", "issued": {"date-parts": [["2018", "1", 8]]}},
+        {"id": "b2019", "title": "B", "issued": {"date-parts": [["2019"]]}},
+        {"id": "c2020", "title": "C", "issued": {"date-parts": [["spring 2020"]]}},
+    ]))
+    (repo / "entries" / "publications.csv").write_text("id,citekey\np1,a2018\np2,b2019\np3,c2020\n")
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},
+        sections=[{"id": "publications", "source": "publications"}],
+    )
+    monkeypatch.setattr(
+        "parcours.core.build.load_views", lambda path: {"publications": _publications_view()}
+    )
+
+    data = build_rendercv_data(repo, profile)
+
+    dates = {e["title"]: e.get("date") for e in data["cv"]["sections"]["Publications"]}
+    assert dates == {"A": "2018-01-08", "B": "2019", "C": None}
+
+
 def test_build_leaves_zotero_fields_absent_for_an_unresolved_citekey(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     (repo / "reference").mkdir()

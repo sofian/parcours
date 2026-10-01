@@ -24,9 +24,13 @@ from .views import ViewSpec, load_views
 
 
 def _csl_date_to_iso(record: dict) -> str | None:
+    """Real Better BibTeX CSL-JSON exports mix int and numeric-string
+    date-parts within one file (see `handlers/publications.py::_csl_year`),
+    so each part is normalized to int; a non-numeric part means no date
+    rather than a crash."""
     try:
-        parts = record["issued"]["date-parts"][0]
-    except (KeyError, IndexError, TypeError):
+        parts = [int(part) for part in record["issued"]["date-parts"][0]]
+    except (KeyError, IndexError, TypeError, ValueError):
         return None
     if not parts:
         return None
