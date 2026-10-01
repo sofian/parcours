@@ -168,6 +168,35 @@ def test_match_citekey_by_title_returns_none_when_no_match(tmp_path):
     assert citekey is None
 
 
+def test_match_citekey_by_title_breaks_a_fuzzy_tie_with_a_normalized_exact_title(tmp_path):
+    # Real case: a thesis title that *contains* another paper's full title
+    # fuzzy-matches both records above threshold. The one whose title is
+    # identical once spacing/trailing punctuation is normalized wins.
+    json_path = _write_csl_json(tmp_path, [
+        {"id": "thesis2016", "title": "Machines That Learn: Aesthetics of Adaptive Behaviors in Agent-based Art",
+         "issued": {"date-parts": [[2016]]}},
+        {"id": "paper2016", "title": "Aesthetics of Adaptive Behaviors in Agent-based Art",
+         "issued": {"date-parts": [[2016]]}},
+    ])
+    handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
+
+    citekey = handler.match_citekey_by_title(
+        "Machines That Learn : Aesthetics of Adaptive Behaviors in Agent-based Art.", 2016
+    )
+
+    assert citekey == "thesis2016"
+
+
+def test_match_citekey_by_title_stays_ambiguous_without_a_normalized_exact_title(tmp_path):
+    json_path = _write_csl_json(tmp_path, [
+        {"id": "a2020", "title": "A Widget Study, Part One", "issued": {"date-parts": [[2020]]}},
+        {"id": "b2020", "title": "A Widget Study, Part Two", "issued": {"date-parts": [[2020]]}},
+    ])
+    handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
+
+    assert handler.match_citekey_by_title("A Widget Study, Part", 2020) is None
+
+
 def test_match_citekey_by_title_tolerates_a_one_year_difference(tmp_path):
     json_path = _write_csl_json(tmp_path, [
         {"id": "smith2020widget", "title": "A Widget Study", "issued": {"date-parts": [[2020]]}},
@@ -206,13 +235,12 @@ def test_match_citekey_by_title_handles_a_string_typed_year_in_csl_json(tmp_path
     assert citekey == "smith2020widget"
 
 
-def test_match_citekey_by_title_returns_none_when_ambiguous(tmp_path):
+def test_match_citekey_by_title_prefers_the_exact_title_over_a_fuzzy_sibling(tmp_path):
     json_path = _write_csl_json(tmp_path, [
         {"id": "smith2020widget", "title": "A Widget Study", "issued": {"date-parts": [[2020]]}},
         {"id": "jones2020widget", "title": "A Widget Study II", "issued": {"date-parts": [[2020]]}},
     ])
     handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
 
-    citekey = handler.match_citekey_by_title("A Widget Study", 2020)
-
-    assert citekey is None
+    assert handler.match_citekey_by_title("A Widget Study", 2020) == "smith2020widget"
+    assert handler.match_citekey_by_title("A Widget Study II", 2020) == "jones2020widget"

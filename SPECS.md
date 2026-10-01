@@ -2362,7 +2362,12 @@ within 1 year counts as a match, since a CV's own recorded year and
 Zotero's `issued` date commonly disagree by one, e.g. an
 accepted/presented year vs. an actual publication year; a confident
 match writes the row with that citekey, no match flags it as "needs a
-Zotero citekey"). Real-world CSL-JSON exports don't reliably agree on
+Zotero citekey"). More than one fuzzy hit is ambiguous unless exactly
+one of them has the identical title once case, spacing before
+punctuation, and a trailing period are normalized — a real thesis
+titled "Machines That Learn: Aesthetics of …" fuzzy-matches both itself
+and a paper titled just "Aesthetics of …", and CCV writes it as
+"Machines That Learn : Aesthetics of ….". Real-world CSL-JSON exports don't reliably agree on
 whether `issued.date-parts`' year is an int or a numeric string
 (confirmed against a real ~1800-item Better BibTeX export mixing
 both) — the year is normalized to `int` before any comparison, so this

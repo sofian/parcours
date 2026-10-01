@@ -4,6 +4,7 @@ DOI+fuzzy-title dedup (see SPECS.md, "publications (handler:
 publications)")."""
 
 import json
+import re
 
 from ..matching import fuzzy_match
 from ..validation import LintIssue
@@ -82,7 +83,11 @@ class PublicationsHandler(CategoryHandler):
         year on the CV vs. an actual publication year in Zotero, or vice
         versa) — anything further apart is treated as a different work.
         Returns the citekey on exactly one confident match, None on no
-        match or an ambiguous (more than one) match."""
+        match or an ambiguous (more than one) match — except that a tie
+        is broken by the one candidate whose title is identical once
+        spacing and trailing punctuation are normalized (a long title
+        that contains another record's whole title, e.g. a thesis named
+        after one of its papers, fuzzy-matches both)."""
         candidates = []
         for citekey, record in self._csl_by_key.items():
             if not fuzzy_match(title, record.get("title", "")):
@@ -93,7 +98,23 @@ class PublicationsHandler(CategoryHandler):
             candidates.append(citekey)
         if len(candidates) == 1:
             return candidates[0]
+        normalized_title = _normalize_title(title)
+        exact = [
+            citekey for citekey in candidates
+            if _normalize_title(self._csl_by_key[citekey].get("title", "")) == normalized_title
+        ]
+        if len(exact) == 1:
+            return exact[0]
         return None
+
+
+def _normalize_title(title: str) -> str:
+    """Lowercased, whitespace-collapsed, with no space before `:;,?!` and
+    no trailing period — CCV exports commonly write "Title : Subtitle."
+    where the citation export has "Title: Subtitle"."""
+    text = " ".join(title.lower().split())
+    text = re.sub(r"\s+([:;,?!])", r"\1", text)
+    return text.rstrip(". ")
 
 
 def _csl_year(record: dict) -> int | None:
