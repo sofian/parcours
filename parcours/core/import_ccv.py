@@ -230,6 +230,7 @@ def _map_presentation(record_el, lang, ctx) -> MappedRow:
 @_register("Recognitions")
 def _map_recognitions(record_el, lang, ctx) -> MappedRow:
     recognition_type_raw = x.field_lov(record_el, "Recognition Type")
+    name_fr, name_en = x.field_single_language(record_el, "Recognition Name", lang)
     description_fr, description_en = x.field_bilingual(record_el, "Description", lang)
     currency, currency_flag = _currency_code(x.field_lov(record_el, "Currency"))
 
@@ -238,7 +239,8 @@ def _map_recognitions(record_el, lang, ctx) -> MappedRow:
         ccv_label="Recognitions",
         fields={
             "recognition_type": _RECOGNITION_TYPE.get(recognition_type_raw, ""),
-            "name": x.field_text(record_el, "Recognition Name"),
+            "name_en": name_en,
+            "name_fr": name_fr,
             "organization": x.field_organization(record_el),
             "role": "recipient",
             "date": x.field_yearmonth(record_el, "Effective Date"),
@@ -371,6 +373,7 @@ def _map_positions_affiliation(record_el, lang, ctx) -> MappedRow:
 
 @_register("Graduate Examination Activities")
 def _map_service_graduate_examination(record_el, lang, ctx) -> MappedRow:
+    detail_fr, detail_en = x.field_single_language(record_el, "Student Name", lang)
     return MappedRow(
         category="service",
         ccv_label="Graduate Examination Activities",
@@ -380,13 +383,15 @@ def _map_service_graduate_examination(record_el, lang, ctx) -> MappedRow:
             "organization": x.field_organization(record_el),
             "start_date": x.field_yearmonth(record_el, "Start Date"),
             "end_date": x.field_yearmonth(record_el, "End Date"),
-            "detail": x.field_text(record_el, "Student Name"),
+            "detail_en": detail_en,
+            "detail_fr": detail_fr,
         },
     )
 
 
 @_register("Research Funding Application Assessment Activities")
 def _map_service_funding_review(record_el, lang, ctx) -> MappedRow:
+    detail_fr, detail_en = x.field_single_language(record_el, "Committee Name", lang)
     return MappedRow(
         category="service",
         ccv_label="Research Funding Application Assessment Activities",
@@ -396,7 +401,8 @@ def _map_service_funding_review(record_el, lang, ctx) -> MappedRow:
             "organization": x.field_organization(record_el),
             "start_date": x.field_yearmonth(record_el, "Start Date"),
             "end_date": x.field_yearmonth(record_el, "End Date"),
-            "detail": x.field_text(record_el, "Committee Name"),
+            "detail_en": detail_en,
+            "detail_fr": detail_fr,
         },
     )
 
@@ -404,7 +410,6 @@ def _map_service_funding_review(record_el, lang, ctx) -> MappedRow:
 @_register("Community and Volunteer Activities")
 def _map_service_volunteer(record_el, lang, ctx) -> MappedRow:
     description_fr, description_en = x.field_bilingual(record_el, "Activity Description", lang)
-    detail = description_en or description_fr
     return MappedRow(
         category="service",
         ccv_label="Community and Volunteer Activities",
@@ -414,13 +419,15 @@ def _map_service_volunteer(record_el, lang, ctx) -> MappedRow:
             "organization": x.field_organization(record_el),
             "start_date": x.field_yearmonth(record_el, "Start Date"),
             "end_date": x.field_yearmonth(record_el, "End Date"),
-            "detail": detail,
+            "detail_en": description_en,
+            "detail_fr": description_fr,
         },
     )
 
 
 @_register("Committee Memberships")
 def _map_service_committee(record_el, lang, ctx) -> MappedRow:
+    detail_fr, detail_en = x.field_single_language(record_el, "Committee Name", lang)
     return MappedRow(
         category="service",
         ccv_label="Committee Memberships",
@@ -430,7 +437,8 @@ def _map_service_committee(record_el, lang, ctx) -> MappedRow:
             "organization": x.field_organization(record_el),
             "start_date": x.field_yearmonth(record_el, "Membership Start Date"),
             "end_date": x.field_yearmonth(record_el, "Membership End Date"),
-            "detail": x.field_text(record_el, "Committee Name"),
+            "detail_en": detail_en,
+            "detail_fr": detail_fr,
         },
     )
 
@@ -439,8 +447,14 @@ def _map_service_committee(record_el, lang, ctx) -> MappedRow:
 def _map_service_program_development(record_el, lang, ctx) -> MappedRow:
     description_fr, description_en = x.field_bilingual(record_el, "Program Description", lang)
     program_title = x.field_text(record_el, "Program Title")
-    description = description_en or description_fr
-    detail = f"{program_title}: {description}" if description else program_title
+
+    def _detail(description: str) -> str:
+        return f"{program_title}: {description}" if description else program_title
+
+    # The title is single-language, so a side with no description of its
+    # own still gets the title only on the export's language side.
+    detail_en = _detail(description_en) if (description_en or lang != "fr") else ""
+    detail_fr = _detail(description_fr) if (description_fr or lang == "fr") else ""
     return MappedRow(
         category="service",
         ccv_label="Program Development",
@@ -450,7 +464,8 @@ def _map_service_program_development(record_el, lang, ctx) -> MappedRow:
             "organization": x.field_organization(record_el),
             "start_date": x.field_yearmonth(record_el, "Date First Taught"),
             "end_date": "",
-            "detail": detail,
+            "detail_en": detail_en,
+            "detail_fr": detail_fr,
         },
     )
 

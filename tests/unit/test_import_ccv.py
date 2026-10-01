@@ -126,7 +126,8 @@ def test_map_recognitions():
     """)
     row = map_record(el, "Recognitions", "en", _ctx())
     assert row.fields["recognition_type"] == "prize"
-    assert row.fields["name"] == "Best Paper"
+    assert row.fields["name_en"] == "Best Paper"
+    assert row.fields["name_fr"] == ""
     assert row.fields["organization"] == "Some Society"
     assert row.fields["role"] == "recipient"
     assert row.fields["date"] == "2021-05"
@@ -134,6 +135,19 @@ def test_map_recognitions():
     assert row.fields["currency"] == "CAD"
     assert row.fields["description_en"] == "A description"
     assert row.fields["description_fr"] == "Une description"
+
+
+def test_map_recognitions_routes_name_to_the_export_language_side():
+    el = _record("""
+    <section label="Recognitions" recordId="r7">
+      <field label="Recognition Type"><lov id="1">Distinction</lov></field>
+      <field label="Recognition Name"><value type="String">Prix d'excellence</value></field>
+      <field label="Effective Date"><value type="YearMonth">2014/9</value></field>
+    </section>
+    """)
+    row = map_record(el, "Recognitions", "fr", _ctx())
+    assert row.fields["name_fr"] == "Prix d'excellence"
+    assert row.fields["name_en"] == ""
 
 
 def test_map_recognitions_defaults_currency_when_ccv_gives_none():
@@ -340,7 +354,7 @@ def test_map_service_graduate_examination():
     assert row.fields["type"] == "graduate-examination"
     assert row.fields["role"] == "Thesis Defense Examiner"
     assert row.fields["organization"] == "Test University"
-    assert row.fields["detail"] == "A Student"
+    assert row.fields["detail_en"] == "A Student"
     assert row.fields["start_date"] == "2020-01"
 
 
@@ -357,7 +371,7 @@ def test_map_service_funding_review():
     assert row.fields["type"] == "funding-review"
     assert row.fields["role"] == "External Reviewer"
     assert row.fields["organization"] == "Some Agency"
-    assert row.fields["detail"] == "Panel A"
+    assert row.fields["detail_en"] == "Panel A"
 
 
 def test_map_service_volunteer():
@@ -375,7 +389,8 @@ def test_map_service_volunteer():
     row = map_record(el, "Community and Volunteer Activities", "en", _ctx())
     assert row.fields["type"] == "volunteer"
     assert row.fields["role"] == "Board Member"
-    assert row.fields["detail"] == "Helped organize events"
+    assert row.fields["detail_en"] == "Helped organize events"
+    assert row.fields["detail_fr"] == ""
 
 
 def test_map_service_committee_membership():
@@ -391,7 +406,7 @@ def test_map_service_committee_membership():
     row = map_record(el, "Committee Memberships", "en", _ctx())
     assert row.fields["type"] == "committee"
     assert row.fields["role"] == "Committee Member"
-    assert row.fields["detail"] == "Hiring Committee"
+    assert row.fields["detail_en"] == "Hiring Committee"
     assert row.fields["start_date"] == "2021-01"
     assert row.fields["end_date"] == "2022-01"
 
@@ -414,8 +429,8 @@ def test_map_service_program_development():
     assert row.fields["type"] == "program-development"
     assert row.fields["start_date"] == "2020-09"
     assert row.fields["end_date"] == ""
-    assert "New MFA Program" in row.fields["detail"]
-    assert "A revised curriculum" in row.fields["detail"]
+    assert row.fields["detail_en"] == "New MFA Program: A revised curriculum"
+    assert row.fields["detail_fr"] == ""
 
 
 def test_map_outreach():

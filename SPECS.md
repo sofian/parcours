@@ -577,7 +577,8 @@ fields:
   - {name: organization, required: true, glossary: organization}  # free text — no vocab, too many distinct values
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}          # blank = ongoing
-  - {name: detail}                                               # student name (graduate-examination) / committee name
+  - {name: detail_en}
+  - {name: detail_fr}                                            # student name (graduate-examination) / committee name
                                                                   # (funding-review) / which committee, e.g. "Hiring
                                                                   # Committee" (committee) / program title + description
                                                                   # (program-development) / activity description
@@ -610,7 +611,11 @@ dedup:
   `start_date` — a mislabeled field for this record type, an artifact of
   the shared CCV wrapper — with `end_date` left blank, since CCV doesn't
   track when this kind of review work ended. Program title and
-  description fold into `detail`.
+  description fold into `detail_en`/`detail_fr`.
+- `detail` is a bilingual pair (`detail_en`/`detail_fr`): a committee
+  or program name usually has a real name in each language, while a
+  student's name just goes in the export's own language side (a view's
+  `{detail}` falls back to the other side when one is blank).
 
 ### outreach (handler: generic)
 
@@ -1034,7 +1039,8 @@ fields:
   - {name: id,               generated: true}                          # award-2026-004
   - {name: weight,           type: int}                                # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: recognition_type, required: true, vocab: recognition_type}   # citation / distinction / prize
-  - {name: name,             required: true}                            # free text
+  - {name: name_en}
+  - {name: name_fr}                                                     # free text — usually only one filled, see require_one_of
   - {name: organization,     required: true, glossary: organization}  # free text — refTable or "Other Organization" fallback, same pattern as positions/education
   - {name: role,             vocab: recognition_role, default: recipient}  # recipient / educator — for an award given to a student you supervised
   - {name: date,             type: date, precision: month, required: true}
@@ -1043,11 +1049,18 @@ fields:
   - {name: currency,         default: $currency.default}
   - {name: description_en}
   - {name: description_fr}
+require_one_of:
+  - [name_en, name_fr]
 dedup:
-  - when: [{exact: organization}, {fuzzy: name}, {same_year: date}]
+  - when: [{exact: organization}, {fuzzy: [name_en, name_fr]}, {same_year: date}]
     as: duplicate
 ```
 
+- `name` is a bilingual pair (`name_en`/`name_fr`) under
+  `require_one_of`, like titles elsewhere — an award usually has an
+  official name in each language ("Doctoral Award of Excellence" / "Prix
+  doctoral d'excellence"), but CCV's `Recognition Name` is one
+  single-language string, so import fills only the export's side.
 - `recognition_type` (Citation/Distinction/Prize-Award) is a small,
   confirmed set from the reference export (all 7 records fall into one
   of three values).

@@ -10,7 +10,8 @@ fields:
   - {name: organization, required: true, glossary: organization}  # free text — no vocab, too many distinct values
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}          # blank = ongoing
-  - {name: detail}                                               # student name (graduate-examination) / committee name
+  - {name: detail_en}
+  - {name: detail_fr}                                            # student name (graduate-examination) / committee name
                                                                   # (funding-review) / which committee, e.g. "Hiring
                                                                   # Committee" (committee) / program title + description
                                                                   # (program-development) / activity description
