@@ -5,7 +5,7 @@ fields:
   - {name: weight,             type: int}                                    # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: activity_type,      required: true, vocab: outreach_activity_type} # community-engagement / consulting-for-industry / ...
   - {name: target_stakeholder, vocab: outreach_stakeholder}                   # general-public / industry / ...
-  - {name: organization,       required: true}                               # free text — "Group/Organization/Business Serviced"
+  - {name: organization,       required: true, glossary: organization}  # free text — "Group/Organization/Business Serviced"
   - {name: role}                                                              # free text
   - {name: start_date,         type: date, precision: month, required: true}
   - {name: end_date,           type: date, precision: month}                 # blank = ongoing

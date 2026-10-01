@@ -6,9 +6,9 @@ fields:
   - {name: type,             required: true, vocab: position_type}   # academic / non-academic / affiliation
   - {name: title_en}
   - {name: title_fr}
-  - {name: organization,     required: true}                         # free text — CCV mostly supplies "Other Organization" here, not the refTable
-  - {name: faculty}                                                   # free text — e.g. "School of Media"
-  - {name: department}                                                # free text
+  - {name: organization,     required: true, glossary: organization}  # free text — CCV mostly supplies "Other Organization" here, not the refTable
+  - {name: faculty, glossary: organization}                             # free text — e.g. "School of Media"
+  - {name: department, glossary: organization}                          # free text
   - {name: position_status,  vocab: position_status}                  # e.g. full-time / part-time / casual
   - {name: start_date,       type: date, precision: month, required: true}
   - {name: end_date,         type: date, precision: month}            # blank = ongoing

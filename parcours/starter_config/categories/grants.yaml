@@ -5,7 +5,7 @@ fields:
   - {name: weight,       type: int}                         # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}
-  - {name: funder,       required: true}                    # free text
+  - {name: funder,       required: true, glossary: organization}  # free text
   - {name: program}
   - {name: role,         required: true, vocab: grant_role}     # PI / co-PI / collaborator
   - {name: status,       required: true, vocab: grant_status}   # submitted / awarded / declined

@@ -5,7 +5,7 @@ fields:
   - {name: weight,                 type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: student_name,           required: true}                        # free text
   - {name: role,                   required: true, vocab: student_role}   # principal-supervisor / co-supervisor
-  - {name: institution}                                                    # free text
+  - {name: institution, glossary: organization}                              # free text
   - {name: degree_type,            required: true, vocab: degree_type}    # bachelors-honours / masters / doctorate / postdoc
   - {name: degree_status,          required: true, vocab: degree_status}  # completed / in-progress / withdrawn / all-but-degree
   - {name: supervision_start_date, type: date, precision: month, required: true}

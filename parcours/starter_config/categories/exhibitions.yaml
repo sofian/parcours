@@ -5,8 +5,8 @@ fields:
   - {name: weight,       type: int}                                # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}                                                # usually only one filled
-  - {name: event}                                                    # free text — festival/series, e.g. "MUTEK Forum"
-  - {name: venue}                                                    # free text — hosting institution, e.g. "National Gallery"
+  - {name: event, glossary: organization}                              # free text — festival/series, e.g. "MUTEK Forum"
+  - {name: venue, glossary: organization}                              # free text — hosting institution, e.g. "National Gallery"
   - {name: city,         required: true, glossary: city}
   - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — credited curator(s)

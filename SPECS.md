@@ -533,7 +533,7 @@ fields:
   - {name: weight,       type: int}                         # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}
-  - {name: funder,       required: true}                    # free text
+  - {name: funder,       required: true, glossary: organization}  # free text
   - {name: program}
   - {name: role,         required: true, vocab: grant_role}     # PI / co-PI / collaborator
   - {name: status,       required: true, vocab: grant_status}   # submitted / awarded / declined
@@ -574,7 +574,7 @@ fields:
   - {name: role,         required: true}                        # free text — CCV's own Role field is a controlled list for some
                                                                   # service types and free text for others, so a merged vocab
                                                                   # wouldn't correspond to any single real list
-  - {name: organization, required: true}                        # free text — no vocab, too many distinct values
+  - {name: organization, required: true, glossary: organization}  # free text — no vocab, too many distinct values
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}          # blank = ongoing
   - {name: detail}                                               # student name (graduate-examination) / committee name
@@ -622,7 +622,7 @@ fields:
   - {name: weight,             type: int}                                    # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: activity_type,      required: true, vocab: outreach_activity_type} # community-engagement / consulting-for-industry / ...
   - {name: target_stakeholder, vocab: outreach_stakeholder}                   # general-public / industry / ...
-  - {name: organization,       required: true}                               # free text — "Group/Organization/Business Serviced"
+  - {name: organization,       required: true, glossary: organization}  # free text — "Group/Organization/Business Serviced"
   - {name: role}                                                              # free text
   - {name: start_date,         type: date, precision: month, required: true}
   - {name: end_date,           type: date, precision: month}                 # blank = ongoing
@@ -711,7 +711,7 @@ fields:
   - {name: weight,                 type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: student_name,           required: true}                        # free text
   - {name: role,                   required: true, vocab: student_role}   # principal-supervisor / co-supervisor
-  - {name: institution}                                                    # free text
+  - {name: institution, glossary: organization}                              # free text
   - {name: degree_type,            required: true, vocab: degree_type}    # bachelors-honours / masters / doctorate / postdoc
   - {name: degree_status,          required: true, vocab: degree_status}  # completed / in-progress / withdrawn / all-but-degree
   - {name: supervision_start_date, type: date, precision: month, required: true}
@@ -752,8 +752,8 @@ fields:
   - {name: title_en}
   - {name: title_fr}
   - {name: role}                                          # free text, e.g. Professor
-  - {name: organization, required: true}                  # resolved from CCV's refTable (see CCV export structure)
-  - {name: department}
+  - {name: organization, required: true, glossary: organization}  # resolved from CCV's refTable (see CCV export structure)
+  - {name: department, glossary: organization}
   - {name: date,         type: date, precision: month, required: true}  # term/year of this specific offering
 dedup:
   - when: [{exact: course_label}, {exact: organization}, {same_year: date}]
@@ -936,7 +936,7 @@ fields:
   - {name: degree_name_fr,    required: true}                         # e.g. "Ph. D. Humanities" / "Ph. D. Sciences humaines"
   - {name: specialization_en}
   - {name: specialization_fr}                                         # e.g. "Fine Arts" / "Beaux-arts"
-  - {name: organization,      required: true}                         # resolved from CCV's refTable
+  - {name: organization,      required: true, glossary: organization}  # resolved from CCV's refTable
   - {name: degree_status,     required: true, vocab: degree_status}   # completed / in-progress / withdrawn / all-but-degree — shared vocab with students
   - {name: start_date,        type: date, precision: month, required: true}
   - {name: end_date,          type: date, precision: month}           # blank = ongoing
@@ -977,9 +977,9 @@ fields:
   - {name: type,             required: true, vocab: position_type}   # academic / non-academic / affiliation
   - {name: title_en}
   - {name: title_fr}
-  - {name: organization,     required: true}                         # free text — CCV mostly supplies "Other Organization" here, not the refTable
-  - {name: faculty}                                                   # free text — e.g. "School of Media"
-  - {name: department}                                                # free text
+  - {name: organization,     required: true, glossary: organization}  # free text — CCV mostly supplies "Other Organization" here, not the refTable
+  - {name: faculty, glossary: organization}                             # free text — e.g. "School of Media"
+  - {name: department, glossary: organization}                          # free text
   - {name: position_status,  vocab: position_status}                  # e.g. full-time / part-time / casual
   - {name: start_date,       type: date, precision: month, required: true}
   - {name: end_date,         type: date, precision: month}            # blank = ongoing
@@ -1035,7 +1035,7 @@ fields:
   - {name: weight,           type: int}                                # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: recognition_type, required: true, vocab: recognition_type}   # citation / distinction / prize
   - {name: name,             required: true}                            # free text
-  - {name: organization,     required: true}                            # free text — refTable or "Other Organization" fallback, same pattern as positions/education
+  - {name: organization,     required: true, glossary: organization}  # free text — refTable or "Other Organization" fallback, same pattern as positions/education
   - {name: role,             vocab: recognition_role, default: recipient}  # recipient / educator — for an award given to a student you supervised
   - {name: date,             type: date, precision: month, required: true}
   - {name: end_date,         type: date, precision: month}              # blank for one-time citations; set for fellowship-like awards with a disbursement period
@@ -1085,8 +1085,8 @@ fields:
   - {name: weight,       type: int}                                # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}                                                # usually only one filled
-  - {name: event}                                                    # free text — festival/series, e.g. "MUTEK Forum"
-  - {name: venue}                                                    # free text — hosting institution, e.g. "National Gallery"
+  - {name: event, glossary: organization}                              # free text — festival/series, e.g. "MUTEK Forum"
+  - {name: venue, glossary: organization}                              # free text — hosting institution, e.g. "National Gallery"
   - {name: city,         required: true, glossary: city}
   - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — credited curator(s)
@@ -1150,8 +1150,8 @@ fields:
   - {name: weight,       type: int}                                # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}
-  - {name: event}
-  - {name: venue}
+  - {name: event, glossary: organization}
+  - {name: venue, glossary: organization}
   - {name: city,         required: true, glossary: city}
   - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — co-curator(s), if any (your own curatorial role is implicit)
@@ -1177,7 +1177,7 @@ handler: generic
 fields:
   - {name: id,           generated: true}                       # res-2026-004
   - {name: weight,       type: int}                             # optional; higher = appears earlier, refines/overrides date-based ordering
-  - {name: organization, required: true}                        # free text — e.g. "Hexagram", "LABoral"
+  - {name: organization, required: true, glossary: organization}  # free text — e.g. "Hexagram", "LABoral"
   - {name: city,         required: true, glossary: city}
   - {name: country,      required: true, glossary: country}                          # pre-populated in translations.csv at `init`, see Translations
   - {name: start_date,   type: date, precision: month, required: true}
@@ -1377,6 +1377,19 @@ Amounts can be converted to a reporting currency, mainly for statistics.
   won't automatically reach an already-initialized repo — a rare,
   minor cost given country names essentially never change, not an
   ongoing sync mechanism this tool needs to build.
+- **`category: organization`** backs every field naming an institution
+  or venue: `organization` on `education`, `positions`, `teaching`,
+  `service`, `outreach`, `recognitions` and `residencies`; `positions`'
+  `faculty`/`department` and `teaching`'s `department`; `grants.funder`;
+  `students.institution`; and `event`/`venue` on `exhibitions` and
+  `curatorship`. Institution names are a real bilingual pain point in a
+  Quebec CV (Concordia University / Université Concordia, Canada
+  Council for the Arts / Conseil des arts du Canada, Musée d'art
+  contemporain de Montréal / Montreal Museum of Contemporary Art) that
+  the user's LaTeX CV already handled with `\gtr{}` keys. Not
+  pre-populated, same as `city`: the stored value is whatever name you
+  type (conventionally the institution's own official name), and only
+  names whose form differs between languages need a row.
 - **Managing translations:** `translations.csv` has no `categories/*.yaml`
   schema (it's a fixed shape: `id, category, en, fr`), so it gets its own
   small command group rather than reusing `add`/`edit`/`delete`/`list`:

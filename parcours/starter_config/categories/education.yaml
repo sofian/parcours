@@ -8,7 +8,7 @@ fields:
   - {name: degree_name_fr,    required: true}                         # e.g. "Ph. D. Humanities" / "Ph. D. Sciences humaines"
   - {name: specialization_en}
   - {name: specialization_fr}                                         # e.g. "Fine Arts" / "Beaux-arts"
-  - {name: organization,      required: true}                         # resolved from CCV's refTable
+  - {name: organization,      required: true, glossary: organization}  # resolved from CCV's refTable
   - {name: degree_status,     required: true, vocab: degree_status}   # completed / in-progress / withdrawn / all-but-degree — shared vocab with students
   - {name: start_date,        type: date, precision: month, required: true}
   - {name: end_date,          type: date, precision: month}           # blank = ongoing

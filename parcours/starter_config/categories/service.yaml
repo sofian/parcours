@@ -7,7 +7,7 @@ fields:
   - {name: role,         required: true}                        # free text — CCV's own Role field is a controlled list for some
                                                                   # service types and free text for others, so a merged vocab
                                                                   # wouldn't correspond to any single real list
-  - {name: organization, required: true}                        # free text — no vocab, too many distinct values
+  - {name: organization, required: true, glossary: organization}  # free text — no vocab, too many distinct values
   - {name: start_date,   type: date, precision: month, required: true}
   - {name: end_date,     type: date, precision: month}          # blank = ongoing
   - {name: detail}                                               # student name (graduate-examination) / committee name

@@ -7,8 +7,8 @@ fields:
   - {name: title_en}
   - {name: title_fr}
   - {name: role}                                          # free text, e.g. Professor
-  - {name: organization, required: true}                  # resolved from CCV's refTable (see CCV export structure)
-  - {name: department}
+  - {name: organization, required: true, glossary: organization}  # resolved from CCV's refTable (see CCV export structure)
+  - {name: department, glossary: organization}
   - {name: date,         type: date, precision: month, required: true}  # term/year of this specific offering
 dedup:
   - when: [{exact: course_label}, {exact: organization}, {same_year: date}]
