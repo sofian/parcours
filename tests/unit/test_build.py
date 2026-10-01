@@ -229,6 +229,30 @@ def test_build_handles_string_typed_csl_date_parts(tmp_path, monkeypatch):
     assert dates == {"A": "2018-01-08", "B": "2019", "C": None}
 
 
+def test_build_uses_literal_names_and_falls_back_to_editors(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "reference").mkdir()
+    (repo / "reference" / "library.json").write_text(json.dumps([
+        {"id": "org2007", "title": "Org Report", "author": [{"literal": "Some Collective"}],
+         "issued": {"date-parts": [[2007]]}},
+        {"id": "ed2024", "title": "Edited Catalog", "editor": [{"given": "Pat", "family": "Editor"}],
+         "issued": {"date-parts": [[2024]]}},
+    ]))
+    (repo / "entries" / "publications.csv").write_text("id,citekey\np1,org2007\np2,ed2024\n")
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},
+        sections=[{"id": "publications", "source": "publications"}],
+    )
+    monkeypatch.setattr(
+        "parcours.core.build.load_views", lambda path: {"publications": _publications_view()}
+    )
+
+    data = build_rendercv_data(repo, profile)
+
+    authors = {e["title"]: e.get("authors") for e in data["cv"]["sections"]["Publications"]}
+    assert authors == {"Org Report": ["Some Collective"], "Edited Catalog": ["Pat Editor"]}
+
+
 def test_build_leaves_zotero_fields_absent_for_an_unresolved_citekey(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     (repo / "reference").mkdir()

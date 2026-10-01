@@ -43,14 +43,22 @@ def _csl_date_to_iso(record: dict) -> str | None:
 
 
 def _csl_authors_to_list(record: dict) -> list[str]:
-    names = []
-    for author in record.get("author", []):
-        given = author.get("given", "")
-        family = author.get("family", "")
-        full_name = " ".join(part for part in [given, family] if part)
-        if full_name:
-            names.append(full_name)
-    return names
+    """Authors as display names — an institutional author is a single
+    `literal` name in CSL-JSON, and an edited volume or exhibition
+    catalog often has only `editor`s, which are used instead of leaving
+    the entry author-less (RenderCV rejects a PublicationEntry without
+    authors)."""
+    def _names(people: list[dict]) -> list[str]:
+        names = []
+        for person in people:
+            full_name = person.get("literal") or " ".join(
+                part for part in [person.get("given", ""), person.get("family", "")] if part
+            )
+            if full_name:
+                names.append(full_name)
+        return names
+
+    return _names(record.get("author", [])) or _names(record.get("editor", []))
 
 
 def _merge_zotero_fields(handler: PublicationsHandler, row: dict) -> dict:
