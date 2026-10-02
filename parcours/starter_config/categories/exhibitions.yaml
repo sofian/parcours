@@ -8,7 +8,7 @@ fields:
   - {name: event, glossary: organization}                              # free text — festival/series, e.g. "MUTEK Forum"
   - {name: venue, glossary: organization}                              # free text — hosting institution, e.g. "National Gallery"
   - {name: city,         required: true, glossary: city}
-  - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
+  - {name: country,      required: true, required_unless: {city: Online}, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — credited curator(s)
   - {name: start_date,   type: date, precision: year, required: true}
   - {name: end_date,     type: date, precision: year}              # blank = single-day event or unknown

@@ -816,7 +816,7 @@ fields:
   - {name: event_en}
   - {name: event_fr}                                                    # Conference / Event Name — usually only one filled (e.g. "Colloque ACFAS" has no English name)
   - {name: city,      required: true, glossary: city}                                        # e.g. "The Hague"
-  - {name: country,   required: true, glossary: country}                                     # e.g. "Netherlands" — pre-populated in translations.csv at `init`, see Translations
+  - {name: country,   required: true, required_unless: {city: Online}, glossary: country}                                     # e.g. "Netherlands" — pre-populated in translations.csv at `init`, see Translations
   - {name: invited,   type: bool}
   - {name: keynote,   type: bool}
   - {name: format,    vocab: presentation_format}                     # talk / panel / round-table / workshop / poster / special-session
@@ -866,8 +866,11 @@ dedup:
   `"Online"` (one of CCV's actual location values, entered in the free-
   text `City` field since CCV's own `Location` is a closed country
   list) writes into `city` as-is; `country` comes back blank from CCV
-  for these rows, same as any other missing-required-field gap `parco
-  lint` catches afterward — nothing import-side needs to special-case.
+  for these rows. `country` is `required_unless: {city: Online}` on
+  `presentations`, `exhibitions` and `curatorship`, so an online event
+  needs no country, and `"{city}, {country}"` renders as just "Online"
+  ("En ligne" via the `city` glossary): compound templates trim a
+  separator left dangling by a blank field.
 - `format` records what kind of session it was — a real CV tags
   nearly every entry this way ("Panel", "Round table", "Workshop"…),
   and it has no CCV equivalent, so import leaves it blank. A keynote is
@@ -1130,7 +1133,7 @@ fields:
   - {name: event, glossary: organization}                              # free text — festival/series, e.g. "MUTEK Forum"
   - {name: venue, glossary: organization}                              # free text — hosting institution, e.g. "National Gallery"
   - {name: city,         required: true, glossary: city}
-  - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
+  - {name: country,      required: true, required_unless: {city: Online}, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — credited curator(s)
   - {name: start_date,   type: date, precision: year, required: true}
   - {name: end_date,     type: date, precision: year}              # blank = single-day event or unknown
@@ -1196,7 +1199,7 @@ fields:
   - {name: event, glossary: organization}
   - {name: venue, glossary: organization}
   - {name: city,         required: true, glossary: city}
-  - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
+  - {name: country,      required: true, required_unless: {city: Online}, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — co-curator(s), if any (your own curatorial role is implicit)
   - {name: start_date,   type: date, precision: year, required: true}
   - {name: end_date,     type: date, precision: year}
@@ -1681,6 +1684,9 @@ same as `highlights`' own list-of-separately-resolved-strings shape.
 A placeholder can list fallbacks separated by `|` — `"{title|event|venue}"`
 resolves to the first non-blank one — so a view can still name an entry
 whose optional title is blank (a festival appearance listed by festival).
+A compound template also trims separators left dangling at either end by
+a blank field (`"{funder} — {role}"` with no role renders `FRQSC`, not
+`FRQSC — `).
 
 **Zotero-backed views (`publications`, `review`, `catalog`):** these
 categories' `fields` templates reference the *resolved Zotero CSL-JSON

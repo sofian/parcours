@@ -8,7 +8,7 @@ fields:
   - {name: event, glossary: organization}
   - {name: venue, glossary: organization}
   - {name: city,         required: true, glossary: city}
-  - {name: country,      required: true, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
+  - {name: country,      required: true, required_unless: {city: Online}, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — co-curator(s), if any (your own curatorial role is implicit)
   - {name: start_date,   type: date, precision: year, required: true}
   - {name: end_date,     type: date, precision: year}
