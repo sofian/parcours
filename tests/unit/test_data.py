@@ -332,3 +332,21 @@ def test_format_table_aligns_columns():
 
 def test_format_table_handles_no_rows():
     assert format_table(["id"], []) == "(no rows)"
+
+
+def test_query_orders_by_several_keys_with_numeric_weight(tmp_path):
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "widgets.csv").write_text(
+        "id,weight,date\na,,2024\nb,1,\nc,,2026\nd,10,2001\ne,9,2001\n", encoding="utf-8"
+    )
+    rows = query_category_rows(tmp_path, "widgets", order_by="weight desc, date desc")
+    # numeric weights first (10 before 9, not string order), then the
+    # unweighted rows by date
+    assert [r["id"] for r in rows] == ["d", "e", "b", "c", "a"]
+
+
+def test_query_rejects_an_invalid_direction_in_a_later_key(tmp_path):
+    (tmp_path / "entries").mkdir()
+    (tmp_path / "entries" / "widgets.csv").write_text("id,weight,date\na,1,2024\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="direction"):
+        query_category_rows(tmp_path, "widgets", order_by="weight desc, date sideways")

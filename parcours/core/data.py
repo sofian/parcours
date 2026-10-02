@@ -73,16 +73,26 @@ def query_category_rows(
         query += " WHERE " + " AND ".join(clauses)
 
     if order_by:
-        parts = order_by.split()
-        field_name = parts[0]
-        direction_str = parts[1] if len(parts) > 1 else ""
-        direction = direction_str.upper() if direction_str else "ASC"
-        if direction not in ("ASC", "DESC"):
-            raise ValueError(
-                f"Invalid order_by direction '{direction_str}' for category '{category_name}' "
-                "(expected 'asc' or 'desc')"
-            )
-        query += f' ORDER BY "{field_name}" {direction}'
+        # Comma-separated keys, e.g. "weight desc, date desc" (SPECS.md,
+        # `weight`). Every column loads as text, so each key sorts first by
+        # its numeric value when it has one — "10" after "9" for `weight`
+        # — and then as text, which keeps ISO partial dates in order.
+        terms = []
+        for key in order_by.split(","):
+            parts = key.split()
+            if not parts:
+                continue
+            field_name = parts[0]
+            direction_str = parts[1] if len(parts) > 1 else ""
+            direction = direction_str.upper() if direction_str else "ASC"
+            if direction not in ("ASC", "DESC"):
+                raise ValueError(
+                    f"Invalid order_by direction '{direction_str}' for category '{category_name}' "
+                    "(expected 'asc' or 'desc')"
+                )
+            terms.append(f'TRY_CAST("{field_name}" AS DOUBLE) {direction} NULLS LAST')
+            terms.append(f'"{field_name}" {direction} NULLS LAST')
+        query += " ORDER BY " + ", ".join(terms)
 
     if limit is not None:
         query += " LIMIT ?"

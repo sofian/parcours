@@ -253,7 +253,13 @@ knowledge explicitly rather than relying on CSV row order, which isn't
 reliably preserved through edits. `order_by` in profiles/views can
 reference it as a tiebreaker alongside date-based ordering (e.g.
 `order_by: date desc, weight desc`), or, for `skills` (which has no
-dates at all), as the only ordering mechanism.
+dates at all), as the only ordering mechanism. `order_by` takes any
+number of comma-separated `field [asc|desc]` keys; since every column
+loads as text, each key compares numerically when its values are
+numbers (so `weight` 10 sorts above 9) and as text otherwise, with blank
+values last in either direction. `weight desc, date desc` pins weighted
+rows — e.g. a work still in progress, which has no date — above the
+dated ones.
 
 ### CCV export structure (documented from a real export)
 
