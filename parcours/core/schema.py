@@ -18,6 +18,19 @@ class FieldSpec:
     generated: bool = False
     precision: str | None = None
     glossary: str | None = None
+    # `required_unless: {status: in-progress}` — `required` is waived when
+    # every listed field holds the listed value (e.g. an artwork still in
+    # progress has no production year yet).
+    required_unless: dict[str, str] | None = None
+
+    def is_required(self, entry: dict) -> bool:
+        if not self.required:
+            return False
+        if self.required_unless and all(
+            (entry.get(name) or "") == value for name, value in self.required_unless.items()
+        ):
+            return False
+        return True
 
 
 @dataclass

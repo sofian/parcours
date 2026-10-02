@@ -184,7 +184,8 @@ Handler options (e.g. export paths) live in the schema's `options:` block.
 One file per category at `categories/<name>.yaml` in the data repo.
 Field keys: `name`, `type` (`string` default, `int`, `number`, `bool`,
 `text`, `date`, `person_list`), `required`, `vocab`, `default`,
-`generated`, `precision` (`date` fields only). `date` fields always
+`generated`, `precision` (`date` fields only), `glossary`,
+`required_unless` (see below). `date` fields always
 hold ISO partial dates (`2024`, `2024-09`, `2024-09-30`) — `precision`
 sets the **minimum** acceptable granularity (`year`, `month`, or
 `day`), never a maximum: a field declared `precision: year` still
@@ -230,6 +231,17 @@ per-row content fields on category data, where forcing both sides
 would mean inventing translations that don't really exist. `lint` warns
 only if **no** field in a `require_one_of` group is filled — not if
 only one is.
+
+**`required_unless`** (field-level, alongside `required`): a mapping of
+field → value that waives `required` when every listed field holds that
+value — e.g. `artworks.date` is `required: true, required_unless:
+{status: in-progress}`, since a work still in progress has no production
+year yet, while a finished work without one is still a lint error. An
+explicit status was chosen over "a blank date means in progress" so that
+an in-progress work stays distinguishable from a forgotten date. A value
+that *is* given is still validated normally. The wizard applies the same
+rule, so a field becomes skippable once an earlier answer meets the
+condition (declare the condition field first).
 
 **`weight`** (a standard optional `int` field, present in every schema
 right after `id`): a manual ordering hint, higher = appears earlier.

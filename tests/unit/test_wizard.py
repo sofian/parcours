@@ -274,3 +274,26 @@ def test_weight_is_always_asked_last_regardless_of_declared_position(monkeypatch
     wizard.collect_field_values(schema, {})
 
     assert prompted_fields == ["title_en", "event", "weight"]
+
+
+def _conditional_schema():
+    return CategorySchema(
+        name="artworks",
+        fields=[
+            FieldSpec(name="id", generated=True),
+            FieldSpec(name="status", vocab="artwork_status"),
+            FieldSpec(name="date", type="date", required=True, required_unless={"status": "in-progress"}),
+        ],
+    )
+
+
+def test_required_unless_lets_the_wizard_skip_the_field_when_the_condition_holds(monkeypatch):
+    _prompt_sequence(monkeypatch, ["1", ""])
+    values = wizard.collect_field_values(_conditional_schema(), {"artwork_status": ["in-progress", "completed"]})
+    assert values == {"status": "in-progress", "date": ""}
+
+
+def test_required_unless_keeps_the_field_required_otherwise(monkeypatch):
+    _prompt_sequence(monkeypatch, ["2", "", "2024"])
+    values = wizard.collect_field_values(_conditional_schema(), {"artwork_status": ["in-progress", "completed"]})
+    assert values == {"status": "completed", "date": "2024"}

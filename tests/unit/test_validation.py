@@ -90,3 +90,36 @@ def test_generated_fields_are_never_flagged_as_missing():
     entry = {"id": "", "title_en": "A Widget", "status": "draft", "start_date": "2024-09"}
     issues = validate_common(_schema(), entry, VOCAB)
     assert not any(i.field == "id" for i in issues)
+
+
+def _conditional_schema():
+    return CategorySchema(
+        name="artworks",
+        fields=[
+            FieldSpec(name="id", generated=True),
+            FieldSpec(name="status", vocab="artwork_status"),
+            FieldSpec(name="date", type="date", precision="year", required=True,
+                      required_unless={"status": "in-progress"}),
+        ],
+    )
+
+
+ART_VOCAB = {"artwork_status": ["in-progress", "completed"]}
+
+
+def test_required_unless_exempts_a_blank_field_when_the_condition_holds():
+    entry = {"id": "a1", "status": "in-progress", "date": ""}
+    assert validate_common(_conditional_schema(), entry, ART_VOCAB) == []
+
+
+def test_required_unless_still_requires_the_field_otherwise():
+    for status in ("completed", ""):
+        entry = {"id": "a1", "status": status, "date": ""}
+        issues = validate_common(_conditional_schema(), entry, ART_VOCAB)
+        assert [i.field for i in issues] == ["date"]
+
+
+def test_required_unless_still_validates_a_value_that_is_given():
+    entry = {"id": "a1", "status": "in-progress", "date": "someday"}
+    issues = validate_common(_conditional_schema(), entry, ART_VOCAB)
+    assert [i.field for i in issues] == ["date"]

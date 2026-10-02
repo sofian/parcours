@@ -92,3 +92,18 @@ def test_default_date_field_falls_back_to_plain_date():
 def test_default_date_field_none_when_neither_present():
     schema = CategorySchema(name="publications", fields=[FieldSpec(name="citekey")])
     assert schema.default_date_field() is None
+
+
+def test_loads_required_unless(tmp_path):
+    schema_file = _write(tmp_path / "works.yaml", """
+name: works
+fields:
+  - {name: id, generated: true}
+  - {name: status, vocab: work_status}
+  - {name: date, type: date, required: true, required_unless: {status: in-progress}}
+""")
+    date_field = load_category_schema(schema_file).get_field("date")
+    assert date_field.required_unless == {"status": "in-progress"}
+    assert date_field.is_required({"status": "in-progress"}) is False
+    assert date_field.is_required({"status": "completed"}) is True
+    assert date_field.is_required({}) is True

@@ -18,11 +18,11 @@ def _require_one_of_group(schema: CategorySchema, field_name: str) -> list[str] 
     return None
 
 
-def _ask_vocab_field(field: FieldSpec, choices: list[str], current: str | None) -> str:
+def _ask_vocab_field(field: FieldSpec, choices: list[str], current: str | None, required: bool) -> str:
     typer.echo(f"{field.name}:")
     for i, choice in enumerate(choices, start=1):
         typer.echo(f"  {i}. {choice}")
-    if not field.required:
+    if not required:
         typer.echo("  0. [skip]")
 
     # `current` (edit's existing value, or add's --field prefill) wins
@@ -42,36 +42,41 @@ def _ask_vocab_field(field: FieldSpec, choices: list[str], current: str | None) 
         except (TypeError, ValueError):
             typer.echo("Please enter a number.")
             continue
-        if number == 0 and not field.required:
+        if number == 0 and not required:
             return ""
         if 1 <= number <= len(choices):
             return choices[number - 1]
         typer.echo("Not a valid choice.")
 
 
-def _ask_plain_field(field: FieldSpec, current: str | None) -> str:
+def _ask_plain_field(field: FieldSpec, current: str | None, required: bool) -> str:
     default = current or ""
-    if not current and field.type == "date" and field.required:
+    if not current and field.type == "date" and required:
         default = str(date.today().year)
-    prompt_suffix = "" if field.required else " ([Enter] to skip)"
+    prompt_suffix = "" if required else " ([Enter] to skip)"
 
     while True:
         answer = typer.prompt(f"{field.name}{prompt_suffix}", default=default, show_default=bool(default)).strip()
-        if field.required and not answer:
+        if required and not answer:
             typer.echo(f"'{field.name}' is required.")
             continue
         return answer
 
 
-def _ask_field(field: FieldSpec, vocab: dict, current: str | None) -> str:
+def _ask_field(field: FieldSpec, vocab: dict, current: str | None, required: bool | None = None) -> str:
+    """`required` overrides `field.required` — the full wizard passes the
+    answers so far through `field.is_required()` so a `required_unless`
+    condition met by an earlier answer makes this field skippable."""
+    if required is None:
+        required = field.required
     if field.vocab:
         choices = vocab.get(field.vocab, [])
         if not choices:
             raise typer.BadParameter(
                 f"vocab list '{field.vocab}' for field '{field.name}' is empty or undefined in vocab.yaml"
             )
-        return _ask_vocab_field(field, choices, current)
-    return _ask_plain_field(field, current)
+        return _ask_vocab_field(field, choices, current, required)
+    return _ask_plain_field(field, current, required)
 
 
 def ask_field_by_name(schema: CategorySchema, vocab: dict, field_name: str, current: str | None) -> str:
@@ -126,7 +131,9 @@ def collect_field_values(
             values.update(ask_group_fields(schema, vocab, group, prefill))
             continue
 
-        values[field.name] = _ask_field(field, vocab, prefill.get(field.name))
+        values[field.name] = _ask_field(
+            field, vocab, prefill.get(field.name), required=field.is_required({**prefill, **values})
+        )
 
     return values
 
