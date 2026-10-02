@@ -4,7 +4,7 @@ validation beyond required/vocab checks" (SPECS.md, "Category handlers")."""
 
 from dataclasses import dataclass
 
-from .dates import InvalidDateError, meets_precision_floor
+from .dates import InvalidDateError, date_format_hint, meets_precision_floor
 from .names import InvalidPersonListError, parse_person_list
 from .schema import CategorySchema
 from .vocab import is_valid_value
@@ -53,11 +53,13 @@ def validate_common(schema: CategorySchema, entry: dict, vocab: dict) -> list[Li
                 if not meets_precision_floor(value, f.precision):
                     issues.append(LintIssue(
                         schema.name, row_id, f.name,
-                        f"'{f.name}' must have at least {f.precision} precision, got '{value}'",
+                        f"'{f.name}' must have at least {f.precision} precision, got '{value}' "
+                        f"(use {date_format_hint(f.precision)})",
                     ))
             except InvalidDateError:
                 issues.append(LintIssue(
-                    schema.name, row_id, f.name, f"'{f.name}' is not a valid date: '{value}'",
+                    schema.name, row_id, f.name,
+                    f"'{f.name}' is not a valid date: '{value}' (use {date_format_hint(f.precision)})",
                 ))
 
         if f.type == "person_list":

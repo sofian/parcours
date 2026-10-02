@@ -297,3 +297,42 @@ def test_required_unless_keeps_the_field_required_otherwise(monkeypatch):
     _prompt_sequence(monkeypatch, ["2", "", "2024"])
     values = wizard.collect_field_values(_conditional_schema(), {"artwork_status": ["in-progress", "completed"]})
     assert values == {"status": "completed", "date": "2024"}
+
+
+def test_date_field_prompt_shows_the_format_and_rejects_bad_input(monkeypatch):
+    prompts, echoes = [], []
+    answers = iter(["06-09-18", "2018", "2018-09"])
+
+    def _fake_prompt(text, **kwargs):
+        prompts.append(text)
+        return next(answers)
+
+    monkeypatch.setattr(wizard.typer, "prompt", _fake_prompt)
+    monkeypatch.setattr(wizard.typer, "echo", lambda msg="", **k: echoes.append(msg))
+    schema = CategorySchema(name="grants", fields=[
+        FieldSpec(name="start_date", type="date", precision="month", required=True),
+    ])
+
+    value = wizard.ask_field_by_name(schema, {}, "start_date", "2018")
+
+    assert value == "2018-09"
+    assert "YYYY-MM or YYYY-MM-DD" in prompts[0]
+    assert len(prompts) == 3
+    assert any("YYYY-MM" in e for e in echoes)
+
+
+def test_required_date_default_matches_the_precision_floor(monkeypatch):
+    calls = []
+
+    def _fake_prompt(text, **kwargs):
+        calls.append(kwargs.get("default"))
+        return kwargs.get("default")
+
+    monkeypatch.setattr(wizard.typer, "prompt", _fake_prompt)
+    monkeypatch.setattr(wizard.typer, "echo", lambda *a, **k: None)
+    schema = CategorySchema(name="grants", fields=[
+        FieldSpec(name="id", generated=True),
+        FieldSpec(name="start_date", type="date", precision="month", required=True),
+    ])
+    values = wizard.collect_field_values(schema, {})
+    assert values["start_date"] == date.today().strftime("%Y-%m")

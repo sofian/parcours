@@ -55,3 +55,19 @@ def test_ranges_overlap_ongoing_end_date():
     # A blank or "present" end means ongoing (open-ended).
     assert ranges_overlap("2020-01", None, "2025-01", "2025-06") is True
     assert ranges_overlap("2020-01", "present", "2099-01", "2099-06") is True
+
+
+def test_date_format_hint_lists_accepted_shapes_from_the_precision_floor():
+    from parcours.core.dates import date_format_hint
+    assert date_format_hint("year") == "YYYY, YYYY-MM or YYYY-MM-DD"
+    assert date_format_hint("month") == "YYYY-MM or YYYY-MM-DD"
+    assert date_format_hint("day") == "YYYY-MM-DD"
+    assert date_format_hint(None) == "YYYY, YYYY-MM or YYYY-MM-DD"
+
+
+def test_date_input_problem_explains_what_is_wrong():
+    from parcours.core.dates import date_input_problem
+    assert date_input_problem("2018-09", "month") is None
+    assert "YYYY-MM" in date_input_problem("2018", "month")
+    assert "YYYY-MM" in date_input_problem("06-09-18", "month")
+    assert "not a valid date" in date_input_problem("2018-13", "month")

@@ -194,6 +194,12 @@ require one. The wizard asks for a date at the field's minimum
 granularity and offers to go more precise (year → month → day) rather
 than demanding a fixed format, since real recall is uneven — some
 dates you'll remember to the day, most only to the year.
+Every date prompt (wizard, `lint --fix-interactive`) shows the accepted
+shapes for that field's floor — e.g. `start_date (YYYY-MM or
+YYYY-MM-DD)` — pre-fills today at that precision, and rejects a malformed
+(`06-09-18`), impossible (`2018-13`) or too-imprecise answer on the spot
+with the reason, rather than writing it and leaving it for `lint`.
+`lint`'s own date messages name the expected format the same way.
 
 `person_list` fields always hold `"Last, First; Last, First"` —
 semicolon-separated people, each `Last, First` (`core/names.py`'s

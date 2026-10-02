@@ -7,7 +7,7 @@ from datetime import date
 
 import typer
 
-from ..core.dates import InvalidDateError, parse_partial_date
+from ..core.dates import InvalidDateError, date_format_hint, date_input_problem, parse_partial_date
 from ..core.schema import CategorySchema, FieldSpec
 
 
@@ -52,14 +52,26 @@ def _ask_vocab_field(field: FieldSpec, choices: list[str], current: str | None, 
 def _ask_plain_field(field: FieldSpec, current: str | None, required: bool) -> str:
     default = current or ""
     if not current and field.type == "date" and required:
-        default = str(date.today().year)
+        # Pre-fill today at the field's own precision floor, so accepting
+        # the default with Enter always passes validation.
+        default = {"month": date.today().strftime("%Y-%m"), "day": date.today().isoformat()}.get(
+            field.precision, str(date.today().year)
+        )
     prompt_suffix = "" if required else " ([Enter] to skip)"
+    label = field.name
+    if field.type == "date":
+        label = f"{field.name} ({date_format_hint(field.precision)})"
 
     while True:
-        answer = typer.prompt(f"{field.name}{prompt_suffix}", default=default, show_default=bool(default)).strip()
+        answer = typer.prompt(f"{label}{prompt_suffix}", default=default, show_default=bool(default)).strip()
         if required and not answer:
             typer.echo(f"'{field.name}' is required.")
             continue
+        if answer and field.type == "date":
+            problem = date_input_problem(answer, field.precision)
+            if problem:
+                typer.echo(problem)
+                continue
         return answer
 
 

@@ -60,6 +60,33 @@ def meets_precision_floor(value: str, minimum: str) -> bool:
     return _PRECISION_RANK[parsed.precision] >= _PRECISION_RANK[minimum]
 
 
+_HINTS = {
+    "year": "YYYY, YYYY-MM or YYYY-MM-DD",
+    "month": "YYYY-MM or YYYY-MM-DD",
+    "day": "YYYY-MM-DD",
+}
+
+
+def date_format_hint(precision: str | None) -> str:
+    """The input shapes a date field accepts, given its precision floor —
+    shown next to date prompts so the ISO order is never a guess."""
+    return _HINTS.get(precision or "year", _HINTS["year"])
+
+
+def date_input_problem(value: str, precision: str | None) -> str | None:
+    """A human-readable reason `value` isn't acceptable for a date field
+    with this precision floor, or None if it is."""
+    hint = date_format_hint(precision)
+    try:
+        if not meets_precision_floor(value, precision or "year"):
+            return f"'{value}' is less precise than this field requires — use {hint} (e.g. 2018-09)."
+    except InvalidDateError as exc:
+        if "Not a valid date" in str(exc):
+            return f"'{value}' is not a valid date (month 01–12, a real day) — use {hint}."
+        return f"'{value}' isn't in year-month-day order — use {hint} (e.g. 2018-09-06)."
+    return None
+
+
 def same_year(a: str, b: str) -> bool:
     return parse_partial_date(a).year == parse_partial_date(b).year
 
