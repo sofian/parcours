@@ -90,3 +90,16 @@ def test_starter_translations_grants_row_matches_the_agreed_wording():
     table = load_translations(_STARTER_DIR / "translations.csv")
     assert table.lookup("section", "grants", "en") == "Grants"
     assert table.lookup("section", "grants", "fr") == "Subventions"
+
+
+def test_artwork_status_values_have_en_fr_labels_and_waive_the_date():
+    vocab = load_vocab(_STARTER_DIR / "vocab.yaml")
+    table = load_translations(_STARTER_DIR / "translations.csv")
+    for value in vocab["artwork_status"]:
+        assert table.lookup("artwork_status", value, "en")
+        assert table.lookup("artwork_status", value, "fr")
+    assert table.lookup("artwork_status", "in-progress", "fr") == "en cours"
+
+    date_field = load_category_schema(_CATEGORIES_DIR / "artworks.yaml").get_field("date")
+    assert date_field.is_required({"status": "in-progress"}) is False
+    assert date_field.is_required({"status": ""}) is True

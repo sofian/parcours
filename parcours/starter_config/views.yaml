@@ -56,7 +56,7 @@ artworks:
   entry_type: NormalEntry
   fields:
     name: "{title}"
-    date: date
+    date: "{date|status}"
     highlights:
       - "{role}"
       - "{co_authors}"

@@ -6,7 +6,8 @@ fields:
   - {name: title_en}
   - {name: title_fr}                                             # usually only one filled — see require_one_of
   - {name: role,           required: true, vocab: artwork_role, default: author}  # author / collaborator
-  - {name: date,           type: date, precision: year, required: true}  # production year
+  - {name: status,         vocab: artwork_status, glossary: artwork_status}  # in-progress / completed — blank = completed
+  - {name: date,           type: date, precision: year, required: true, required_unless: {status: in-progress}}  # production year
   - {name: description_en}
   - {name: description_fr}                                       # CCV's "Description / Contribution Value"
   - {name: co_authors,     type: person_list}                    # other primary authors (not you) — "Last, First; Last, First"

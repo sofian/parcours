@@ -670,7 +670,8 @@ fields:
   - {name: title_en}
   - {name: title_fr}                                             # usually only one filled — see require_one_of
   - {name: role,           required: true, vocab: artwork_role, default: author}  # author / collaborator
-  - {name: date,           type: date, precision: year, required: true}  # production year
+  - {name: status,         vocab: artwork_status, glossary: artwork_status}  # in-progress / completed — blank = completed
+  - {name: date,           type: date, precision: year, required: true, required_unless: {status: in-progress}}  # production year
   - {name: description_en}
   - {name: description_fr}                                       # CCV's "Description / Contribution Value"
   - {name: co_authors,     type: person_list}                    # other primary authors (not you) — "Last, First; Last, First"
@@ -717,6 +718,12 @@ dedup:
 - `date` is the **production year**, not a performance/exhibition date —
   `precision: year` (a floor, not a ceiling, per Category schemas above:
   a more precise date is still fine if known, just not required).
+- `status` (`artwork_status`: `in-progress`/`completed`, blank meaning
+  completed) marks a work still being made. Its `date` is then optional
+  (`required_unless`, see Category schemas above) — a planned year may
+  still be given — and the view prints the status ("in progress" / "en
+  cours", via the `artwork_status` glossary rows seeded at `init`) when
+  there's no date: `date: "{date|status}"`.
 
 ### students (handler: generic)
 
@@ -1462,6 +1469,7 @@ grant_role: [pi, co-pi, collaborator]
 grant_status: [submitted, awarded, declined]
 
 artwork_role: [author, collaborator]
+artwork_status: [in-progress, completed]
 
 presentation_format: [talk, panel, round-table, workshop, poster, special-session]
 

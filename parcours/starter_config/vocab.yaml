@@ -5,6 +5,7 @@ grant_role: [pi, co-pi, collaborator]
 grant_status: [submitted, awarded, declined]
 
 artwork_role: [author, collaborator]
+artwork_status: [in-progress, completed]
 
 presentation_format: [talk, panel, round-table, workshop, poster, special-session]
 
