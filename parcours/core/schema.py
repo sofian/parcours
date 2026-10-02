@@ -27,7 +27,8 @@ class FieldSpec:
         if not self.required:
             return False
         if self.required_unless and all(
-            (entry.get(name) or "") == value for name, value in self.required_unless.items()
+            (entry.get(name) or "").strip().lower() == str(value).strip().lower()
+            for name, value in self.required_unless.items()
         ):
             return False
         return True

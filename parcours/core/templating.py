@@ -69,4 +69,6 @@ def resolve_template(template, row: dict, language: str):
         value = _resolve_alternatives(row, match.group(1), language)
         return str(value) if value else ""
 
-    return _PLACEHOLDER.sub(_substitute, template)
+    # A blank field leaves its literal separator dangling ("Online, " from
+    # "{city}, {country}" for an online event) — trim those at the ends.
+    return _PLACEHOLDER.sub(_substitute, template).strip(" ,;:–—")

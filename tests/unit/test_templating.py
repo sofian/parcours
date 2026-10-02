@@ -62,9 +62,9 @@ def test_resolve_template_compound_string_substitutes_each_placeholder():
     assert resolve_template("{funder} — {role}", row, "en") == "FRQSC — PI"
 
 
-def test_resolve_template_compound_string_treats_blank_fields_as_empty():
+def test_resolve_template_compound_string_drops_the_separator_of_a_blank_field():
     row = {"funder": "FRQSC", "role": ""}
-    assert resolve_template("{funder} — {role}", row, "en") == "FRQSC — "
+    assert resolve_template("{funder} — {role}", row, "en") == "FRQSC"
 
 
 def test_resolve_template_list_resolves_each_item_and_drops_blanks():
@@ -92,3 +92,9 @@ def test_resolve_template_pipe_uses_the_first_field_when_present():
 def test_resolve_template_pipe_works_inside_a_compound_string():
     row = {"title_en": "", "event_fr": "Festival", "city": "Paris"}
     assert resolve_template("{title|event} ({city})", row, "en") == "Festival (Paris)"
+
+
+def test_resolve_template_compound_trims_separators_left_by_a_blank_field():
+    assert resolve_template("{city}, {country}", {"city": "Online", "country": ""}, "en") == "Online"
+    assert resolve_template("{city}, {country}", {"city": "", "country": "France"}, "en") == "France"
+    assert resolve_template("{city}, {country}", {"city": "Paris", "country": "France"}, "en") == "Paris, France"

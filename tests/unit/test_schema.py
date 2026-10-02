@@ -107,3 +107,10 @@ fields:
     assert date_field.is_required({"status": "in-progress"}) is False
     assert date_field.is_required({"status": "completed"}) is True
     assert date_field.is_required({}) is True
+
+
+def test_required_unless_matches_case_insensitively():
+    from parcours.core.schema import FieldSpec
+    country = FieldSpec(name="country", required=True, required_unless={"city": "Online"})
+    assert country.is_required({"city": "online"}) is False
+    assert country.is_required({"city": "Paris"}) is True
