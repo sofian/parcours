@@ -123,7 +123,7 @@ def test_grant_role_has_co_applicant_and_every_value_is_translated():
     for value in vocab["grant_role"]:
         assert table.lookup("grant_role", value, "en")
         assert table.lookup("grant_role", value, "fr")
-    assert table.lookup("grant_role", "co-applicant", "fr") == "Cocandidat.e"
+    assert table.lookup("grant_role", "co-applicant", "fr") == "Cocandidat·e"
 
     role_field = load_category_schema(_CATEGORIES_DIR / "grants.yaml").get_field("role")
     assert role_field.glossary == "grant_role"

@@ -599,7 +599,7 @@ dedup:
   imported as-is). CCV's other roles (Co-director, Knowledge User,
   Decision/Policy maker, …) were left out as not worth the vocab weight.
   The field is also `glossary: grant_role`, so `build` renders the
-  translated label (`Cocandidat.e`) instead of the raw value.
+  translated label (`Cocandidat·e`) instead of the raw value.
 - Amounts are stored, which is one reason the data repo is private.
   Converted amounts are described under Currency conversion below.
 - RenderCV mapping (in `views.yaml`): a grant becomes a `NormalEntry` —
