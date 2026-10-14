@@ -230,5 +230,5 @@ in-progress,artwork_status,in progress,en cours
 completed,artwork_status,completed,terminé
 pi,grant_role,Principal investigator,Chercheur.e principal.e
 co-pi,grant_role,Co-investigator,Cochercheur.e
-co-applicant,grant_role,Co-applicant,Codemandeur.e
-collaborator,grant_role,Collaborator,Collaborateur.trice
+co-applicant,grant_role,Co-applicant,Cocandidat.e
+collaborator,grant_role,Collaborator,Collaborateur.ice
