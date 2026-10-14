@@ -194,6 +194,13 @@ require one. The wizard asks for a date at the field's minimum
 granularity and offers to go more precise (year → month → day) rather
 than demanding a fixed format, since real recall is uneven — some
 dates you'll remember to the day, most only to the year.
+Wherever a full date is needed (range overlap, currency conversion), a
+partial date is read as the widest span it covers: a *start* date's
+missing parts are the first day of the month/year, an *end* date's the
+last (`2010-03`–`2010-03` → 2010-03-01 to 2010-03-31; `2011`–`2011` →
+2011-01-01 to 2011-12-31; `2024-02` as an end → 2024-02-29). The CSV
+keeps what you entered; the full date is only inferred when read
+(`core/dates.py`'s `inferred_start`/`inferred_end`).
 Every date prompt (wizard, `lint --fix-interactive`) shows the accepted
 shapes for that field's floor — e.g. `start_date (YYYY-MM or
 YYYY-MM-DD)` — pre-fills today at that precision, and rejects a malformed
@@ -561,15 +568,13 @@ fields:
   - {name: program,      glossary: program}                  # e.g. "Concept to Realization"
   - {name: role,         required: true, vocab: grant_role}     # PI / co-PI / collaborator
   - {name: status,       required: true, vocab: grant_status}   # submitted / awarded / declined
-  - {name: start_date,   type: date, precision: month, required: true}
-  - {name: end_date,     type: date, precision: month}      # blank = ongoing
+  - {name: start_date,   type: date, precision: year, required: true}  # partial = first day of the month/year
+  - {name: end_date,     type: date, precision: year}       # blank = ongoing; partial = last day of the month/year
   - {name: amount,       type: number}
   - {name: currency,     default: $currency.default}         # from parco.yaml, e.g. CAD
   - {name: co_investigators, type: person_list}
   - {name: note_en}
   - {name: note_fr}
-require_one_of:
-  - [title_en, title_fr]
 dedup:
   - when: [{exact: funder}, {overlap: [start_date, end_date]}, {fuzzy: [title_en, title_fr]}]
     as: duplicate
@@ -580,7 +585,14 @@ dedup:
   were originally both `required: true`; loosened to `require_one_of`
   (see Category schemas above) for the same reason as `artworks` —
   the CCV importer can only ever fill one side per record, and forcing
-  a translation would mean inventing one.
+  a translation would mean inventing one. Later dropped altogether: some
+  grants (operating support, travel grants) have no title of their own,
+  so the view names the entry `"{title|program|funder}"`. An untitled
+  grant never fuzzy-matches another, so the dedup rule can't flag it.
+- Dates: `precision` was `month` (for currency conversion) until real
+  data showed older grants known only to the year. Lowered to `year`;
+  a year-only `start_date` converts at January's rate (see Currency
+  conversion).
 - Amounts are stored, which is one reason the data repo is private.
   Converted amounts are described under Currency conversion below.
 - RenderCV mapping (in `views.yaml`): a grant becomes a `NormalEntry` —
@@ -845,9 +857,9 @@ dedup:
   year, so ~90 of ~95 imported talks failed a month floor with no source
   to fix them from — permanent lint noise drowning out real gaps. The
   same reasoning lowered `exhibitions`, `curatorship`, `residencies`,
-  `software` and `service` dates to `year`. `grants` keeps `month`
-  (currency conversion needs a start month) and so does `teaching` (the
-  month identifies the term).
+  `software` and `service` dates to `year`. `teaching` keeps `month` (the
+  month identifies the term). `grants` kept `month` for currency
+  conversion until it too was lowered to `year` (see grants above).
 - `title` follows the artworks pattern: CCV's single `Presentation
   Title` splits to `title_en`/`title_fr`, import fills the matching side
   and leaves the other blank. Unlike artworks, a title isn't required at
@@ -1358,8 +1370,9 @@ Amounts can be converted to a reporting currency, mainly for statistics.
   structured result (rows added, failure reason); the CLI reports it.
   Tests mock the HTTP call.
 - **Convention:** a grant is converted at the monthly rate for its
-  `start_date` month (always defined, since `start_date` is required and
-  month-precise). One rate per grant; the amount is not spread across
+  `start_date` month (always defined, since `start_date` is required; a
+  year-only start is read as January, per the partial-date rule under
+  Category schemas). One rate per grant; the amount is not spread across
   the term.
 - **Lookup:** a core `convert(amount, from, to, month)` function, plus a
   derived `amount_<report>` column (e.g. `amount_cad`) in the `grants`

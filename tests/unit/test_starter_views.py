@@ -59,3 +59,8 @@ def test_authors_field_is_a_bare_placeholder_not_a_compound_template():
     views = load_views(_STARTER_VIEWS_PATH)
     for category_name in ("publications", "review", "catalog"):
         assert views[category_name].fields["authors"] == "{zotero_authors}"
+
+
+def test_untitled_grant_falls_back_to_program_then_funder():
+    views = load_views(_STARTER_VIEWS_PATH)
+    assert views["grants"].fields["name"] == "{title|program|funder}"

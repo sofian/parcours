@@ -103,3 +103,13 @@ def test_artwork_status_values_have_en_fr_labels_and_waive_the_date():
     date_field = load_category_schema(_CATEGORIES_DIR / "artworks.yaml").get_field("date")
     assert date_field.is_required({"status": "in-progress"}) is False
     assert date_field.is_required({"status": ""}) is True
+
+
+def test_grants_title_is_optional_and_dates_accept_a_bare_year():
+    # Some grants (travel or operating support) have no title of their own,
+    # and older ones are only known to the year.
+    schema = load_category_schema(_CATEGORIES_DIR / "grants.yaml")
+    assert not any("title_en" in group for group in schema.require_one_of)
+    by_name = {f.name: f for f in schema.fields}
+    assert by_name["start_date"].precision == "year"
+    assert by_name["end_date"].precision == "year"
