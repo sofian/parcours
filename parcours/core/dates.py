@@ -54,6 +54,20 @@ def parse_partial_date(value: str) -> PartialDate:
     raise InvalidDateError(f"Not a valid ISO partial date: {value!r}")
 
 
+def inferred_start(value: str) -> date:
+    """The full date a partial *start* date stands for: missing parts are
+    the first day of the month/year (`2010-03` → 2010-03-01, `2011` →
+    2011-01-01)."""
+    return date(*parse_partial_date(value).start_bound())
+
+
+def inferred_end(value: str) -> date:
+    """The full date a partial *end* date stands for: missing parts are
+    the last day of the month/year (`2010-03` → 2010-03-31, `2024-02` →
+    2024-02-29, `2011` → 2011-12-31)."""
+    return date(*parse_partial_date(value).end_bound())
+
+
 def meets_precision_floor(value: str, minimum: str) -> bool:
     """True if `value` is at least as precise as `minimum` (year < month < day)."""
     parsed = parse_partial_date(value)
@@ -91,7 +105,7 @@ def same_year(a: str, b: str) -> bool:
     return parse_partial_date(a).year == parse_partial_date(b).year
 
 
-_OPEN_ENDED = (9999, 12, 31)
+_OPEN_ENDED = date(9999, 12, 31)
 
 
 def ranges_overlap(
@@ -99,8 +113,8 @@ def ranges_overlap(
 ) -> bool:
     """True if [start_a, end_a] and [start_b, end_b] intersect. A blank
     or `"present"` end means ongoing (open-ended)."""
-    a_start = parse_partial_date(start_a).start_bound()
-    b_start = parse_partial_date(start_b).start_bound()
-    a_end = parse_partial_date(end_a).end_bound() if end_a and end_a != "present" else _OPEN_ENDED
-    b_end = parse_partial_date(end_b).end_bound() if end_b and end_b != "present" else _OPEN_ENDED
+    a_start = inferred_start(start_a)
+    b_start = inferred_start(start_b)
+    a_end = inferred_end(end_a) if end_a and end_a != "present" else _OPEN_ENDED
+    b_end = inferred_end(end_b) if end_b and end_b != "present" else _OPEN_ENDED
     return a_start <= b_end and b_start <= a_end

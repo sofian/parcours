@@ -71,3 +71,35 @@ def test_date_input_problem_explains_what_is_wrong():
     assert "YYYY-MM" in date_input_problem("2018", "month")
     assert "YYYY-MM" in date_input_problem("06-09-18", "month")
     assert "not a valid date" in date_input_problem("2018-13", "month")
+
+
+def test_inferred_start_fills_missing_parts_with_the_first_day():
+    from datetime import date
+    from parcours.core.dates import inferred_start
+    assert inferred_start("2010-03") == date(2010, 3, 1)
+    assert inferred_start("2011") == date(2011, 1, 1)
+    assert inferred_start("2011-05-17") == date(2011, 5, 17)
+
+
+def test_inferred_end_fills_missing_parts_with_the_last_day():
+    from datetime import date
+    from parcours.core.dates import inferred_end
+    assert inferred_end("2010-03") == date(2010, 3, 31)
+    assert inferred_end("2010-04") == date(2010, 4, 30)
+    assert inferred_end("2011") == date(2011, 12, 31)
+    assert inferred_end("2011-05-17") == date(2011, 5, 17)
+
+
+def test_inferred_end_handles_february_in_leap_years():
+    from datetime import date
+    from parcours.core.dates import inferred_end
+    assert inferred_end("2024-02") == date(2024, 2, 29)  # leap year
+    assert inferred_end("2023-02") == date(2023, 2, 28)
+    assert inferred_end("2000-02") == date(2000, 2, 29)  # divisible by 400
+    assert inferred_end("1900-02") == date(1900, 2, 28)  # divisible by 100 only
+
+
+def test_same_month_range_spans_the_whole_month():
+    from datetime import date
+    from parcours.core.dates import inferred_end, inferred_start
+    assert (inferred_start("2010-03"), inferred_end("2010-03")) == (date(2010, 3, 1), date(2010, 3, 31))
