@@ -726,6 +726,19 @@ def test_map_grant_completed_status_collapses_to_awarded():
     assert row.fields["status"] == "awarded"
 
 
+def test_map_grant_co_applicant_role_keeps_its_own_value():
+    el = _record("""
+    <section label="Research Funding History" recordId="g3">
+      <field label="Funding Title"><value type="String">Art Grant</value></field>
+      <field label="Funding Role"><lov id="1">Co-applicant</lov></field>
+      <field label="Funding Status"><lov id="2">Awarded</lov></field>
+      <field label="Funding Start Date"><value type="YearMonth">2016/1</value></field>
+    </section>
+    """)
+    row = map_record(el, "Research Funding History", "en", _ctx())
+    assert row.fields["role"] == "co-applicant"
+
+
 def test_map_grant_flags_multiple_funding_sources():
     el = _record("""
     <section label="Research Funding History" recordId="g3">

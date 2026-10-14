@@ -7,7 +7,7 @@ fields:
   - {name: title_fr}
   - {name: funder,       required: true, glossary: organization}  # free text
   - {name: program,      glossary: program}                  # e.g. "Concept to Realization"
-  - {name: role,         required: true, vocab: grant_role}     # PI / co-PI / collaborator
+  - {name: role,         required: true, vocab: grant_role, glossary: grant_role}  # PI / co-PI / co-applicant / collaborator
   - {name: status,       required: true, vocab: grant_status}   # submitted / awarded / declined
   - {name: start_date,   type: date, precision: year, required: true}  # partial = first day of the month/year
   - {name: end_date,     type: date, precision: year}       # blank = ongoing; partial = last day of the month/year

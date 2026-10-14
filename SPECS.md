@@ -566,7 +566,7 @@ fields:
   - {name: title_fr}
   - {name: funder,       required: true, glossary: organization}  # free text
   - {name: program,      glossary: program}                  # e.g. "Concept to Realization"
-  - {name: role,         required: true, vocab: grant_role}     # PI / co-PI / collaborator
+  - {name: role,         required: true, vocab: grant_role, glossary: grant_role}  # PI / co-PI / co-applicant / collaborator
   - {name: status,       required: true, vocab: grant_status}   # submitted / awarded / declined
   - {name: start_date,   type: date, precision: year, required: true}  # partial = first day of the month/year
   - {name: end_date,     type: date, precision: year}       # blank = ongoing; partial = last day of the month/year
@@ -593,6 +593,13 @@ dedup:
   data showed older grants known only to the year. Lowered to `year`;
   a year-only `start_date` converts at January's rate (see Currency
   conversion).
+- `role`: `pi`/`co-pi` follow research-council usage, where one PI
+  administers the grant. Arts-council grants are often applied for by
+  equal partners instead, hence `co-applicant` (CCV's own "Co-applicant",
+  imported as-is). CCV's other roles (Co-director, Knowledge User,
+  Decision/Policy maker, …) were left out as not worth the vocab weight.
+  The field is also `glossary: grant_role`, so `build` renders the
+  translated label (`Codemandeur.e`) instead of the raw value.
 - Amounts are stored, which is one reason the data repo is private.
   Converted amounts are described under Currency conversion below.
 - RenderCV mapping (in `views.yaml`): a grant becomes a `NormalEntry` —
@@ -1493,7 +1500,7 @@ one schema's reference records happened to use them.
 publication_status: [submitted, under-review, accepted, in-press, published]
 publication_type: [journal-article, conference-paper, book, book-chapter, report, thesis, magazine-entry, online-resource]
 
-grant_role: [pi, co-pi, collaborator]
+grant_role: [pi, co-pi, co-applicant, collaborator]
 grant_status: [submitted, awarded, declined]
 
 artwork_role: [author, collaborator]

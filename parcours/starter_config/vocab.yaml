@@ -1,7 +1,7 @@
 publication_status: [submitted, under-review, accepted, in-press, published]
 publication_type: [journal-article, conference-paper, book, book-chapter, report, thesis, magazine-entry, online-resource]
 
-grant_role: [pi, co-pi, collaborator]
+grant_role: [pi, co-pi, co-applicant, collaborator]
 grant_status: [submitted, awarded, declined]
 
 artwork_role: [author, collaborator]

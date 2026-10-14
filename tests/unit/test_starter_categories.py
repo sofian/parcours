@@ -113,3 +113,17 @@ def test_grants_title_is_optional_and_dates_accept_a_bare_year():
     by_name = {f.name: f for f in schema.fields}
     assert by_name["start_date"].precision == "year"
     assert by_name["end_date"].precision == "year"
+
+
+def test_grant_role_has_co_applicant_and_every_value_is_translated():
+    # Art grants often have equal co-applicants rather than a PI.
+    vocab = load_vocab(_STARTER_DIR / "vocab.yaml")
+    table = load_translations(_STARTER_DIR / "translations.csv")
+    assert "co-applicant" in vocab["grant_role"]
+    for value in vocab["grant_role"]:
+        assert table.lookup("grant_role", value, "en")
+        assert table.lookup("grant_role", value, "fr")
+    assert table.lookup("grant_role", "co-applicant", "fr") == "Codemandeur.e"
+
+    role_field = load_category_schema(_CATEGORIES_DIR / "grants.yaml").get_field("role")
+    assert role_field.glossary == "grant_role"

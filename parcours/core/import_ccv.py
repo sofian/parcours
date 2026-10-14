@@ -642,7 +642,7 @@ def _map_exhibition(record_el, lang, ctx) -> MappedRow:
 _GRANT_ROLE = {
     "Principal Applicant": "pi",
     "Principal Investigator": "pi",
-    "Co-applicant": "co-pi",
+    "Co-applicant": "co-applicant",
     "Co-investigator": "co-pi",
     "Collaborator": "collaborator",
 }
