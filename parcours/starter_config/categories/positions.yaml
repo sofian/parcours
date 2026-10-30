@@ -7,8 +7,8 @@ fields:
   - {name: title_en}
   - {name: title_fr}
   - {name: organization,     required: true, glossary: organization}  # free text — CCV mostly supplies "Other Organization" here, not the refTable
-  - {name: faculty, glossary: organization}                             # free text — e.g. "School of Media"
-  - {name: department, glossary: organization}                          # free text
+  - {name: unit, glossary: organization}                                # free text — narrowest group: a lab, department, company division
+  - {name: parent_unit, glossary: organization}                         # free text — the level above `unit`, e.g. a school or faculty
   - {name: position_status,  vocab: position_status}                  # e.g. full-time / part-time / casual
   - {name: start_date,       type: date, precision: month, required: true}
   - {name: end_date,         type: date, precision: month}            # blank = ongoing

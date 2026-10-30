@@ -314,6 +314,8 @@ def _map_press_text(record_el, lang, ctx) -> MappedRow:
 @_register("Academic Work Experience")
 def _map_positions_academic(record_el, lang, ctx) -> MappedRow:
     title_fr, title_en = x.field_single_language(record_el, "Position Title", lang)
+    faculty = x.field_text(record_el, "Faculty / School / Campus")
+    department = x.field_text(record_el, "Department")
     return MappedRow(
         category="positions",
         ccv_label="Academic Work Experience",
@@ -322,8 +324,8 @@ def _map_positions_academic(record_el, lang, ctx) -> MappedRow:
             "title_en": title_en,
             "title_fr": title_fr,
             "organization": x.field_organization(record_el),
-            "faculty": x.field_text(record_el, "Faculty / School / Campus"),
-            "department": x.field_text(record_el, "Department"),
+            "unit": department or faculty,
+            "parent_unit": faculty if department else "",
             "position_status": _POSITION_STATUS.get(x.field_lov(record_el, "Position Status"), ""),
             "start_date": x.field_yearmonth(record_el, "Start Date"),
             "end_date": x.field_yearmonth(record_el, "End Date"),
@@ -342,8 +344,8 @@ def _map_positions_non_academic(record_el, lang, ctx) -> MappedRow:
             "title_en": title_en,
             "title_fr": title_fr,
             "organization": x.field_organization(record_el),
-            "faculty": "",
-            "department": x.field_text(record_el, "Unit / Division"),
+            "unit": x.field_text(record_el, "Unit / Division"),
+            "parent_unit": "",
             "position_status": "",
             "start_date": x.field_yearmonth(record_el, "Start Date"),
             "end_date": x.field_yearmonth(record_el, "End Date"),
@@ -362,8 +364,8 @@ def _map_positions_affiliation(record_el, lang, ctx) -> MappedRow:
             "title_en": title_en,
             "title_fr": title_fr,
             "organization": x.field_organization(record_el),
-            "faculty": "",
-            "department": x.field_text(record_el, "Department"),
+            "unit": x.field_text(record_el, "Department"),
+            "parent_unit": "",
             "position_status": "",
             "start_date": x.field_yearmonth(record_el, "Start Date"),
             "end_date": x.field_yearmonth(record_el, "End Date"),

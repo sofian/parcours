@@ -151,8 +151,8 @@ positions:
     end_date: end_date
     summary: "{description}"
     highlights:
-      - "{faculty}"
-      - "{department}"
+      - "{unit}"
+      - "{parent_unit}"
 
 recognitions:
   source: recognitions

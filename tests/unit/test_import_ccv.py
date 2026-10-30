@@ -293,8 +293,8 @@ def test_map_positions_academic():
     assert row.fields["type"] == "academic"
     assert row.fields["title_en"] == "Professor"
     assert row.fields["organization"] == "Test University"
-    assert row.fields["faculty"] == "Media"
-    assert row.fields["department"] == "Studies"
+    assert row.fields["unit"] == "Studies"
+    assert row.fields["parent_unit"] == "Media"
     assert row.fields["position_status"] == "full-time"
     assert row.fields["start_date"] == "2015-08"
 
@@ -316,9 +316,23 @@ def test_map_positions_affiliation_title_is_truly_bilingual():
     assert row.fields["title_en"] == "Member"
     assert row.fields["title_fr"] == "Membre"
     assert row.fields["organization"] == "Some Institute"
+    assert row.fields["unit"] == "N/A"
+    assert row.fields["parent_unit"] == ""
 
 
-def test_map_positions_non_academic_uses_unit_division_as_department():
+def test_map_positions_academic_without_a_department_keeps_the_faculty_as_unit():
+    el = _record("""
+    <section label="Academic Work Experience" recordId="r9">
+      <field label="Position Title"><value type="String">Professor</value></field>
+      <field label="Faculty / School / Campus"><value type="String">Media</value></field>
+    </section>
+    """)
+    row = map_record(el, "Academic Work Experience", "en", _ctx())
+    assert row.fields["unit"] == "Media"
+    assert row.fields["parent_unit"] == ""
+
+
+def test_map_positions_non_academic_uses_unit_division_as_unit():
     el = _record("""
     <section label="Non-academic Work Experience" recordId="r11">
       <field label="Position Title"><value type="String">Consultant</value></field>
@@ -331,8 +345,8 @@ def test_map_positions_non_academic_uses_unit_division_as_department():
     row = map_record(el, "Non-academic Work Experience", "en", _ctx())
     assert row.fields["type"] == "non-academic"
     assert row.fields["organization"] == "Some Company"
-    assert row.fields["department"] == "R&D"
-    assert row.fields["faculty"] == ""
+    assert row.fields["unit"] == "R&D"
+    assert row.fields["parent_unit"] == ""
 
 
 def test_map_service_graduate_examination():

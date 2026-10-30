@@ -1040,8 +1040,8 @@ fields:
   - {name: title_en}
   - {name: title_fr}
   - {name: organization,     required: true, glossary: organization}  # free text — CCV mostly supplies "Other Organization" here, not the refTable
-  - {name: faculty, glossary: organization}                             # free text — e.g. "School of Media"
-  - {name: department, glossary: organization}                          # free text
+  - {name: unit, glossary: organization}                                # free text — narrowest group: a lab, department, company division
+  - {name: parent_unit, glossary: organization}                         # free text — the level above `unit`, e.g. a school or faculty
   - {name: position_status,  vocab: position_status}                  # e.g. full-time / part-time / casual
   - {name: start_date,       type: date, precision: month, required: true}
   - {name: end_date,         type: date, precision: month}            # blank = ongoing
@@ -1064,11 +1064,16 @@ dedup:
   always use CCV's free-text `Other Organization` field instead (Hexagram,
   mXlab, Perte de Signal, Koumbit aren't in CCV's institution list), so
   the importer should read whichever CCV field actually has a value.
-- `faculty` and `department` are kept as two separate fields rather
-  than merged — checked against the data: both are filled
-  *simultaneously* in the same academic records (11/11 and 7/11), so
-  merging would lose information genuinely present at once, the same
-  reasoning as `outreach`'s outcome/evidence fields.
+- `unit` and `parent_unit` are deliberately neutral: positions sit in
+  labs, departments, company divisions and research centres as well as
+  faculties, and a CV lists these narrowest to broadest with no labels,
+  so the schema doesn't record what kind of group each one is. Two
+  levels below `organization` are enough; a longer chain drops its
+  broadest level. Import maps CCV's `Department` (or `Unit / Division`)
+  to `unit` and `Faculty / School / Campus` to `parent_unit`, promoting
+  the faculty to `unit` when a record has no department. They stay
+  separate rather than merged because each is backed by the glossary
+  on its own, and CCV fills both at once in most academic records.
 - **Dropped:** `Academic Rank`, `Tenure Status` and tenure dates.
 - `description_en`/`description_fr` hold the free-form text a real
   LaTeX CV attaches to positions (the research project behind a
@@ -1451,7 +1456,7 @@ Amounts can be converted to a reporting currency, mainly for statistics.
 - **`category: organization`** backs every field naming an institution
   or venue: `organization` on `education`, `positions`, `teaching`,
   `service`, `outreach`, `recognitions` and `residencies`; `positions`'
-  `faculty`/`department` and `teaching`'s `department`; `grants.funder`;
+  `unit`/`parent_unit` and `teaching`'s `department`; `grants.funder`;
   `students.institution`; and `event`/`venue` on `exhibitions` and
   `curatorship`. Institution names are a real bilingual pain point in a
   Quebec CV (Concordia University / Université Concordia, Canada
@@ -1755,7 +1760,7 @@ Entry type per category:
 | presentations | `NormalEntry` | single `date`; summary=event; highlights: invited/keynote |
 | press | `NormalEntry` | single `date`; highlights: author, program |
 | education | `EducationEntry` | institution=organization, area=specialization, degree=degree_name; summary=thesis_title; highlights: advisor, note |
-| positions | `ExperienceEntry` | company=organization, position=title; highlights: faculty, department, position_status |
+| positions | `ExperienceEntry` | company=organization, position=title; highlights: unit, parent_unit, position_status |
 | recognitions | `NormalEntry` | highlights: organization, amount+currency, description |
 | exhibitions, curatorship | `NormalEntry` | highlights: event, venue, curator |
 | residencies | `NormalEntry` | name=organization; no highlights needed |
