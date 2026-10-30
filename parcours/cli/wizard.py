@@ -143,6 +143,13 @@ def collect_field_values(
             values.update(ask_group_fields(schema, vocab, group, prefill))
             continue
 
+        # Goes through `values` rather than dropping the key, so that an
+        # edit into the skipped state clears the old value instead of
+        # leaving it behind.
+        if field.is_skipped({**prefill, **values}):
+            values[field.name] = ""
+            continue
+
         values[field.name] = _ask_field(
             field, vocab, prefill.get(field.name), required=field.is_required({**prefill, **values})
         )

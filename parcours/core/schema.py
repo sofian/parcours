@@ -8,6 +8,13 @@ from typing import Any
 import yaml
 
 
+def _conditions_hold(conditions: dict[str, str], entry: dict) -> bool:
+    return all(
+        (entry.get(name) or "").strip().lower() == str(value).strip().lower()
+        for name, value in conditions.items()
+    )
+
+
 @dataclass
 class FieldSpec:
     name: str
@@ -22,16 +29,20 @@ class FieldSpec:
     # every listed field holds the listed value (e.g. an artwork still in
     # progress has no production year yet).
     required_unless: dict[str, str] | None = None
+    # `skip_when: {type: affiliation}` — the field doesn't apply when every
+    # listed field holds the listed value (e.g. an affiliation has no
+    # full-time/part-time status), so it stays blank.
+    skip_when: dict[str, str] | None = None
 
     def is_required(self, entry: dict) -> bool:
         if not self.required:
             return False
-        if self.required_unless and all(
-            (entry.get(name) or "").strip().lower() == str(value).strip().lower()
-            for name, value in self.required_unless.items()
-        ):
+        if self.required_unless and _conditions_hold(self.required_unless, entry):
             return False
         return True
+
+    def is_skipped(self, entry: dict) -> bool:
+        return bool(self.skip_when) and _conditions_hold(self.skip_when, entry)
 
 
 @dataclass

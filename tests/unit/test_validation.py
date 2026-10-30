@@ -123,3 +123,38 @@ def test_required_unless_still_validates_a_value_that_is_given():
     entry = {"id": "a1", "status": "in-progress", "date": "someday"}
     issues = validate_common(_conditional_schema(), entry, ART_VOCAB)
     assert [i.field for i in issues] == ["date"]
+
+
+def _skip_when_schema():
+    return CategorySchema(
+        name="positions",
+        fields=[
+            FieldSpec(name="id", generated=True),
+            FieldSpec(name="type", vocab="position_type"),
+            FieldSpec(name="position_status", vocab="position_status", required=True,
+                      skip_when={"type": "affiliation"}),
+        ],
+    )
+
+
+POSITION_VOCAB = {
+    "position_type": ["academic", "affiliation"],
+    "position_status": ["full-time", "part-time"],
+}
+
+
+def test_skip_when_flags_a_value_on_a_row_the_field_does_not_apply_to():
+    entry = {"id": "p1", "type": "affiliation", "position_status": "full-time"}
+    issues = validate_common(_skip_when_schema(), entry, POSITION_VOCAB)
+    assert [i.field for i in issues] == ["position_status"]
+    assert "does not apply" in issues[0].message
+
+
+def test_skip_when_waives_required_when_the_condition_holds():
+    entry = {"id": "p1", "type": "affiliation", "position_status": ""}
+    assert validate_common(_skip_when_schema(), entry, POSITION_VOCAB) == []
+
+
+def test_skip_when_leaves_other_rows_alone():
+    entry = {"id": "p1", "type": "academic", "position_status": "full-time"}
+    assert validate_common(_skip_when_schema(), entry, POSITION_VOCAB) == []

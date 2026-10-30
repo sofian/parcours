@@ -114,3 +114,29 @@ def test_required_unless_matches_case_insensitively():
     country = FieldSpec(name="country", required=True, required_unless={"city": "Online"})
     assert country.is_required({"city": "online"}) is False
     assert country.is_required({"city": "Paris"}) is True
+
+
+def test_loads_skip_when(tmp_path):
+    schema_file = _write(tmp_path / "jobs.yaml", """
+name: jobs
+fields:
+  - {name: id, generated: true}
+  - {name: type, vocab: job_type}
+  - {name: status, vocab: job_status, skip_when: {type: affiliation}}
+""")
+    status_field = load_category_schema(schema_file).get_field("status")
+    assert status_field.skip_when == {"type": "affiliation"}
+    assert status_field.is_skipped({"type": "affiliation"}) is True
+    assert status_field.is_skipped({"type": "academic"}) is False
+    assert status_field.is_skipped({}) is False
+
+
+def test_skip_when_matches_case_insensitively():
+    from parcours.core.schema import FieldSpec
+    status = FieldSpec(name="status", skip_when={"type": "affiliation"})
+    assert status.is_skipped({"type": "Affiliation"}) is True
+
+
+def test_field_without_skip_when_is_never_skipped():
+    from parcours.core.schema import FieldSpec
+    assert FieldSpec(name="status").is_skipped({"type": "affiliation"}) is False

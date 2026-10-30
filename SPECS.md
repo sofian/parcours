@@ -256,6 +256,15 @@ that *is* given is still validated normally. The wizard applies the same
 rule, so a field becomes skippable once an earlier answer meets the
 condition (declare the condition field first).
 
+**`skip_when`** (field-level): a mapping of field → value, matched the
+same way as `required_unless`, for a field that doesn't apply at all
+when the condition holds — e.g. `positions.position_status` is
+`skip_when: {type: affiliation}`, since a membership has no
+full-time/part-time status. The wizard doesn't ask for the field and
+clears any old value (declare the condition field first), and `lint`
+flags a value that's there anyway, such as one typed into the CSV by
+hand. `required_unless` differs in that the field can still be filled.
+
 **`weight`** (a standard optional `int` field, present in every schema
 right after `id`): a manual ordering hint, higher = appears earlier.
 Not every CV entry has a precise date — decades-old material especially
@@ -1042,7 +1051,7 @@ fields:
   - {name: organization,     required: true, glossary: organization}  # free text — CCV mostly supplies "Other Organization" here, not the refTable
   - {name: unit, glossary: organization}                                # free text — narrowest group: a lab, department, company division
   - {name: parent_unit, glossary: organization}                         # free text — the level above `unit`, e.g. a school or faculty
-  - {name: position_status,  vocab: position_status}                  # e.g. full-time / part-time / casual
+  - {name: position_status,  vocab: position_status, skip_when: {type: affiliation}}  # e.g. full-time / part-time
   - {name: start_date,       type: date, precision: month, required: true}
   - {name: end_date,         type: date, precision: month}            # blank = ongoing
   - {name: description_en}

@@ -33,6 +33,14 @@ def validate_common(schema: CategorySchema, entry: dict, vocab: dict) -> list[Li
         value = entry.get(f.name)
         blank = _is_blank(value)
 
+        if f.is_skipped(entry):
+            if not blank:
+                issues.append(LintIssue(
+                    schema.name, row_id, f.name,
+                    f"'{f.name}' does not apply here (skip_when {f.skip_when}) but holds '{value}'",
+                ))
+            continue
+
         if blank and f.is_required(entry):
             issues.append(LintIssue(
                 schema.name, row_id, f.name, f"'{f.name}' is required but blank",

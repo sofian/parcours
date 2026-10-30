@@ -299,6 +299,43 @@ def test_required_unless_keeps_the_field_required_otherwise(monkeypatch):
     assert values == {"status": "completed", "date": "2024"}
 
 
+def _skip_when_schema():
+    return CategorySchema(
+        name="positions",
+        fields=[
+            FieldSpec(name="id", generated=True),
+            FieldSpec(name="type", vocab="position_type"),
+            FieldSpec(name="position_status", vocab="position_status", skip_when={"type": "affiliation"}),
+            FieldSpec(name="start_date", type="date", precision="year"),
+        ],
+    )
+
+
+POSITION_VOCAB = {
+    "position_type": ["academic", "affiliation"],
+    "position_status": ["full-time", "part-time"],
+}
+
+
+def test_skip_when_does_not_prompt_for_the_field(monkeypatch):
+    _prompt_sequence(monkeypatch, ["2", "2020"])
+    values = wizard.collect_field_values(_skip_when_schema(), POSITION_VOCAB)
+    assert values == {"type": "affiliation", "position_status": "", "start_date": "2020"}
+
+
+def test_skip_when_still_prompts_when_the_condition_does_not_hold(monkeypatch):
+    _prompt_sequence(monkeypatch, ["1", "1", "2020"])
+    values = wizard.collect_field_values(_skip_when_schema(), POSITION_VOCAB)
+    assert values == {"type": "academic", "position_status": "full-time", "start_date": "2020"}
+
+
+def test_skip_when_clears_a_stale_value_when_an_edit_changes_the_condition(monkeypatch):
+    _prompt_sequence(monkeypatch, ["2", "2020"])
+    prefill = {"type": "academic", "position_status": "full-time", "start_date": "2020"}
+    values = wizard.collect_field_values(_skip_when_schema(), POSITION_VOCAB, prefill=prefill)
+    assert values == {"type": "affiliation", "position_status": "", "start_date": "2020"}
+
+
 def test_date_field_prompt_shows_the_format_and_rejects_bad_input(monkeypatch):
     prompts, echoes = [], []
     answers = iter(["06-09-18", "2018", "2018-09"])
