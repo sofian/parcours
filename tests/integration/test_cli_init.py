@@ -118,6 +118,8 @@ def test_init_writes_a_provided_citation_export_path(tmp_path, monkeypatch):
     assert "Citation export: /home/jane/Zotero/library.json" in result.stdout
     content = (target / "categories" / "publications.yaml").read_text(encoding="utf-8")
     assert "json: /home/jane/Zotero/library.json" in content
+    press_content = (target / "categories" / "press.yaml").read_text(encoding="utf-8")
+    assert "json: /home/jane/Zotero/library.json" in press_content
 
 
 def test_init_rejects_variant_name_with_path_separator(tmp_path, monkeypatch):
@@ -178,3 +180,18 @@ def test_init_defaults_to_the_current_directory(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.stdout
     assert (tmp_path / "parco.yaml").is_file()
+
+
+def test_init_orders_export_backed_sections_by_their_export_date(tmp_path, monkeypatch):
+    _git_env(monkeypatch)
+    target = tmp_path / "my-cv"
+
+    result = runner.invoke(
+        app,
+        ["init", str(target)],
+        input="Jane\nDoe\n\n1\nAssociate Professor\njane@example.edu\n\n\nCAD\n\ny\n",
+    )
+
+    assert result.exit_code == 0, result.stdout
+    profile_text = "".join(p.read_text(encoding="utf-8") for p in (target / "profiles").glob("*.yaml"))
+    assert "- id: press\n  source: press\n  order_by: zotero_date desc" in profile_text

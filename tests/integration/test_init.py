@@ -131,7 +131,7 @@ def test_scaffold_repo_generated_sections_use_the_generic_order_by_rule(tmp_path
     by_id = {s["id"]: s for s in profile["sections"]}
     assert by_id["grants"]["order_by"] == "start_date desc"
     assert by_id["artworks"]["order_by"] == "date desc"
-    assert "order_by" not in by_id["publications"]
+    assert by_id["publications"]["order_by"] == "zotero_date desc"
 
 
 def test_scaffold_repo_creates_a_real_git_repo_with_one_commit(tmp_path, monkeypatch):

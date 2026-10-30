@@ -236,43 +236,6 @@ def test_map_teaching_course_development():
     assert row.fields["date"] == "2019-09"
 
 
-def test_map_press_broadcast_interview():
-    el = _record("""
-    <section label="Broadcast Interviews" recordId="r7">
-      <field label="Interviewer"><value type="String">A Journalist</value></field>
-      <field label="Program"><value type="String">Morning Show</value></field>
-      <field label="Network"><value type="String">Test Radio</value></field>
-      <field label="First Broadcast Date"><value type="Date">2021-03-14</value></field>
-      <field label="Description / Contribution Value">
-        <value type="Bilingual"></value>
-        <bilingual><french></french><english>A discussion</english></bilingual>
-      </field>
-      <field label="URL"><value type="String">http://example.com/clip</value></field>
-    </section>
-    """)
-    row = map_record(el, "Broadcast Interviews", "en", _ctx())
-    assert row.category == "press"
-    assert row.fields["author"] == "A Journalist"
-    assert row.fields["outlet"] == "Test Radio"
-    assert row.fields["program"] == "Morning Show"
-    assert row.fields["date"] == "2021-03-14"
-    assert row.fields["description_en"] == "A discussion"
-
-
-def test_map_press_text_interview_has_no_program():
-    el = _record("""
-    <section label="Text Interviews" recordId="r8">
-      <field label="Interviewer"><value type="String">A Journalist</value></field>
-      <field label="Forum"><value type="String">Test Magazine</value></field>
-      <field label="Publication Date"><value type="Date">2020-11-02</value></field>
-    </section>
-    """)
-    row = map_record(el, "Text Interviews", "en", _ctx())
-    assert row.fields["outlet"] == "Test Magazine"
-    assert row.fields["program"] == ""
-    assert row.fields["date"] == "2020-11-02"
-
-
 def test_map_positions_academic():
     el = _record("""
     <section label="Academic Work Experience" recordId="r9">
@@ -1125,6 +1088,85 @@ def test_plan_import_dispatches_zotero_matched_records():
         assert len(report.flagged) == 1
         assert report.flagged[0].ccv_label == "Journal Articles"
         assert "No confident match in your citation export" in report.flagged[0].reason
+
+
+def _add_press_category(data_dir):
+    (data_dir / "categories" / "press.yaml").write_text(textwrap.dedent("""
+        name: press
+        handler: publications
+        options:
+          json: reference/library.json
+        fields:
+          - {name: id, generated: true}
+          - {name: weight, type: int}
+          - {name: citekey, required: true}
+          - {name: program}
+          - {name: description_en}
+          - {name: description_fr}
+    """), encoding="utf-8")
+    (data_dir / "entries" / "press.csv").write_text(
+        "id,weight,citekey,program,description_en,description_fr\n", encoding="utf-8",
+    )
+    reference_dir = data_dir / "reference"
+    reference_dir.mkdir()
+    (reference_dir / "library.json").write_text(
+        '[{"id": "radio2021", "title": "A Radio Discussion", "issued": {"date-parts": [[2021]]}}]',
+        encoding="utf-8",
+    )
+
+
+def _press_xml(body):
+    return f"""<?xml version="1.0"?>
+    <generic-cv:generic-cv xmlns:generic-cv="http://www.cihr-irsc.gc.ca/generic-cv/1.0.0" lang="en">
+      <section label="Contributions">{body}</section>
+    </generic-cv:generic-cv>
+    """
+
+
+def test_plan_import_matches_a_broadcast_interview_to_its_citekey():
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        data_dir = _minimal_data_dir(Path(d))
+        _add_press_category(data_dir)
+        xml_path = _write_xml(data_dir, _press_xml("""
+          <section label="Broadcast Interviews" recordId="r7">
+            <field label="Topic"><value type="String">A Radio Discussion</value></field>
+            <field label="Program"><value type="String">Morning Show</value></field>
+            <field label="Network"><value type="String">Test Radio</value></field>
+            <field label="First Broadcast Date"><value type="Date">2021-03-14</value></field>
+            <field label="Description / Contribution Value">
+              <value type="Bilingual"></value>
+              <bilingual><french></french><english>A discussion</english></bilingual>
+            </field>
+          </section>
+        """))
+        report = plan_import(data_dir, xml_path)
+        assert report.flagged == []
+        assert len(report.to_write) == 1
+        row = report.to_write[0]
+        assert row.category == "press"
+        assert row.fields["citekey"] == "radio2021"
+        assert row.fields["program"] == "Morning Show"
+        assert row.fields["description_en"] == "A discussion"
+
+
+def test_plan_import_flags_a_text_interview_with_no_citekey_match():
+    import tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as d:
+        data_dir = _minimal_data_dir(Path(d))
+        _add_press_category(data_dir)
+        xml_path = _write_xml(data_dir, _press_xml("""
+          <section label="Text Interviews" recordId="r8">
+            <field label="Topic"><value type="String">Something Else Entirely</value></field>
+            <field label="Forum"><value type="String">Test Magazine</value></field>
+            <field label="Publication Date"><value type="Date">2020-11-02</value></field>
+          </section>
+        """))
+        report = plan_import(data_dir, xml_path)
+        assert report.to_write == []
+        assert [f.ccv_label for f in report.flagged] == ["Text Interviews"]
 
 
 def test_plan_import_maps_accepted_publishing_status():

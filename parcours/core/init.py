@@ -134,12 +134,12 @@ def _copy_categories_and_csvs(path: Path, starter_dir: Path) -> None:
             fh.write(",".join(schema.field_names()) + "\n")
 
 
-_CITATION_EXPORT_CATEGORIES = ("publications", "catalog", "review")
+_CITATION_EXPORT_CATEGORIES = ("publications", "catalog", "review", "press")
 
 
 def _set_citation_export_path(path: Path, export_path: str) -> None:
     """Overwrites the `json:` option line in publications.yaml/catalog.yaml/
-    review.yaml with the user's real citation export path, as a targeted
+    review.yaml/press.yaml with the user's real citation export path, as a targeted
     text replace rather than a full YAML round-trip — re-dumping the whole
     file would silently drop its hand-written comments. A blank
     `export_path` leaves the starter default (`reference/library.json`)
@@ -173,7 +173,10 @@ def _write_identity_yaml(path: Path, answers: InitAnswers) -> None:
 
 def _section_order_by(schema: CategorySchema) -> str | None:
     date_field = schema.default_date_field()
-    return f"{date_field} desc" if date_field else None
+    if date_field:
+        return f"{date_field} desc"
+    # These categories keep their dates in the citation export, not a column.
+    return "zotero_date desc" if schema.handler == "publications" else None
 
 
 def _build_sections(path: Path) -> list[dict]:

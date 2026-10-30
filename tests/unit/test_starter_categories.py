@@ -127,3 +127,11 @@ def test_grant_role_has_co_applicant_and_every_value_is_translated():
 
     role_field = load_category_schema(_CATEGORIES_DIR / "grants.yaml").get_field("role")
     assert role_field.glossary == "grant_role"
+
+
+def test_press_is_backed_entirely_by_the_citation_export():
+    schema = load_category_schema(_CATEGORIES_DIR / "press.yaml")
+    assert schema.handler == "publications"
+    assert schema.options["json"] == "reference/library.json"
+    assert schema.get_field("citekey").required is True
+    assert schema.field_names() == ["id", "weight", "citekey", "program", "description_en", "description_fr"]

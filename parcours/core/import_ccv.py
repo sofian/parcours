@@ -273,44 +273,6 @@ def _map_teaching(record_el, lang, ctx) -> MappedRow:
     )
 
 
-@_register("Broadcast Interviews")
-def _map_press_broadcast(record_el, lang, ctx) -> MappedRow:
-    description_fr, description_en = x.field_bilingual(record_el, "Description / Contribution Value", lang)
-    return MappedRow(
-        category="press",
-        ccv_label="Broadcast Interviews",
-        fields={
-            "citekey": "",
-            "author": x.field_text(record_el, "Interviewer"),
-            "outlet": x.field_text(record_el, "Network"),
-            "program": x.field_text(record_el, "Program"),
-            "date": x.field_date(record_el, "First Broadcast Date"),
-            "description_en": description_en,
-            "description_fr": description_fr,
-            "url": x.field_text(record_el, "URL"),
-        },
-    )
-
-
-@_register("Text Interviews")
-def _map_press_text(record_el, lang, ctx) -> MappedRow:
-    description_fr, description_en = x.field_bilingual(record_el, "Description / Contribution Value", lang)
-    return MappedRow(
-        category="press",
-        ccv_label="Text Interviews",
-        fields={
-            "citekey": "",
-            "author": x.field_text(record_el, "Interviewer"),
-            "outlet": x.field_text(record_el, "Forum"),
-            "program": "",
-            "date": x.field_date(record_el, "Publication Date"),
-            "description_en": description_en,
-            "description_fr": description_fr,
-            "url": x.field_text(record_el, "URL"),
-        },
-    )
-
-
 @_register("Academic Work Experience")
 def _map_positions_academic(record_el, lang, ctx) -> MappedRow:
     title_fr, title_en = x.field_single_language(record_el, "Position Title", lang)
@@ -750,9 +712,18 @@ _ZOTERO_CANDIDATE_FIELDS = {
     "Online Resources": ("Title", x.field_year, "Year posted online"),
     "Conference Publications": ("Publication Title", x.field_year, "Year"),
     "Exhibition Catalogues": ("Catalogue Title", x.field_yearmonth, "Publication Date"),
+    "Broadcast Interviews": ("Topic", x.field_date, "First Broadcast Date"),
+    "Text Interviews": ("Topic", x.field_date, "Publication Date"),
 }
 
 ZOTERO_MATCHED_LABELS = frozenset(_ZOTERO_CANDIDATE_FIELDS)
+
+# Everything else in `_ZOTERO_CANDIDATE_FIELDS` lands in `publications`.
+_ZOTERO_CATEGORIES = {
+    "Exhibition Catalogues": "catalog",
+    "Broadcast Interviews": "press",
+    "Text Interviews": "press",
+}
 
 
 def extract_zotero_candidate(record_el, label: str, lang: str) -> ZoteroCandidate:
@@ -797,7 +768,7 @@ def plan_import(data_dir: Path, xml_path: Path) -> ImportReport:
 
         if label in ZOTERO_MATCHED_LABELS:
             candidate = extract_zotero_candidate(record.element, label, lang)
-            category = "catalog" if label == "Exhibition Catalogues" else "publications"
+            category = _ZOTERO_CATEGORIES.get(label, "publications")
             handler = handlers.get(category)
             citekey = handler.match_citekey_by_title(candidate.title, candidate.year) if handler else None
             if citekey is None:
@@ -811,6 +782,15 @@ def plan_import(data_dir: Path, xml_path: Path) -> ImportReport:
             if "status" in fields:
                 status_raw = x.field_lov(record.element, "Publishing Status")
                 fields["status"] = _PUBLICATION_STATUS.get(status_raw, "")
+            if category == "press":
+                description_fr, description_en = x.field_bilingual(
+                    record.element, "Description / Contribution Value", lang
+                )
+                fields |= {
+                    "program": x.field_text(record.element, "Program"),
+                    "description_en": description_en,
+                    "description_fr": description_fr,
+                }
             mapped = MappedRow(category=category, ccv_label=label, fields=fields)
         elif label in MAPPERS:
             mapped = map_record(record.element, label, lang, ctx)

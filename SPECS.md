@@ -136,10 +136,9 @@ schema may also name a custom handler by dotted import path
 - **Zotero-citekey resolution is a shared capability, not exclusive to
   `publications`.** Any category whose schema declares a `citekey`
   field plus Zotero `options` (bib/json paths) gets it resolved against
-  the export and becomes `Citable` — this is how `press` optionally
-  links a row to its Zotero record without needing its own handler.
+  the export and becomes `Citable`.
 - **The `publications` handler is reused by categories other than
-  `publications`.** `review` and `catalog` also use
+  `publications`.** `review`, `catalog` and `press` also use
   `handler: publications` — not just the shared citekey capability, but
   its full behavior (citekey required and must always resolve,
   DOI+fuzzy-title dedup) — because a review of your work or a catalog
@@ -331,7 +330,7 @@ Category ↔ CCV section mapping found by inspecting a real export:
 | service | Activities → Assessment and Review Activities (→ Graduate Examination Activities, Research Funding Application Assessment Activities), Community and Volunteer Activities, Memberships, Teaching Activities → Program Development |
 | outreach | Activities → Knowledge and Technology Translation |
 | presentations | Contributions → Presentations |
-| press | Contributions → Interviews and Media Relations (→ Broadcast Interviews, Text Interviews) |
+| press | Contributions → Interviews and Media Relations (→ Broadcast Interviews, Text Interviews) (Zotero-backed, matched to a citekey like `catalog`) |
 | review | *(none — Zotero-only; CCV tracks your own contributions, not third-party reception of them)* |
 | catalog | Contributions → Artistic Contributions → Exhibition Catalogues (Zotero-backed, same as `publications`/`review` — the importer's job here is matching each record to a citekey, not field-mapping; see below) |
 | education | Education → Degrees |
@@ -915,46 +914,46 @@ dedup:
 - `Main Audience` (CCV's `researcher`/`knowledge-user`/`general-public`
   list) is dropped — not tracked here.
 
-### press (handler: generic)
+### press (handler: publications)
 
 ```yaml
 name: press
-handler: generic
+handler: publications
 options:
-  zotero: {bib: reference/library.bib, json: reference/library.json}  # for rows that set citekey
+  bib: reference/library.bib
+  json: reference/library.json
 fields:
   - {name: id,           generated: true}                    # press-2026-004
   - {name: weight,       type: int}                          # optional; higher = appears earlier, refines/overrides date-based ordering
-  - {name: citekey}                                            # optional — set when also a Zotero-catalogued item
-                                                                 # (e.g. a written review); enables citation
-                                                                 # formatting on this row (see Category handlers:
-                                                                 # shared Zotero capability). Blank for podcast/radio/TV/interview
-                                                                 # appearances, which aren't Zotero items.
-  - {name: author}                                              # free text — who wrote or conducted it
-  - {name: outlet,       required: true}                        # free text — publisher, radio/TV station, network
-  - {name: program}                                              # free text — the specific show/program, if any
-                                                                 # (blank for print/text pieces)
-  - {name: date,         type: date, precision: month, required: true}
+  - {name: citekey,      required: true}                     # must resolve in the export, same rule as publications —
+                                                               # date, title, author and outlet all come from there
+  - {name: program}                                            # free text — the specific show/program, if any
+                                                               # (blank for print/text pieces)
   - {name: description_en}
   - {name: description_fr}
-  - {name: url}
-dedup:
-  - when: [{exact: citekey}]
-    as: duplicate
-  - when: [{fuzzy: outlet}, {fuzzy: program}, {same_year: date}]
-    as: duplicate
 ```
 
-- No `type` field for now — CCV's Broadcast/Text distinction is
-  captured well enough by `program` being blank for text pieces, without
-  needing a controlled value; can be added later if needed.
-- `outlet`/`program` split mirrors CCV's own `Network`+`Program` (kept as
-  two fields rather than merged, unlike the earlier draft), with
-  `outlet` also covering CCV's `Forum` for text pieces (a text piece has
-  no `Program` equivalent, so it's left blank).
-- CCV's `End Date` (Broadcast Interviews only) is dropped — checked
-  against all 3 reference records and always identical to `First
-  Broadcast Date`, i.e. not a real range.
+- Zotero-backed like `review` and `catalog`: every press item, broadcast
+  ones included, is expected to be in the citation export, so the date,
+  title, author and outlet aren't stored here. The CSV holds a citekey
+  plus what CSL-JSON has no field for: `program` and the descriptions.
+- `build` reads an outlet from `container-title`, then `collection-title`,
+  then `publisher`, and an author from `author`, then `editor`, `director`
+  and `host`, since interviews are often catalogued with a director or
+  host and no author (see `zotero_outlet`/`zotero_authors`).
+- The view is a `NormalEntry`, unlike `review`'s `PublicationEntry`,
+  because RenderCV rejects a `PublicationEntry` with no authors and some
+  broadcast items have none at all.
+- Sections sort with `order_by: zotero_date desc`, applied by `build`
+  after the export is merged, since no date column exists to sort on.
+  `lint` warns when a record has no `issued` date, for every category
+  using this handler.
+- No `type` field — CCV's Broadcast/Text distinction is captured well
+  enough by `program` being blank for text pieces, without needing a
+  controlled value; can be added later if needed.
+- CCV import matches `Topic` plus the date's year to a citekey, keeping
+  `Program` and `Description / Contribution Value`. A record with no
+  match is flagged, not written, the same as `catalog`.
 
 ### review (handler: publications)
 
@@ -1767,7 +1766,7 @@ Entry type per category:
 | service | `ExperienceEntry` | company=organization, position=role; highlights: type, detail |
 | outreach | `ExperienceEntry` | company=organization, position=role; summary=description (no highlights) |
 | presentations | `NormalEntry` | single `date`; summary=event; highlights: invited/keynote |
-| press | `NormalEntry` | single `date`; highlights: author, program |
+| press | `NormalEntry` | name=zotero_title, date=zotero_date; highlights: zotero_author_text, zotero_outlet, program |
 | education | `EducationEntry` | institution=organization, area=specialization, degree=degree_name; summary=thesis_title; highlights: advisor, note |
 | positions | `ExperienceEntry` | company=organization, position=title; highlights: unit, parent_unit, position_status |
 | recognitions | `NormalEntry` | highlights: organization, amount+currency, description |
@@ -1861,18 +1860,16 @@ skills-text:                               # expertise / other
   only sensible use case for citing something is citing an entry
   already tracked in your CV data, `list`'s search *is* the lookup.
   Zotero-backed categories only for v1, gated on `isinstance(handler,
-  PublicationsHandler)` — concretely `publications`/`review`/`catalog`
-  (all three declare `handler: publications`). **`press` does NOT
-  qualify**, despite having an optional `citekey` field: it declares
-  `handler: generic`, and only `PublicationsHandler` implements
-  citekey resolution today — the `Citable` protocol (see Category
-  handlers) that was meant to let `press` share this capability without
-  the full `publications` handler is declared but not implemented by
-  anything yet. The category list this surfaces to a user is derived
-  dynamically from which loaded handlers actually support resolution,
-  never a hardcoded name list, so `press` (or any future category) picks
-  this up automatically the moment that capability gets built, with no
-  doc/code drift to fix later. `artworks` (which would need a
+  PublicationsHandler)` — concretely
+  `publications`/`review`/`catalog`/`press` (all four declare
+  `handler: publications`). Only
+  `PublicationsHandler` implements citekey resolution today — the
+  `Citable` protocol (see Category handlers) is declared but not
+  implemented by anything yet. The category list this surfaces to a
+  user is derived dynamically from which loaded handlers actually
+  support resolution, never a hardcoded name list, so any future
+  category picks this up automatically the moment that capability gets
+  built, with no doc/code drift to fix later. `artworks` (which would need a
   synthesized CSL item from `co_authors`/`collaborators`/
   `identity.yaml` rather than a real Zotero record) is a separate,
   clean, deliberate follow-up, not built here either.
@@ -2231,9 +2228,9 @@ a `date` or `start_date` field, grouping by the year extracted via
 `core/dates.py`'s existing `parse_partial_date` rather than the raw
 string value (so `2024-03` and `2024-09` count as the same group) —
 this is the flagship use case (a category with a real local date
-field, per year — `publications`' own dates live in Zotero, not a
-local column, so `stats publications --by year` genuinely doesn't
-apply to it) and worth a small special-case rather than making everyone
+field, per year — `publications`' and `press`' own dates live in
+Zotero, not a local column, so `stats publications --by year` genuinely
+doesn't apply to them) and worth a small special-case rather than making everyone
 write `parco query` by hand for it. **No dollar-amount aggregation in this first cut** —
 summing `grants.amount` across mixed currencies would be silently
 misleading with no `rates.csv` conversion in place yet (see Currency
@@ -2309,9 +2306,8 @@ and style details) composes with `--search`/`--filter`/`--after`/
 each matched row prints, not which rows match. Only valid for a
 category whose loaded handler actually implements citekey resolution
 (`isinstance(handler, PublicationsHandler)` today — concretely
-`publications`/`review`/`catalog`; **not** `press`, despite its
-optional `citekey` field, since it declares `handler: generic` — see
-Citation formatting); any other category exits cleanly with an error
+`publications`/`review`/`catalog`/`press` — see Citation formatting);
+any other category exits cleanly with an error
 naming which categories *do* support it, derived dynamically rather
 than hardcoded, rather than a confusing empty/garbled attempt. A row
 whose citekey
@@ -2633,11 +2629,8 @@ aggregating them; there's no standalone `parco cite` — citation
 formatting is `parco list --format citation`, using citeproc-py against
 three bundled CSL styles, Markdown-style italic/bold output, and only
 categories whose handler actually resolves a citekey today
-(`publications`/`review`/`catalog` — **not** `press`, which has an
-optional `citekey` field but `handler: generic`, not `handler:
-publications`; the shared `Citable` capability that would let it
-qualify without the full `publications` handler is declared but
-unimplemented) — `artworks`' `person_list`-based citation (see Category
+(`publications`/`review`/`catalog`/`press`; the shared `Citable`
+capability is declared but unimplemented) — `artworks`' `person_list`-based citation (see Category
 schemas: `artworks`) is a separate, clean, deliberate follow-up. What
 remains to design is `sync` — see CLI.
 

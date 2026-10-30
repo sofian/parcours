@@ -67,7 +67,9 @@ def test_validate_flags_unresolved_citekey(tmp_path):
 
 
 def test_validate_passes_a_resolvable_citekey(tmp_path):
-    json_path = _write_csl_json(tmp_path, [{"id": "audry2024plaquette", "title": "Plaquette"}])
+    json_path = _write_csl_json(tmp_path, [
+        {"id": "audry2024plaquette", "title": "Plaquette", "issued": {"date-parts": [[2024]]}},
+    ])
     handler = PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
 
     assert handler.validate({"id": "pub-1", "citekey": "audry2024plaquette"}) == []
@@ -244,3 +246,22 @@ def test_match_citekey_by_title_prefers_the_exact_title_over_a_fuzzy_sibling(tmp
 
     assert handler.match_citekey_by_title("A Widget Study", 2020) == "smith2020widget"
     assert handler.match_citekey_by_title("A Widget Study II", 2020) == "jones2020widget"
+
+
+def _handler_with_records(tmp_path, records):
+    json_path = _write_csl_json(tmp_path, records)
+    return PublicationsHandler(_schema(json_path), HandlerContext(data_dir=tmp_path))
+
+
+def test_validate_warns_when_the_export_record_has_no_date(tmp_path):
+    handler = _handler_with_records(tmp_path, [{"id": "undated", "title": "Undated"}])
+    issues = handler.validate({"id": "p1", "citekey": "undated"})
+    assert [(i.field, i.severity) for i in issues] == [("citekey", "warning")]
+    assert "no date" in issues[0].message
+
+
+def test_validate_accepts_an_export_record_with_a_date(tmp_path):
+    handler = _handler_with_records(
+        tmp_path, [{"id": "dated", "issued": {"date-parts": [[2021]]}}]
+    )
+    assert handler.validate({"id": "p1", "citekey": "dated"}) == []

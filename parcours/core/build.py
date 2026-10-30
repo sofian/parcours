@@ -44,10 +44,10 @@ def _csl_date_to_iso(record: dict) -> str | None:
 
 def _csl_authors_to_list(record: dict) -> list[str]:
     """Authors as display names — an institutional author is a single
-    `literal` name in CSL-JSON, and an edited volume or exhibition
-    catalog often has only `editor`s, which are used instead of leaving
-    the entry author-less (RenderCV rejects a PublicationEntry without
-    authors)."""
+    `literal` name in CSL-JSON. An edited volume or exhibition catalog
+    often has only `editor`s, and a broadcast only a `director` or `host`,
+    which are used instead of leaving the entry author-less (RenderCV
+    rejects a PublicationEntry without authors)."""
     def _names(people: list[dict]) -> list[str]:
         names = []
         for person in people:
@@ -58,7 +58,11 @@ def _csl_authors_to_list(record: dict) -> list[str]:
                 names.append(full_name)
         return names
 
-    return _names(record.get("author", [])) or _names(record.get("editor", []))
+    for role in ("author", "editor", "director", "host"):
+        names = _names(record.get(role, []))
+        if names:
+            return names
+    return []
 
 
 def _merge_zotero_fields(handler: PublicationsHandler, row: dict) -> dict:
@@ -70,11 +74,47 @@ def _merge_zotero_fields(handler: PublicationsHandler, row: dict) -> dict:
     merged = dict(row)
     merged["zotero_title"] = record.get("title", "")
     merged["zotero_authors"] = _csl_authors_to_list(record)
+    merged["zotero_author_text"] = ", ".join(merged["zotero_authors"])
     merged["zotero_journal"] = record.get("container-title", "")
+    merged["zotero_outlet"] = (
+        record.get("container-title") or record.get("collection-title") or record.get("publisher") or ""
+    )
     merged["zotero_doi"] = record.get("DOI", "")
     merged["zotero_url"] = record.get("URL", "")
     merged["zotero_date"] = _csl_date_to_iso(record) or ""
     return merged
+
+
+def _order_value(field_name: str, value: str):
+    # Mirrors `query_category_rows`' numeric-then-text ordering, except
+    # that `zotero_*` values always sort as text: a year-only export date
+    # ("2015") has to stay in line with its fuller neighbours ("2015-06").
+    if not field_name.startswith("zotero_"):
+        try:
+            return (0, float(value), "")
+        except ValueError:
+            pass
+    return (1, 0.0, str(value))
+
+
+def _order_merged_rows(rows: list[dict], order_by: str) -> list[dict]:
+    """`order_by` for a section sorting on a `zotero_*` field, which only
+    exists once rows are merged with the citation export, so DuckDB can't
+    sort on it. Applied last key first, relying on sort stability; blank
+    values go last in either direction."""
+    for key in reversed(order_by.split(",")):
+        parts = key.split()
+        if not parts:
+            continue
+        field_name = parts[0]
+        direction = parts[1].lower() if len(parts) > 1 else "asc"
+        if direction not in ("asc", "desc"):
+            raise ValueError(f"Invalid order_by direction '{parts[1]}' (expected 'asc' or 'desc')")
+        filled = [row for row in rows if row.get(field_name)]
+        blank = [row for row in rows if not row.get(field_name)]
+        filled.sort(key=lambda row: _order_value(field_name, row[field_name]), reverse=direction == "desc")
+        rows = filled + blank
+    return rows
 
 
 def _map_row_to_entry(view: ViewSpec, row: dict, language: str) -> dict:
@@ -107,18 +147,27 @@ def _resolve_glossary_fields(schema, row: dict, translations, language: str) -> 
 def _build_section_entries(
     data_dir: Path, schema, view: ViewSpec, section: dict, language: str, translations
 ) -> list[dict]:
+    handler = load_handler(schema, HandlerContext(data_dir=data_dir))
+    order_by = section.get("order_by")
+    limit = section.get("limit")
+    orders_after_merge = isinstance(handler, PublicationsHandler) and "zotero_" in (order_by or "")
+
     rows = query_category_rows(
         data_dir,
         view.source,
         filters=section.get("filter"),
-        order_by=section.get("order_by"),
-        limit=section.get("limit"),
+        order_by=None if orders_after_merge else order_by,
+        limit=None if orders_after_merge else limit,
     )
     rows = [_resolve_glossary_fields(schema, row, translations, language) for row in rows]
 
-    handler = load_handler(schema, HandlerContext(data_dir=data_dir))
     if isinstance(handler, PublicationsHandler):
         rows = [_merge_zotero_fields(handler, row) for row in rows]
+
+    if orders_after_merge:
+        rows = _order_merged_rows(rows, order_by)
+        if limit is not None:
+            rows = rows[:limit]
 
     return [_map_row_to_entry(view, row, language) for row in rows]
 

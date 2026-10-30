@@ -121,10 +121,11 @@ press:
   source: press
   entry_type: NormalEntry
   fields:
-    name: "{outlet}"
-    date: date
+    name: "{zotero_title}"
+    date: "{zotero_date}"
     highlights:
-      - "{author}"
+      - "{zotero_author_text}"
+      - "{zotero_outlet}"
       - "{program}"
 
 education:

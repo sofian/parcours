@@ -253,6 +253,124 @@ def test_build_uses_literal_names_and_falls_back_to_editors(tmp_path, monkeypatc
     assert authors == {"Org Report": ["Some Collective"], "Edited Catalog": ["Pat Editor"]}
 
 
+def _press_view():
+    from parcours.core.views import ViewSpec
+    return ViewSpec(
+        name="press", source="press", entry_type="NormalEntry",
+        fields={
+            "name": "{zotero_title}",
+            "date": "{zotero_date}",
+            "highlights": ["{zotero_author_text}", "{zotero_outlet}", "{program}"],
+        },
+    )
+
+
+def _setup_press(repo, records, csv_text):
+    (repo / "categories" / "press.yaml").write_text("""
+name: press
+handler: publications
+options:
+  json: reference/library.json
+fields:
+  - {name: id, generated: true}
+  - {name: weight, type: int}
+  - {name: citekey, required: true}
+  - {name: program}
+""")
+    with open(repo / "entries" / "translations.csv", "a", encoding="utf-8") as fh:
+        fh.write("press,section,Press,Revue de presse\n")
+    (repo / "reference").mkdir()
+    (repo / "reference" / "library.json").write_text(json.dumps(records))
+    (repo / "entries" / "press.csv").write_text(csv_text)
+
+
+def _press_entries(repo, monkeypatch, section_options):
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},
+        sections=[{"id": "press", "source": "press", **section_options}],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {"press": _press_view()})
+    return build_rendercv_data(repo, profile)["cv"]["sections"]["Press"]
+
+
+def test_build_fills_a_press_entry_from_the_citation_export(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    _setup_press(repo, [
+        {"id": "a2021", "title": "An Interview", "container-title": "Radio X",
+         "director": [{"given": "Pat", "family": "Host"}], "issued": {"date-parts": [[2021, 3, 14]]}},
+    ], "id,weight,citekey,program\np1,,a2021,Morning Show\n")
+
+    entries = _press_entries(repo, monkeypatch, {})
+
+    assert entries == [{
+        "name": "An Interview",
+        "date": "2021-03-14",
+        "highlights": ["Pat Host", "Radio X", "Morning Show"],
+    }]
+
+
+def test_build_falls_back_to_hosts_and_the_collection_title(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    _setup_press(repo, [
+        {"id": "a2024", "title": "A Podcast", "collection-title": "Some Show",
+         "host": [{"given": "Ann", "family": "One"}, {"given": "Bob", "family": "Two"}],
+         "guest": [{"given": "Jane", "family": "Doe"}]},
+    ], "id,weight,citekey,program\np1,,a2024,\n")
+
+    entries = _press_entries(repo, monkeypatch, {})
+
+    assert entries[0]["highlights"] == ["Ann One, Bob Two", "Some Show"]
+
+
+def test_build_falls_back_to_the_publisher_for_the_outlet(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    _setup_press(repo, [{"id": "a2015", "title": "A Book", "publisher": "Que"}],
+                 "id,weight,citekey,program\np1,,a2015,\n")
+
+    entries = _press_entries(repo, monkeypatch, {})
+
+    assert entries[0]["highlights"] == ["Que"]
+
+
+def _dated_press_records():
+    return [
+        {"id": "old", "title": "Old", "issued": {"date-parts": [[2015]]}},
+        {"id": "new", "title": "New", "issued": {"date-parts": [[2021, 3]]}},
+        {"id": "mid", "title": "Mid", "issued": {"date-parts": [[2015, 6]]}},
+        {"id": "undated", "title": "Undated"},
+    ]
+
+
+def test_build_orders_a_section_by_the_citation_export_date(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    _setup_press(repo, _dated_press_records(),
+                 "id,weight,citekey,program\np1,,undated,\np2,,old,\np3,,new,\np4,,mid,\n")
+
+    entries = _press_entries(repo, monkeypatch, {"order_by": "zotero_date desc"})
+
+    assert [e["name"] for e in entries] == ["New", "Mid", "Old", "Undated"]
+
+
+def test_build_applies_limit_after_ordering_by_the_export_date(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    _setup_press(repo, _dated_press_records(),
+                 "id,weight,citekey,program\np1,,undated,\np2,,old,\np3,,new,\np4,,mid,\n")
+
+    entries = _press_entries(repo, monkeypatch, {"order_by": "zotero_date desc", "limit": 2})
+
+    assert [e["name"] for e in entries] == ["New", "Mid"]
+
+
+def test_build_orders_weight_numerically_ahead_of_the_export_date(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    _setup_press(repo, _dated_press_records(),
+                 "id,weight,citekey,program\np1,,undated,\np2,9,old,\np3,,new,\np4,10,mid,\n")
+
+    entries = _press_entries(repo, monkeypatch, {"order_by": "weight desc, zotero_date desc"})
+
+    assert [e["name"] for e in entries] == ["Mid", "Old", "New", "Undated"]
+
+
 def test_build_leaves_zotero_fields_absent_for_an_unresolved_citekey(tmp_path, monkeypatch):
     repo = _setup_data_repo(tmp_path)
     (repo / "reference").mkdir()

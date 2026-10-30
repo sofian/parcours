@@ -37,10 +37,19 @@ class PublicationsHandler(CategoryHandler):
 
     def validate(self, entry: dict) -> list[LintIssue]:
         citekey = entry.get("citekey") or ""
-        if citekey and self.resolve(citekey) is None:
+        if not citekey:
+            return []
+        record = self.resolve(citekey)
+        if record is None:
             return [LintIssue(
                 self.schema.name, entry.get("id"), "citekey",
                 f"citekey '{citekey}' does not resolve in the citation export",
+            )]
+        if not record.get("issued"):
+            return [LintIssue(
+                self.schema.name, entry.get("id"), "citekey",
+                f"citekey '{citekey}' has no date in the citation export",
+                severity="warning",
             )]
         return []
 
