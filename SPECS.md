@@ -207,6 +207,13 @@ YYYY-MM-DD)` — pre-fills today at that precision, and rejects a malformed
 with the reason, rather than writing it and leaving it for `lint`.
 `lint`'s own date messages name the expected format the same way.
 
+`lint` also rejects a range whose end comes before its start, for every
+`*end_date` paired with its `*start_date` (or `*date`, as on
+`recognitions`). It compares the way RenderCV does, each partial date
+standing for its first day, so a passing `lint` can't fail on this at
+build time: `2013-09`–`2013` is flagged, since `2013` renders as
+2013-01-01, even though the widest-span reading above would allow it.
+
 `person_list` fields always hold `"Last, First; Last, First"` —
 semicolon-separated people, each `Last, First` (`core/names.py`'s
 `parse_person_list`, mirroring `core/dates.py`'s pattern for `date`

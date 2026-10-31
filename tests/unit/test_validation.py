@@ -158,3 +158,68 @@ def test_skip_when_waives_required_when_the_condition_holds():
 def test_skip_when_leaves_other_rows_alone():
     entry = {"id": "p1", "type": "academic", "position_status": "full-time"}
     assert validate_common(_skip_when_schema(), entry, POSITION_VOCAB) == []
+
+
+def _range_schema(**overrides):
+    fields = [
+        FieldSpec(name="id", generated=True),
+        FieldSpec(name="start_date", type="date", precision="year"),
+        FieldSpec(name="end_date", type="date", precision="year"),
+    ]
+    return _schema(fields=fields, require_one_of=[], **overrides)
+
+
+def _range_issues(start, end):
+    entry = {"id": "widget-1", "start_date": start, "end_date": end}
+    return validate_common(_range_schema(), entry, VOCAB)
+
+
+def test_flags_an_end_date_before_the_start_date():
+    issues = _range_issues("2013-09", "2013-08")
+    assert [i.field for i in issues] == ["end_date"]
+    assert "2013-08" in issues[0].message and "2013-09" in issues[0].message
+    assert issues[0].severity == "error"
+
+
+def test_a_range_within_one_month_passes():
+    assert _range_issues("2013-09", "2013-09") == []
+
+
+def test_a_blank_end_date_is_ongoing_and_passes():
+    assert _range_issues("2013-09", "") == []
+
+
+def test_flags_a_coarser_end_date_that_would_render_before_the_start():
+    # `2013` reads as 2013-01-01 at render time, so RenderCV rejects this.
+    assert [i.field for i in _range_issues("2013-09", "2013")] == ["end_date"]
+
+
+def test_a_malformed_range_date_is_only_flagged_as_malformed():
+    issues = _range_issues("2013-09", "not-a-date")
+    assert len(issues) == 1
+    assert "not a valid date" in issues[0].message
+
+
+def test_flags_an_end_date_before_a_plain_date_field():
+    schema = _schema(fields=[
+        FieldSpec(name="id", generated=True),
+        FieldSpec(name="date", type="date", precision="year"),
+        FieldSpec(name="end_date", type="date", precision="year"),
+    ], require_one_of=[])
+    issues = validate_common(schema, {"id": "w", "date": "2020", "end_date": "2019"}, VOCAB)
+    assert [i.field for i in issues] == ["end_date"]
+
+
+def test_each_prefixed_date_range_is_checked_separately():
+    schema = _schema(fields=[
+        FieldSpec(name="id", generated=True),
+        FieldSpec(name="degree_start_date", type="date", precision="year"),
+        FieldSpec(name="degree_end_date", type="date", precision="year"),
+        FieldSpec(name="supervision_start_date", type="date", precision="year"),
+        FieldSpec(name="supervision_end_date", type="date", precision="year"),
+    ], require_one_of=[])
+    entry = {
+        "id": "w", "degree_start_date": "2020", "degree_end_date": "2021",
+        "supervision_start_date": "2020", "supervision_end_date": "2019",
+    }
+    assert [i.field for i in validate_common(schema, entry, VOCAB)] == ["supervision_end_date"]

@@ -4,7 +4,7 @@ validation beyond required/vocab checks" (SPECS.md, "Category handlers")."""
 
 from dataclasses import dataclass
 
-from .dates import InvalidDateError, date_format_hint, meets_precision_floor
+from .dates import InvalidDateError, date_format_hint, ends_before_start, meets_precision_floor
 from .names import InvalidPersonListError, parse_person_list
 from .schema import CategorySchema
 from .vocab import is_valid_value
@@ -77,6 +77,20 @@ def validate_common(schema: CategorySchema, entry: dict, vocab: dict) -> list[Li
                 issues.append(LintIssue(
                     schema.name, row_id, f.name, f"'{f.name}' is not a valid person list: {exc}",
                 ))
+
+    for start_name, end_name in schema.date_ranges():
+        start, end = entry.get(start_name), entry.get(end_name)
+        if _is_blank(start) or _is_blank(end):
+            continue
+        try:
+            if ends_before_start(start, end):
+                issues.append(LintIssue(
+                    schema.name, row_id, end_name,
+                    f"'{end_name}' ({end}) is before '{start_name}' ({start}) "
+                    f"(a partial date counts as its first day)",
+                ))
+        except InvalidDateError:
+            pass  # already flagged above as not a valid date
 
     for group in schema.require_one_of:
         if not any(not _is_blank(entry.get(name)) for name in group):

@@ -105,6 +105,13 @@ def same_year(a: str, b: str) -> bool:
     return parse_partial_date(a).year == parse_partial_date(b).year
 
 
+def ends_before_start(start: str, end: str) -> bool:
+    """True if a range would render backwards. Compares both as RenderCV
+    does, with a partial date standing for its first day, so a coarser end
+    (`2013-09`–`2013`) counts even though `inferred_end` would accept it."""
+    return parse_partial_date(start).start_bound() > parse_partial_date(end).start_bound()
+
+
 _OPEN_ENDED = date(9999, 12, 31)
 
 

@@ -69,6 +69,22 @@ class CategorySchema:
                 return f
         return None
 
+    def date_ranges(self) -> list[tuple[str, str]]:
+        """(start, end) field name pairs: each `*end_date` date field with
+        its matching `*start_date`, or `*date` where a range's beginning is
+        a plain date (`recognitions`)."""
+        date_fields = {f.name for f in self.fields if f.type == "date"}
+        ranges = []
+        for name in date_fields:
+            if not name.endswith("end_date"):
+                continue
+            prefix = name.removesuffix("end_date")
+            for start in (f"{prefix}start_date", f"{prefix}date"):
+                if start in date_fields:
+                    ranges.append((start, name))
+                    break
+        return sorted(ranges)
+
     def default_date_field(self) -> str | None:
         """The field `--by year`/`--after`/`--before` treat as this
         category's one designated date — `start_date` if present (a
