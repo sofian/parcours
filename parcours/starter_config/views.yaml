@@ -80,7 +80,8 @@ teaching:
   fields:
     company: organization
     position: "{course_label} — {title}"
-    date: date
+    start_date: start_date
+    end_date: end_date
     highlights:
       - "{department}"
 

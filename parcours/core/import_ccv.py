@@ -268,7 +268,7 @@ def _map_teaching(record_el, lang, ctx) -> MappedRow:
             "role": x.field_text(record_el, "Role"),
             "organization": x.field_organization(record_el),
             "department": x.field_text(record_el, "Department"),
-            "date": x.field_yearmonth(record_el, "Date First Taught"),
+            "start_date": x.field_yearmonth(record_el, "Date First Taught"),
         },
     )
 

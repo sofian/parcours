@@ -64,3 +64,10 @@ def test_authors_field_is_a_bare_placeholder_not_a_compound_template():
 def test_untitled_grant_falls_back_to_program_then_funder():
     views = load_views(_STARTER_VIEWS_PATH)
     assert views["grants"].fields["name"] == "{title|program|funder}"
+
+
+def test_teaching_view_renders_a_date_range():
+    fields = load_views(_STARTER_VIEWS_PATH)["teaching"].fields
+    assert fields["start_date"] == "start_date"
+    assert fields["end_date"] == "end_date"
+    assert "date" not in fields

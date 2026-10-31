@@ -233,7 +233,9 @@ def test_map_teaching_course_development():
     assert row.fields["role"] == "Professor"
     assert row.fields["organization"] == "Test University"
     assert row.fields["department"] == "Media Studies"
-    assert row.fields["date"] == "2019-09"
+    assert row.fields["start_date"] == "2019-09"
+    assert "end_date" not in row.fields
+    assert "date" not in row.fields
 
 
 def test_map_positions_academic():

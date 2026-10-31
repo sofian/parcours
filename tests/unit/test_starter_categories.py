@@ -135,3 +135,13 @@ def test_press_is_backed_entirely_by_the_citation_export():
     assert schema.options["json"] == "reference/library.json"
     assert schema.get_field("citekey").required is True
     assert schema.field_names() == ["id", "weight", "citekey", "program", "description_en", "description_fr"]
+
+
+def test_teaching_dates_are_a_required_month_precision_range():
+    schema = load_category_schema(_CATEGORIES_DIR / "teaching.yaml")
+    assert "date" not in schema.field_names()
+    for name in ("start_date", "end_date"):
+        field = schema.get_field(name)
+        assert field.type == "date"
+        assert field.precision == "month"
+        assert field.required

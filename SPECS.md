@@ -817,22 +817,25 @@ fields:
   - {name: role, glossary: role}                          # free text, e.g. Professor
   - {name: organization, required: true, glossary: organization}  # resolved from CCV's refTable (see CCV export structure)
   - {name: department, glossary: organization}
-  - {name: date,         type: date, precision: month, required: true}  # term/year of this specific offering
+  - {name: start_date,   type: date, precision: month, required: true}  # first month of this specific offering
+  - {name: end_date,     type: date, precision: month, required: true}  # last month of this specific offering
 dedup:
-  - when: [{exact: course_label}, {exact: organization}, {same_year: date}]
+  - when: [{exact: course_label}, {exact: organization}, {overlap: [start_date, end_date]}]
     as: duplicate
 ```
 
 - **One row per offering, not per course** — the same `course_label`
   legitimately repeats across rows for different years it was taught
-  (e.g. 2022, 2023, 2025). `same_year` in the dedup rule catches an
-  accidental re-entry of the same year without flagging genuine repeat
-  offerings.
+  (e.g. 2022, 2023, 2025). `overlap` in the dedup rule catches an
+  accidental re-entry of the same term without flagging genuine repeat
+  offerings, including two terms of one year.
 - CCV's "Course Development" records are the source (not "Program
   Development", which is service work — see the `service` schema); CCV
   itself only records one date per course record ("Date First Taught"),
   so importing multiple years taught, beyond the one CCV gives, is a
-  manual follow-up, not something the importer can do alone.
+  manual follow-up, not something the importer can do alone. That date
+  fills `start_date`; `end_date` has no CCV source, so an imported row
+  fails lint until it is entered by hand.
 - `description_en`/`description_fr` and `level` (undergraduate/graduate)
   are dropped, despite being present in CCV, as not worth tracking here.
 
@@ -1762,7 +1765,7 @@ Entry type per category:
 | grants | `NormalEntry` | highlights: funder+role, amount+currency, co_investigators |
 | artworks | `NormalEntry` | single `date` (production year); highlights: role, co_authors, collaborators |
 | students | `NormalEntry` | start/end = supervision dates; highlights: degree_type/status, institution, thesis_title |
-| teaching | `ExperienceEntry` | company=organization, position=course_label+title; single `date` per offering |
+| teaching | `ExperienceEntry` | company=organization, position=course_label+title; start/end = first and last month of the offering |
 | service | `ExperienceEntry` | company=organization, position=role; highlights: type, detail |
 | outreach | `ExperienceEntry` | company=organization, position=role; summary=description (no highlights) |
 | presentations | `NormalEntry` | single `date`; summary=event; highlights: invited/keynote |
