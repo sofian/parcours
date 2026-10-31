@@ -1,6 +1,6 @@
 import pytest
 
-from parcours.core.identity import IdentityVariantNotFound, load_identity, resolve_identity
+from parcours.core.identity import IdentityVariantNotFound, load_identity, resolve_identity, resolve_identity_extra
 
 
 def _write_identity(tmp_path):
@@ -81,3 +81,20 @@ def test_resolve_identity_raises_for_unknown_variant(tmp_path):
 
     with pytest.raises(IdentityVariantNotFound, match="job-application"):
         resolve_identity(identity, "job-application", "en")
+
+
+def test_extra_fields_resolve_by_language(tmp_path):
+    path = tmp_path / "identity.yaml"
+    path.write_text("""
+name: {first: Jane, last: Doe}
+variants:
+  academic:
+    email: jane@example.edu
+    extra:
+      address_en: ["1 Main St.", "Springfield"]
+      address_fr: ["1 rue Principale", "Springfield"]
+      aka: "J. Doe"
+""", encoding="utf-8")
+    extra = resolve_identity_extra(load_identity(path), "academic", "fr")
+    assert extra == {"address": ["1 rue Principale", "Springfield"], "aka": "J. Doe"}
+    assert "address" not in resolve_identity(load_identity(path), "academic", "fr")

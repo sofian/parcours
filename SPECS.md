@@ -1704,6 +1704,32 @@ meta:
   language: en
 ```
 
+### Presentation options
+
+A profile controls how a CV looks without new code:
+
+- `meta.design` is passed to RenderCV as its `design` block (page,
+  typography, templates, spacing), merged under `meta.theme`.
+- `meta.theme` may name a custom RenderCV theme (`rendercv create-theme`)
+  kept in the data repo as `themes/<name>/`; `build` copies it next to
+  RenderCV's input. A variant's `extra:` block in `identity.yaml` reaches
+  it as `design.extra`, for header details RenderCV's `cv` block rejects,
+  so such a theme must declare an `extra` field.
+- `date_style: year` (meta or section) shows dates as years, a range
+  within one year as that year. `hide_repeated_dates: true` blanks the
+  date under an entry with the same dates.
+- A section's `citation_style` (a bundled name or a `.csl` path relative
+  to the data repo) adds `zotero_citation` to each row. Rendered one
+  record at a time, so no `2025a` year suffixes appear.
+
+Views have three helpers. `[[...]]` drops its literal text when every
+field inside is blank. `{<field>_display}` is a `person_list` as "First
+Last, First Last" or a `number` with thousands separators. `{label_<id>}`
+is a `translations.csv` row of category `label`, so literal view text
+stays translatable; it never counts as content inside `[[...]]`. A view's
+`group_by` makes one entry per group, joining each field's distinct values
+with commas.
+
 ## views.yaml (draft)
 
 RenderCV's actual entry types and fields, verified against the
@@ -2193,15 +2219,10 @@ document, not new design.
 
 **First-cut scope:** all 18 non-skills categories get real views (once
 the pipeline above works for one category, the rest are config, not
-new code or new risk) — `skills`' `group_by` aggregation is the one
-category deferred. Also deferred: `docx` (rejected with a clear
+new code or new risk). Also deferred: `docx` (rejected with a clear
 "not yet supported" message pending the Pandoc integration this
-already has a working spike for — see Output formats), a profile
-section's `citation_style` key (accepted in the YAML but never read —
-RenderCV's own `PublicationEntry` layout doesn't need it; citation
-formatting lives entirely in `parco list --format citation`, see
-Citation formatting, unrelated to how `build` assembles a CV), and
-currency conversion (`grants.amount` renders as-is; no `rates.csv`
+already has a working spike for — see Output formats), and currency conversion (`grants.amount` renders
+as-is; no `rates.csv`
 fetching exists yet in any form).
 
 ### Query

@@ -46,3 +46,14 @@ def resolve_identity(identity: dict, variant_name: str, language: str) -> dict:
         cv[cv_key] = value
 
     return cv
+
+
+def resolve_identity_extra(identity: dict, variant_name: str, language: str) -> dict:
+    """A variant's `extra:` block, resolved by language: details a custom
+    theme's header shows beyond RenderCV's own `cv` fields, which rejects
+    unknown ones. They reach the theme through `design.extra`."""
+    extra = identity.get("variants", {}).get(variant_name, {}).get("extra", {})
+    return {
+        key: resolve_field(extra, key, language)
+        for key in {key.removesuffix("_en").removesuffix("_fr") for key in extra}
+    }

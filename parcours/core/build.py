@@ -4,23 +4,29 @@ layer: no prompting, no interactive I/O — the one sanctioned exception
 is `run_build`'s subprocess call out to the external `rendercv` CLI,
 treated like Pandoc elsewhere in this codebase."""
 
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
 import yaml
 
+from .citations import render_citations, resolve_style
 from .data import query_category_rows
+from .dates import InvalidDateError, parse_partial_date
 from .handlers import load_handler
 from .handlers.base import HandlerContext
 from .handlers.publications import PublicationsHandler
-from .identity import load_identity, resolve_identity
+from .identity import load_identity, resolve_identity, resolve_identity_extra
 from .lint import run_lint
+from .names import parse_person_list
 from .profiles import Profile
 from .schema import load_all_schemas
 from .templating import resolve_template
 from .translations import load_translations, translations_csv_path
 from .views import ViewSpec, load_views
+
+_DATE_KEYS = ("date", "start_date", "end_date")
 
 
 def _csl_date_to_iso(record: dict) -> str | None:
@@ -117,6 +123,21 @@ def _order_merged_rows(rows: list[dict], order_by: str) -> list[dict]:
     return rows
 
 
+def _add_citations(data_dir: Path, handler: PublicationsHandler, rows: list[dict], style_name: str, language: str) -> list[dict]:
+    """Adds `zotero_citation` to each resolvable row. One record at a time,
+    so a repeated citekey or a style's own sort can't misalign the output,
+    and no style-level year suffix ("2025a") appears across a section."""
+    local_style = data_dir / style_name
+    style_path = resolve_style(str(local_style) if local_style.is_file() else style_name)
+
+    cited = []
+    for row in rows:
+        record = handler.resolve(row.get("citekey") or "")
+        citation = render_citations([record], style_path, language)[0] if record else ""
+        cited.append({**row, "zotero_citation": citation})
+    return cited
+
+
 def _map_row_to_entry(view: ViewSpec, row: dict, language: str) -> dict:
     entry = {}
     for field_name, template in view.fields.items():
@@ -124,6 +145,67 @@ def _map_row_to_entry(view: ViewSpec, row: dict, language: str) -> dict:
         if value:
             entry[field_name] = value
     return entry
+
+
+def _group_entries(view: ViewSpec, rows: list[dict], language: str) -> list[dict]:
+    """A `group_by` view's one entry per group, in order of first
+    appearance: each field's distinct values, comma-joined, so the group's
+    label collapses to one value while a detail field lists every row."""
+    groups: dict[str, list[dict]] = {}
+    for row in rows:
+        groups.setdefault(row.get(view.group_by), []).append(_map_row_to_entry(view, row, language))
+
+    entries = []
+    for group_rows in groups.values():
+        entry = {}
+        for field_name in view.fields:
+            values = [row[field_name] for row in group_rows if field_name in row]
+            if values:
+                entry[field_name] = ", ".join(dict.fromkeys(values))
+        entries.append(entry)
+    return entries
+
+
+def _year_of(value: str) -> str:
+    """A date's year; any other label (`in progress`) stays as it is."""
+    try:
+        return str(parse_partial_date(value).year)
+    except InvalidDateError:
+        return value
+
+
+def _with_year_dates(entry: dict) -> dict:
+    result = dict(entry)
+    if "date" in result:
+        result["date"] = _year_of(result["date"])
+    if "start_date" in result:
+        result["start_date"] = _year_of(result["start_date"])
+    if "end_date" in result:
+        result["end_date"] = _year_of(result["end_date"])
+    if "start_date" in result and result["start_date"] == result.get("end_date"):
+        result["date"] = result.pop("start_date")
+        del result["end_date"]
+    return result
+
+
+def _apply_date_style(entries: list[dict], date_style: str | None, hide_repeated: bool) -> list[dict]:
+    """`date_style: year` shows dates as years, a range within one year as
+    that single year. `hide_repeated_dates` leaves the date column blank
+    under an entry with the same dates, so years read as group headings."""
+    if date_style == "year":
+        entries = [_with_year_dates(entry) for entry in entries]
+    if not hide_repeated:
+        return entries
+
+    result = []
+    previous = None
+    for entry in entries:
+        dates = tuple(entry.get(key) for key in _DATE_KEYS)
+        if dates == previous:
+            entry = {key: value for key, value in entry.items() if key not in _DATE_KEYS}
+        previous = dates
+        result.append(entry)
+    return result
 
 
 def _resolve_glossary_fields(schema, row: dict, translations, language: str) -> dict:
@@ -144,6 +226,31 @@ def _resolve_glossary_fields(schema, row: dict, translations, language: str) -> 
     return resolved
 
 
+def _format_number(value: str, language: str) -> str:
+    try:
+        grouped = f"{int(float(value)):,}"
+    except ValueError:
+        return value
+    return grouped.replace(",", "\u00a0") if language == "fr" else grouped
+
+
+def _add_display_fields(schema, row: dict, language: str) -> dict:
+    """`<field>_display` for views: a `person_list` as "First Last, First
+    Last", a `number` with thousands separators. The raw value stays, for
+    ordering and for views that want it as stored."""
+    displayed = dict(row)
+    for field_spec in schema.fields:
+        value = row.get(field_spec.name)
+        if not value:
+            continue
+        if field_spec.type == "person_list":
+            people = parse_person_list(value)
+            displayed[f"{field_spec.name}_display"] = ", ".join(f"{p.first} {p.last}" for p in people)
+        elif field_spec.type == "number":
+            displayed[f"{field_spec.name}_display"] = _format_number(value, language)
+    return displayed
+
+
 def _build_section_entries(
     data_dir: Path, schema, view: ViewSpec, section: dict, language: str, translations
 ) -> list[dict]:
@@ -160,6 +267,12 @@ def _build_section_entries(
         limit=None if orders_after_merge else limit,
     )
     rows = [_resolve_glossary_fields(schema, row, translations, language) for row in rows]
+    rows = [_add_display_fields(schema, row, language) for row in rows]
+    labels = {
+        f"label_{entry.id}": translations.lookup("label", entry.id, language)
+        for entry in translations.all() if entry.category == "label"
+    }
+    rows = [{**row, **labels} for row in rows]
 
     if isinstance(handler, PublicationsHandler):
         rows = [_merge_zotero_fields(handler, row) for row in rows]
@@ -168,6 +281,12 @@ def _build_section_entries(
         rows = _order_merged_rows(rows, order_by)
         if limit is not None:
             rows = rows[:limit]
+
+    if section.get("citation_style") and isinstance(handler, PublicationsHandler):
+        rows = _add_citations(data_dir, handler, rows, section["citation_style"], language)
+
+    if view.group_by:
+        return _group_entries(view, rows, language)
 
     return [_map_row_to_entry(view, row, language) for row in rows]
 
@@ -211,14 +330,24 @@ def build_rendercv_data(data_dir: Path, profile: Profile) -> dict:
             # repo (see SPECS.md, "Init"), and no CV format wants a
             # visible section with nothing under it.
             continue
+        entries = _apply_date_style(
+            entries,
+            section.get("date_style", profile.meta.get("date_style")),
+            section.get("hide_repeated_dates", profile.meta.get("hide_repeated_dates", False)),
+        )
         title = translations.resolve_or_literal("section", section["id"], language)
         sections[title] = entries
 
     cv["sections"] = sections
 
+    design = {**profile.meta.get("design", {}), "theme": profile.meta["theme"]}
+    extra = resolve_identity_extra(identity, profile.meta["identity_variant"], language)
+    if extra:
+        design["extra"] = extra
+
     return {
         "cv": cv,
-        "design": {"theme": profile.meta["theme"]},
+        "design": design,
         "locale": {"language": _rendercv_locale(language)},
     }
 
@@ -274,6 +403,11 @@ def run_build(
         input_path = scratch_dir / "input.yaml"
         with open(input_path, "w", encoding="utf-8") as fh:
             yaml.safe_dump(rendercv_data, fh, allow_unicode=True, sort_keys=False)
+
+        # RenderCV looks for a custom theme's folder next to its input file.
+        theme_dir = data_dir / "themes" / profile.meta["theme"]
+        if theme_dir.is_dir():
+            shutil.copytree(theme_dir, scratch_dir / theme_dir.name)
 
         try:
             subprocess.run(

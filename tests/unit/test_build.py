@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from parcours.core.build import build_rendercv_data
 from parcours.core.profiles import Profile
@@ -645,3 +646,252 @@ def test_build_emits_a_locale_block_matching_the_profile_language(tmp_path, monk
 
     assert build_rendercv_data(repo, profile_en)["locale"] == {"language": "english"}
     assert build_rendercv_data(repo, profile_fr)["locale"] == {"language": "french"}
+
+
+def _grants_csv(repo, *rows):
+    header = "id,title_en,title_fr,funder,role,start_date,end_date,amount,currency,co_investigators\n"
+    (repo / "entries" / "grants.csv").write_text(header + "".join(
+        f"{row_id},{title},,FRQSC,PI,{start},{end},,,\n" for row_id, title, start, end in rows
+    ))
+
+
+def _grants_entries(tmp_path, monkeypatch, rows, **meta):
+    repo = _setup_data_repo(tmp_path)
+    _grants_csv(repo, *rows)
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov", **meta},
+        sections=[{"id": "grants", "source": "grants", "order_by": "start_date desc"}],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {"grants": _grants_view()})
+    return build_rendercv_data(repo, profile)["cv"]["sections"]["Grants"]
+
+
+def test_profile_design_options_reach_rendercv(tmp_path):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "views.yaml").write_text("")
+    profile = Profile(
+        meta={
+            "language": "en", "identity_variant": "academic", "theme": "moderncv",
+            "design": {"page": {"size": "us-letter"}},
+        },
+        sections=[],
+    )
+    data = build_rendercv_data(repo, profile)
+    assert data["design"] == {"theme": "moderncv", "page": {"size": "us-letter"}}
+
+
+def test_date_style_year_reduces_a_range_to_years(tmp_path, monkeypatch):
+    entries = _grants_entries(
+        tmp_path, monkeypatch, [("g1", "A", "2020-03", "2022-05")], date_style="year",
+    )
+    assert (entries[0]["start_date"], entries[0]["end_date"]) == ("2020", "2022")
+
+
+def test_date_style_year_collapses_a_range_within_one_year(tmp_path, monkeypatch):
+    entries = _grants_entries(
+        tmp_path, monkeypatch, [("g1", "A", "2020-03", "2020-05")], date_style="year",
+    )
+    assert entries[0]["date"] == "2020"
+    assert "start_date" not in entries[0] and "end_date" not in entries[0]
+
+
+def test_date_style_year_keeps_an_ongoing_range_open(tmp_path, monkeypatch):
+    entries = _grants_entries(tmp_path, monkeypatch, [("g1", "A", "2020-03", "")], date_style="year")
+    assert entries[0]["start_date"] == "2020"
+    assert "end_date" not in entries[0] and "date" not in entries[0]
+
+
+def test_date_style_year_leaves_a_non_date_label_alone(tmp_path, monkeypatch):
+    from parcours.core.build import _apply_date_style
+    assert _apply_date_style([{"date": "in progress"}], "year", False) == [{"date": "in progress"}]
+
+
+def test_hide_repeated_dates_only_shows_the_first_of_each_run(tmp_path, monkeypatch):
+    entries = _grants_entries(
+        tmp_path, monkeypatch,
+        [("g1", "A", "2020-09", "2020-10"), ("g2", "B", "2020-02", "2020-03"), ("g3", "C", "2019-01", "2019-02")],
+        date_style="year", hide_repeated_dates=True,
+    )
+    assert [entry.get("date") for entry in entries] == ["2020", None, "2019"]
+
+
+def test_hide_repeated_dates_compares_whole_ranges(tmp_path, monkeypatch):
+    entries = _grants_entries(
+        tmp_path, monkeypatch,
+        [("g1", "A", "2020-01", "2021-01"), ("g2", "B", "2020-01", "2022-01")],
+        date_style="year", hide_repeated_dates=True,
+    )
+    assert entries[1]["end_date"] == "2022"
+
+
+def test_citation_style_adds_a_formatted_citation_to_each_row(tmp_path, monkeypatch):
+    from parcours.core.views import ViewSpec
+    repo = _setup_data_repo(tmp_path)
+    (repo / "reference").mkdir()
+    (repo / "reference" / "library.json").write_text(json.dumps([
+        {"id": "doe2024", "type": "article-journal", "title": "On Widgets",
+         "author": [{"given": "Jane", "family": "Doe"}], "issued": {"date-parts": [[2024]]}},
+        {"id": "roe2023", "type": "article-journal", "title": "On Gadgets",
+         "author": [{"given": "Sam", "family": "Roe"}], "issued": {"date-parts": [[2023]]}},
+    ]))
+    (repo / "entries" / "publications.csv").write_text("id,citekey\np1,roe2023\np2,doe2024\n")
+    (repo / "cv.csl").write_text((Path(__file__).parent.parent.parent / "parcours" / "starter_config" / "csl_styles" / "apa.csl").read_text(encoding="utf-8"), encoding="utf-8")
+    view = ViewSpec(name="publications", source="publications", entry_type="NormalEntry", fields={"name": "{zotero_citation}"})
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},
+        sections=[{"id": "publications", "source": "publications", "citation_style": "cv.csl"}],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {"publications": view})
+
+    entries = build_rendercv_data(repo, profile)["cv"]["sections"]["Publications"]
+
+    assert "Gadgets" in entries[0]["name"] and "Roe" in entries[0]["name"]
+    assert "Widgets" in entries[1]["name"]
+
+
+def test_group_by_joins_each_groups_rows_into_one_entry(tmp_path, monkeypatch):
+    from parcours.core.views import ViewSpec
+    repo = _setup_data_repo(tmp_path)
+    (repo / "categories" / "skills.yaml").write_text("""
+name: skills
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: category, glossary: skill_category}
+  - {name: name_en}
+  - {name: name_fr}
+  - {name: level}
+""")
+    (repo / "entries" / "translations.csv").write_text(
+        "id,category,en,fr\nskills,section,Skills,Compétences\nprogramming,skill_category,programming,programmation\n"
+    )
+    (repo / "entries" / "skills.csv").write_text(
+        "id,category,name_en,name_fr,level\ns1,programming,Python,,\ns2,spoken,English,,fluent\ns3,programming,C++,,\n"
+    )
+    view = ViewSpec(
+        name="skills", source="skills", entry_type="OneLineEntry", group_by="category",
+        fields={"label": "{category}", "details": "{name}[[ ({level})]]"},
+    )
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},
+        sections=[{"id": "skills", "source": "skills"}],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {"skills": view})
+
+    entries = build_rendercv_data(repo, profile)["cv"]["sections"]["Skills"]
+
+    assert entries == [
+        {"label": "programming", "details": "Python, C++"},
+        {"label": "spoken", "details": "English (fluent)"},
+    ]
+
+
+def test_run_build_copies_a_custom_theme_next_to_the_input(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "vocab.yaml").write_text("{}\n")
+    (repo / "views.yaml").write_text("")
+    (repo / "themes" / "mytheme").mkdir(parents=True)
+    (repo / "themes" / "mytheme" / "Header.j2.typ").write_text("header")
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "mytheme", "output": "cv-test"},
+        sections=[],
+    )
+    seen = {}
+
+    def _fake_run(command, **kwargs):
+        seen["copied"] = (Path(command[2]).parent / "mytheme" / "Header.j2.typ").read_text()
+
+    monkeypatch.setattr("parcours.core.build.subprocess.run", _fake_run)
+
+    run_build(repo, profile, "pdf", tmp_path / "out", force=True)
+
+    assert seen["copied"] == "header"
+
+
+def test_person_list_and_number_fields_get_a_display_form(tmp_path, monkeypatch):
+    from parcours.core.views import ViewSpec
+    repo = _setup_data_repo(tmp_path)
+    (repo / "categories" / "grants.yaml").write_text("""
+name: grants
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: amount, type: number}
+  - {name: co_investigators, type: person_list}
+""")
+    (repo / "entries" / "grants.csv").write_text("id,amount,co_investigators\ng1,1234567,\"Doe, Jane; Roe, Sam\"\ng2,,\n")
+    view = ViewSpec(
+        name="grants", source="grants", entry_type="NormalEntry",
+        fields={"name": "x[[ {amount_display}]][[ with {co_investigators_display}]]"},
+    )
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},
+        sections=[{"id": "grants", "source": "grants"}],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {"grants": view})
+
+    entries = build_rendercv_data(repo, profile)["cv"]["sections"]["Grants"]
+
+    assert entries == [{"name": "x 1,234,567 with Jane Doe, Sam Roe"}, {"name": "x"}]
+
+
+def test_number_display_uses_the_french_thousands_separator():
+    from parcours.core.build import _format_number
+    assert _format_number("255193", "fr") == "255 193"
+    assert _format_number("not a number", "en") == "not a number"
+
+
+def test_identity_extra_reaches_a_custom_themes_design(tmp_path):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "views.yaml").write_text("")
+    (repo / "identity.yaml").write_text("""
+name: {first: Jane, last: Doe}
+variants:
+  academic:
+    extra: {aka: J. Doe}
+""")
+    profile = Profile(meta={"language": "en", "identity_variant": "academic", "theme": "mytheme"}, sections=[])
+    data = build_rendercv_data(repo, profile)
+    assert data["design"]["extra"] == {"aka": "J. Doe"}
+    assert "aka" not in data["cv"]
+
+
+def test_no_identity_extra_leaves_a_built_in_themes_design_clean(tmp_path):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "views.yaml").write_text("")
+    profile = Profile(meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"}, sections=[])
+    assert "extra" not in build_rendercv_data(repo, profile)["design"]
+
+
+def test_views_can_use_translated_labels(tmp_path, monkeypatch):
+    from parcours.core.views import ViewSpec
+    repo = _setup_data_repo(tmp_path)
+    (repo / "entries" / "translations.csv").write_text(
+        "id,category,en,fr\ngrants,section,Grants,Subventions\nrole,label,Role:,Rôle :\n"
+    )
+    _grants_csv(repo, ("g1", "A", "2020-01", "2021-01"))
+    view = ViewSpec(name="grants", source="grants", entry_type="NormalEntry", fields={"name": "{label_role} {role}"})
+    profile = Profile(
+        meta={"language": "fr", "identity_variant": "academic", "theme": "sb2nov"},
+        sections=[{"id": "grants", "source": "grants"}],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {"grants": view})
+
+    entries = build_rendercv_data(repo, profile)["cv"]["sections"]["Subventions"]
+
+    assert entries == [{"name": "Rôle : PI"}]
+
+
+def test_showing_only_years_keeps_the_month_and_day_order(tmp_path, monkeypatch):
+    entries = _grants_entries(
+        tmp_path, monkeypatch,
+        [
+            ("g1", "Early", "2020-02-03", "2020-03"),
+            ("g2", "Late", "2020-11-20", "2020-12"),
+            ("g3", "Middle", "2020-06", "2020-07"),
+            ("g4", "Year only", "2020", "2020"),
+            ("g5", "Newest", "2021-01-15", "2021-02"),
+        ],
+        date_style="year", hide_repeated_dates=True,
+    )
+    assert [entry["name"] for entry in entries] == ["Newest", "Late", "Middle", "Early", "Year only"]

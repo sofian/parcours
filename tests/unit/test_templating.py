@@ -98,3 +98,28 @@ def test_resolve_template_compound_trims_separators_left_by_a_blank_field():
     assert resolve_template("{city}, {country}", {"city": "Online", "country": ""}, "en") == "Online"
     assert resolve_template("{city}, {country}", {"city": "", "country": "France"}, "en") == "France"
     assert resolve_template("{city}, {country}", {"city": "Paris", "country": "France"}, "en") == "Paris, France"
+
+
+def test_optional_segment_keeps_its_literal_text_when_a_field_is_filled():
+    row = {"title": "Vessels", "curator": "Jane"}
+    assert resolve_template("{title}[[. Curator: {curator}]].", row, "en") == "Vessels. Curator: Jane."
+
+
+def test_optional_segment_is_dropped_when_its_fields_are_blank():
+    row = {"title": "Vessels", "curator": ""}
+    assert resolve_template("{title}[[. Curator: {curator}]].", row, "en") == "Vessels."
+
+
+def test_optional_segment_is_kept_when_any_of_its_fields_is_filled():
+    row = {"city": "", "country": "Canada"}
+    assert resolve_template("x[[, {city}{country}]]", row, "en") == "x, Canada"
+
+
+def test_a_label_alone_does_not_keep_an_optional_segment():
+    row = {"label_advisor": "Advisor:", "advisor": ""}
+    assert resolve_template("x[[ {label_advisor} {advisor}.]]", row, "en") == "x"
+
+
+def test_a_label_shows_when_its_optional_segment_is_filled():
+    row = {"label_advisor": "Direction :", "advisor": "Jane"}
+    assert resolve_template("x[[ {label_advisor} {advisor}.]]", row, "fr") == "x Direction : Jane."

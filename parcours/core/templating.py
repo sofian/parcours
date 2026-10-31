@@ -6,6 +6,7 @@ plain dicts — no file I/O, no category/schema knowledge."""
 import re
 
 _PLACEHOLDER = re.compile(r"\{(\w+(?:\|\w+)*)\}")
+_OPTIONAL = re.compile(r"\[\[(.*?)\]\]")
 
 
 def resolve_field(row: dict, field_name: str, language: str):
@@ -50,7 +51,10 @@ def resolve_template(template, row: dict, language: str):
     string mixing `{field}`s and literal text (always stringified), or a
     list of any of the above (each resolved independently, blank/falsy
     results dropped — used for `highlights`). A placeholder may list
-    fallbacks, `{title|event}`, taking the first non-blank one."""
+    fallbacks, `{title|event}`, taking the first non-blank one. A
+    `[[...]]` segment, literal text included, is dropped when every field
+    inside it is blank, e.g. `{title}[[. Curator: {curator}]].` A `label_*`
+    field is translated text and never counts as content there."""
     if isinstance(template, list):
         resolved = [resolve_template(item, row, language) for item in template]
         return [value for value in resolved if value]
@@ -68,6 +72,17 @@ def resolve_template(template, row: dict, language: str):
     def _substitute(match):
         value = _resolve_alternatives(row, match.group(1), language)
         return str(value) if value else ""
+
+    def _keep_if_filled(match):
+        segment = match.group(1)
+        filled = any(
+            _resolve_alternatives(row, spec, language)
+            for spec in _PLACEHOLDER.findall(segment)
+            if not spec.startswith("label_")
+        )
+        return segment if filled else ""
+
+    template = _OPTIONAL.sub(_keep_if_filled, template)
 
     # A blank field leaves its literal separator dangling ("Online, " from
     # "{city}, {country}" for an online event) — trim those at the ends.
