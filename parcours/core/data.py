@@ -74,9 +74,10 @@ def query_category_rows(
 
     if order_by:
         # Comma-separated keys, e.g. "weight desc, date desc" (SPECS.md,
-        # `weight`). Every column loads as text, so each key sorts first by
-        # its numeric value when it has one — "10" after "9" for `weight`
-        # — and then as text, which keeps ISO partial dates in order.
+        # `weight`). Every column loads as text, so a column sorts by
+        # numeric value when all its values are numbers — "10" after "9"
+        # for `weight` — and otherwise as text, which keeps ISO partial
+        # dates in order even where a year-only date looks numeric.
         terms = []
         for key in order_by.split(","):
             parts = key.split()
@@ -90,7 +91,8 @@ def query_category_rows(
                     f"Invalid order_by direction '{direction_str}' for category '{category_name}' "
                     "(expected 'asc' or 'desc')"
                 )
-            terms.append(f'TRY_CAST("{field_name}" AS DOUBLE) {direction} NULLS LAST')
+            not_numeric = f'COUNT(*) FILTER (WHERE "{field_name}" IS NOT NULL AND TRY_CAST("{field_name}" AS DOUBLE) IS NULL) OVER ()'
+            terms.append(f'CASE WHEN {not_numeric} = 0 THEN TRY_CAST("{field_name}" AS DOUBLE) END {direction} NULLS LAST')
             terms.append(f'"{field_name}" {direction} NULLS LAST')
         query += " ORDER BY " + ", ".join(terms)
 

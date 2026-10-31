@@ -350,3 +350,19 @@ def test_query_rejects_an_invalid_direction_in_a_later_key(tmp_path):
     (tmp_path / "entries" / "widgets.csv").write_text("id,weight,date\na,1,2024\n", encoding="utf-8")
     with pytest.raises(ValueError, match="direction"):
         query_category_rows(tmp_path, "widgets", order_by="weight desc, date sideways")
+
+
+def test_order_by_keeps_year_only_dates_in_date_order(tmp_path):
+    entries = tmp_path / "entries"
+    entries.mkdir(exist_ok=True)
+    (entries / "mixed.csv").write_text("id,start_date\na,2007\nb,2026-06\nc,2019\nd,2024-01\n")
+    rows = query_category_rows(tmp_path, "mixed", order_by="start_date desc")
+    assert [row["start_date"] for row in rows] == ["2026-06", "2024-01", "2019", "2007"]
+
+
+def test_order_by_still_sorts_an_all_numeric_column_as_numbers(tmp_path):
+    entries = tmp_path / "entries"
+    entries.mkdir(exist_ok=True)
+    (entries / "weighted.csv").write_text("id,weight\na,9\nb,10\nc,\n")
+    rows = query_category_rows(tmp_path, "weighted", order_by="weight desc")
+    assert [row["weight"] for row in rows] == ["10", "9", None]
