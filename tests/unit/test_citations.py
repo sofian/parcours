@@ -73,3 +73,33 @@ def test_render_citations_preserves_registration_order():
 
 def test_render_citations_empty_list_returns_empty_list():
     assert render_citations([], resolve_style("apa")) == []
+
+
+def test_render_citations_uses_the_requested_locale(tmp_path):
+    style = tmp_path / "terms.csl"
+    style.write_text("""<?xml version="1.0" encoding="utf-8"?>
+<style xmlns="http://purl.org/net/xbiblio/csl" class="note" version="1.0">
+  <info><title>Terms</title><id>terms</id><updated>2026-01-01T00:00:00+00:00</updated></info>
+  <citation><layout><text variable="title"/></layout></citation>
+  <bibliography><layout><text term="and"/></layout></bibliography>
+</style>
+""", encoding="utf-8")
+    record = _widget_record()
+    assert render_citations([record], style, language="en")[0].strip() == "and"
+    assert render_citations([record], style, language="fr")[0].strip() == "et"
+
+
+def test_render_citations_credits_a_director_or_host_as_the_author():
+    for role in ("director", "host"):
+        record = _widget_record()
+        del record["author"]
+        record[role] = [{"given": "Sam", "family": "Roe"}]
+        assert "Roe" in render_citations([record], resolve_style("apa"))[0]
+
+
+def test_render_citations_uses_the_event_title_when_there_is_no_container():
+    record = _widget_record()
+    del record["container-title"]
+    record["type"] = "paper-conference"
+    record["event-title"] = "Widget Conference Proceedings"
+    assert "Widget Conference Proceedings" in render_citations([record], resolve_style("apa"))[0]
