@@ -11,6 +11,7 @@ fields:
   - {name: department, glossary: organization}
   - {name: start_date,   type: date, precision: month, required: true}  # first month of this specific offering
   - {name: end_date,     type: date, precision: month, required: true}  # last month of this specific offering
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search
 dedup:
   - when: [{exact: course_label}, {exact: organization}, {overlap: [start_date, end_date]}]
     as: duplicate

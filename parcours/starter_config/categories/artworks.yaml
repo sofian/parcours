@@ -8,11 +8,12 @@ fields:
   - {name: role,           required: true, vocab: artwork_role, default: author}  # author / collaborator
   - {name: status,         vocab: artwork_status, glossary: artwork_status}  # in-progress / completed — blank = completed
   - {name: date,           type: date, precision: year, required: true, required_unless: {status: in-progress}}  # production year
-  - {name: description_en}
-  - {name: description_fr}                                       # CCV's "Description / Contribution Value"
+  - {name: description_en, sentence: true}
+  - {name: description_fr, sentence: true}                                       # CCV's "Description / Contribution Value"
   - {name: co_authors,     type: person_list}                    # other primary authors (not you) — "Last, First; Last, First"
   - {name: collaborators,  type: person_list}                    # named collaborators, credited separately from primary authorship — same format
   - {name: url}
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search
 require_one_of:
   - [title_en, title_fr]
 dedup:

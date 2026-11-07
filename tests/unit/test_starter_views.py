@@ -29,7 +29,13 @@ _EXPECTED_ENTRY_TYPES = {
 
 def test_starter_views_covers_every_non_skills_category():
     views = load_views(_STARTER_VIEWS_PATH)
-    assert set(views.keys()) == set(_EXPECTED_ENTRY_TYPES.keys())
+    assert set(views.keys()) == set(_EXPECTED_ENTRY_TYPES.keys()) | {"showcases", "performances"}
+
+
+def test_exhibition_formats_each_get_their_own_view():
+    views = load_views(_STARTER_VIEWS_PATH)
+    for name, fmt in (("exhibitions", "exhibition"), ("showcases", "showcase"), ("performances", "performance")):
+        assert views[name].source == "exhibitions" and views[name].filter == {"format": fmt}, name
 
 
 def test_starter_views_use_the_documented_entry_type_per_category():
@@ -40,8 +46,8 @@ def test_starter_views_use_the_documented_entry_type_per_category():
 
 def test_starter_views_source_matches_the_view_name_for_every_category():
     views = load_views(_STARTER_VIEWS_PATH)
-    for category_name, view in views.items():
-        assert view.source == category_name
+    for category_name in _EXPECTED_ENTRY_TYPES:
+        assert views[category_name].source == category_name
 
 
 def test_zotero_backed_views_reference_only_zotero_fields():

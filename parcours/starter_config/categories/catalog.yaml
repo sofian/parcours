@@ -7,3 +7,4 @@ fields:
   - {name: id,       generated: true}       # catalog-2026-004
   - {name: weight,   type: int}             # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: citekey,  required: true}
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search

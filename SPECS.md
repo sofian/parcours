@@ -78,6 +78,9 @@ plus CV-specific fields the export doesn't track.
   exists yet; move the files by hand.
 - **No cross-references between tables for v1** (explicit decision — no
   foreign keys, no relational joins between e.g. publications and grants).
+  The one soft link is `titles_in:` (see Category schemas): a field
+  holding `;`-separated titles from another category, which lint only
+  warns about when a title has no match. Nothing depends on it.
 - **IDs:** a bare 6-hex-character random token (e.g. `a3f9c2`), generated
   by `parco add` via Python's `secrets` module and re-rolled on the
   (astronomically unlikely) collision against existing ids already in
@@ -288,6 +291,17 @@ numbers (so `weight` 10 sorts above 9) and as text otherwise, with blank
 values last in either direction. `weight desc, date desc` pins weighted
 rows — e.g. a work still in progress, which has no date — above the
 dated ones.
+
+**`comment`** (a standard optional `text` field, last in every schema): a
+note for whoever enters the data. No starter view shows it, though a view
+can name `{comment}` like any other field. `--search` skips it, while
+`parco query` reads it like any column (`WHERE comment ILIKE '%...%'`).
+The wizard asks for it last, after `weight`, and lint never checks it.
+
+**`titles_in: <category>`**: the field holds titles from another
+category, `;`-separated (exhibitions' `artworks`). Lint warns, never
+errors, on a title matching no `title`/`title_*` value there, ignoring
+case.
 
 ### CCV export structure (documented from a real export)
 
@@ -1184,13 +1198,25 @@ fields:
   - {name: country,      required: true, required_unless: {city: Online}, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — credited curator(s)
   - {name: start_date,   type: date, precision: year, required: true}
-  - {name: end_date,     type: date, precision: year}              # blank = single-day event or unknown
+  - {name: end_date,     type: date, precision: year, required: true}  # same as start_date for a single-day event
+  - {name: format,       vocab: exhibition_format, default: exhibition}  # blank counts as exhibition; showcase/performance get their own CV sections
+  - {name: artworks,     titles_in: artworks}                      # titles of the works shown, `;`-separated; lint warns on a title not in artworks
+  - {name: comment,      type: text}
 require_one_of:
   - [event, venue]                                                   # title is optional: festival appearances are named by event
 dedup:
   - when: [{fuzzy: [title_en, title_fr]}, {fuzzy: [event, venue]}, {same_year: start_date}]
     as: duplicate
 ```
+
+- `format` (`exhibition_format: [exhibition, showcase, performance]`) sorts
+  the rare non-exhibition rows into their own CV sections: a showcase is a
+  one-day presentation of a work (e.g. closing a residency), a performance
+  a live piece. The starter `views.yaml` has an `exhibitions`, `showcases`
+  and `performances` view over this one category, each with a `filter`; an
+  online exhibition stays an exhibition, with `city: Online`.
+- `artworks` is a soft link (`titles_in: artworks`), not printed by the
+  starter views.
 
 - `city`/`country` are each their own glossary-backed field (see
   Translations) — `country`'s translations are pre-populated
@@ -1219,7 +1245,8 @@ dedup:
   point in time like `artworks` — the LaTeX source's own comments show
   real multi-month exhibition runs (e.g. a show spanning several
   months), unlike a single performance date. CCV has no end-date field
-  for exhibitions at all, so `end_date` is always blank on import.
+  for exhibitions at all, so `end_date` is always blank on import and
+  each imported row fails lint until it is entered by hand.
 - `event`/`venue` are kept separate (a festival like MUTEK is not the
   same thing as the gallery hosting a given show within it) but neither
   is individually required — `require_one_of` covers the common case
@@ -1273,8 +1300,8 @@ fields:
   - {name: organization, required: true, glossary: organization}  # free text — e.g. "Hexagram", "LABoral"
   - {name: city,         required: true, glossary: city}
   - {name: country,      required: true, glossary: country}                          # pre-populated in translations.csv at `init`, see Translations
-  - {name: start_date,   type: date, precision: year, required: true}
-  - {name: end_date,     type: date, precision: year}           # blank = short/undated residency
+  - {name: start_date,   type: date, precision: month, required: true}
+  - {name: end_date,     type: date, precision: month, required: true}
 dedup:
   - when: [{exact: organization}, {overlap: [start_date, end_date]}]
     as: duplicate
@@ -1530,6 +1557,7 @@ artwork_role: [author, collaborator]
 artwork_status: [in-progress, completed]
 
 presentation_format: [talk, panel, round-table, workshop, poster, special-session]
+exhibition_format: [exhibition, showcase, performance]
 
 student_role: [principal-supervisor, co-supervisor]
 degree_type: [bachelors, bachelors-honours, masters, doctorate, postdoc]        # shared: students, education
@@ -1649,7 +1677,13 @@ actual `identity.yaml`, in the private data repo, not here.)
   section references a `source` (a named, fixed view over the data —
   never raw SQL in profile files), plus optional `filter` (simple
   key→value, not arbitrary SQL), `order_by`, `limit`, `group_by`,
-  `citation_style`.
+  `citation_style`. A view can carry a `filter` too, merged under the
+  section's, so one category can feed several views. A filter on a value
+  that is a field's `default:` also matches blank cells. A blank cell
+  also falls in the `subsections` group of its field's default.
+- `subsection_of: <section id>` puts a section at the end of another, under
+  its own title as a subsection heading, so one section can gather
+  several categories. Both must use the same entry type.
 - Section `title` is **not** hardcoded per profile — resolved from
   `translations.csv` via the section's `id`, keyed to `meta.language`.
 - **Views are defined in `views.yaml` in the data repo**, not in code.
@@ -1718,6 +1752,13 @@ A profile controls how a CV looks without new code:
 - `date_style: year` (meta or section) shows dates as years, a range
   within one year as that year. `hide_repeated_dates: true` blanks the
   date under an entry with the same dates.
+- A section's `subsections` splits it under subheadings, in the listed
+  order: `field` names a column, or `zotero_type` for a citation-backed
+  section, and each of `groups` gives an `id` (its title comes from
+  `translations.csv`, category `subsection`) and the `values` it takes,
+  compared to the stored value before any glossary. A row in no group
+  fails the build rather than vanishing from the CV. Each heading is a
+  `NormalEntry` flagged `subsection: true`, so a theme can style it.
 - A section's `citation_style` (a bundled name or a `.csl` path relative
   to the data repo) adds `zotero_citation` to each row. Rendered one
   record at a time, so no `2025a` year suffixes appear.
@@ -1729,6 +1770,11 @@ is a `translations.csv` row of category `label`, so literal view text
 stays translatable; it never counts as content inside `[[...]]`. A view's
 `group_by` makes one entry per group, joining each field's distinct values
 with commas.
+
+A field marked `sentence: true` always ends in punctuation on a CV, whatever
+the CSV holds. A blank end date reads as ongoing only when the schema allows
+it: where `end_date` is required, lint flags the row, and a forced build
+shows the start date alone.
 
 ## views.yaml (draft)
 
@@ -2282,8 +2328,8 @@ be pure duplication.
 
 - **`--search`** is unchanged from `list`'s existing behavior: a
   case-insensitive Python-level substring scan across every field's
-  value (`wizard.py`'s existing `search_rows`), applied after the
-  DB-level filters below.
+  value except `comment` (`wizard.py`'s existing `search_rows`), applied
+  after the DB-level filters below.
 - **`--filter <field>=<value>`** is exact-match, DB-level, via
   `core/data.py`'s existing `query_category_rows(filters=...)` — the
   same mechanism `build` already uses for a profile section's own
@@ -2354,7 +2400,7 @@ Wizard behavior:
   declares it right after `id` (for CSV column layout, so it's easy to
   spot in a spreadsheet), but that's not a sensible prompting order —
   the wizard always asks about it last, regardless of its declared
-  position.
+  position. `comment` follows it.
 - `[skip]` on optional fields. A `require_one_of` group is asked
   field-by-field with `[skip]` allowed on each individually, but
   re-prompts the group if every field in it ends up blank (the schema
@@ -2384,7 +2430,8 @@ Wizard behavior:
 
 ### Finding a row to edit or delete (substring search, no display-field config)
 `--search "<text>"` matches case-insensitively as a substring against
-every field's value — no per-category "display field" concept needed.
+every field's value except `comment` — no per-category "display field"
+concept needed.
 Matches are shown as a numbered list; each row's summary line shows its
 `id` plus every field that's either declared `required` or belongs to a
 `require_one_of` group and is non-blank for that row (so a proper-noun-

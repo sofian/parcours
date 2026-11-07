@@ -10,6 +10,7 @@ fields:
   - {name: start_date,     type: date, precision: year, required: true}
   - {name: end_date,       type: date, precision: year}           # blank = ongoing
   - {name: url}
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search
 dedup:
   - when: [{fuzzy: title}, {overlap: [start_date, end_date]}]
     as: duplicate

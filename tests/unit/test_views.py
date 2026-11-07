@@ -59,3 +59,15 @@ education:
     views = load_views(path)
 
     assert set(views.keys()) == {"grants", "education"}
+
+
+def test_load_views_parses_filter(tmp_path):
+    path = tmp_path / "views.yaml"
+    path.write_text("""
+showcases:
+  source: exhibitions
+  entry_type: NormalEntry
+  filter: {format: showcase}
+  fields: {name: "{venue}"}
+""")
+    assert load_views(path)["showcases"].filter == {"format": "showcase"}

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import yaml
+
 from parcours.core.schema import load_category_schema
 from parcours.core.translations import load_translations
 from parcours.core.vocab import load_vocab
@@ -58,11 +60,11 @@ def test_degree_type_and_degree_status_are_shared_between_students_and_education
     assert students.get_field("degree_status").vocab == education.get_field("degree_status").vocab
 
 
-def test_starter_translations_has_exactly_the_18_non_skills_section_rows():
+def test_starter_translations_has_a_section_row_for_every_starter_view():
     table = load_translations(_STARTER_DIR / "translations.csv")
     entries = [e for e in table.all() if e.category == "section"]
-    assert len(entries) == 18
-    assert {e.id for e in entries} == _EXPECTED_CATEGORIES - {"skills"}
+    assert len(entries) == 20
+    assert {e.id for e in entries} == _EXPECTED_CATEGORIES - {"skills"} | {"showcases", "performances"}
 
 
 def test_starter_translations_has_195_pre_populated_country_rows_plus_official_aliases():
@@ -134,7 +136,7 @@ def test_press_is_backed_entirely_by_the_citation_export():
     assert schema.handler == "publications"
     assert schema.options["json"] == "reference/library.json"
     assert schema.get_field("citekey").required is True
-    assert schema.field_names() == ["id", "weight", "citekey", "program", "description_en", "description_fr"]
+    assert schema.field_names() == ["id", "weight", "citekey", "program", "description_en", "description_fr", "comment"]
 
 
 def test_teaching_dates_are_a_required_month_precision_range():
@@ -145,3 +147,34 @@ def test_teaching_dates_are_a_required_month_precision_range():
         assert field.type == "date"
         assert field.precision == "month"
         assert field.required
+
+
+def test_exhibitions_and_residencies_require_an_end_date():
+    for category in ("exhibitions", "residencies"):
+        assert load_category_schema(_CATEGORIES_DIR / f"{category}.yaml").get_field("end_date").required
+
+
+def test_artwork_descriptions_are_sentences():
+    schema = load_category_schema(_CATEGORIES_DIR / "artworks.yaml")
+    assert schema.get_field("description_en").sentence and schema.get_field("description_fr").sentence
+
+
+def test_every_starter_category_ends_with_an_optional_comment():
+    for path in sorted(_CATEGORIES_DIR.glob("*.yaml")):
+        schema = load_category_schema(path)
+        last = schema.fields[-1]
+        assert (last.name, last.type, last.required) == ("comment", "text", False), path.name
+
+
+def test_exhibitions_have_a_format_defaulting_to_exhibition_and_list_their_artworks():
+    schema = load_category_schema(_CATEGORIES_DIR / "exhibitions.yaml")
+    fmt = schema.get_field("format")
+    assert fmt.vocab == "exhibition_format" and fmt.default == "exhibition" and not fmt.required
+    assert schema.get_field("artworks").titles_in == "artworks"
+    vocab = yaml.safe_load((_STARTER_DIR / "vocab.yaml").read_text(encoding="utf-8"))
+    assert vocab["exhibition_format"] == ["exhibition", "showcase", "performance"]
+
+
+def test_residency_dates_need_at_least_a_month():
+    schema = load_category_schema(_CATEGORIES_DIR / "residencies.yaml")
+    assert [schema.get_field(n).precision for n in ("start_date", "end_date")] == ["month", "month"]

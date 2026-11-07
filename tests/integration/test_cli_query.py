@@ -71,3 +71,16 @@ def test_query_rejects_unknown_format(tmp_path, monkeypatch):
 
     assert result.exit_code == 2
     assert "table" in result.stdout.lower()
+
+
+def test_query_can_read_comments(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "entries" / "widgets.csv").write_text(
+        "id,title_en,comment\nw1,First,check the vernissage\nw2,Second,\n", encoding="utf-8"
+    )
+    monkeypatch.chdir(repo)
+
+    result = runner.invoke(app, ["query", "SELECT id FROM widgets WHERE comment ILIKE '%vernissage%'", "--format", "csv"])
+
+    assert result.exit_code == 0, result.stdout
+    assert result.stdout.strip().splitlines() == ["id", "w1"]

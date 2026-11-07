@@ -170,6 +170,35 @@ recognitions:
 exhibitions:
   source: exhibitions
   entry_type: NormalEntry
+  filter: {format: exhibition}
+  fields:
+    name: "{title|event|venue}"
+    start_date: start_date
+    end_date: end_date
+    location: "{city}, {country}"
+    highlights:
+      - "{event}"
+      - "{venue}"
+      - "{curator}"
+
+showcases:
+  source: exhibitions
+  entry_type: NormalEntry
+  filter: {format: showcase}
+  fields:
+    name: "{title|event|venue}"
+    start_date: start_date
+    end_date: end_date
+    location: "{city}, {country}"
+    highlights:
+      - "{event}"
+      - "{venue}"
+      - "{curator}"
+
+performances:
+  source: exhibitions
+  entry_type: NormalEntry
+  filter: {format: performance}
   fields:
     name: "{title|event|venue}"
     start_date: start_date

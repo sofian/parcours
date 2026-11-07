@@ -167,6 +167,15 @@ def test_search_rows_matches_across_any_field():
     assert [m["id"] for m in matches] == ["def456"]
 
 
+def test_search_rows_skips_comments():
+    rows = [
+        {"id": "abc123", "title_en": "A Widget", "comment": "check the vernissage date"},
+        {"id": "def456", "title_en": "Vernissage", "comment": ""},
+    ]
+    matches = wizard.search_rows(rows, "vernissage")
+    assert [m["id"] for m in matches] == ["def456"]
+
+
 def test_pick_row_returns_none_for_no_matches(monkeypatch):
     monkeypatch.setattr(wizard.typer, "echo", lambda *a, **k: None)
     assert wizard.pick_row(_schema(), []) is None
@@ -274,6 +283,30 @@ def test_weight_is_always_asked_last_regardless_of_declared_position(monkeypatch
     wizard.collect_field_values(schema, {})
 
     assert prompted_fields == ["title_en", "event", "weight"]
+
+
+def test_comment_is_asked_after_weight(monkeypatch):
+    prompted_fields = []
+
+    def fake_prompt(text, default="", show_default=True):
+        prompted_fields.append(text.split(" ")[0].split("(")[0])
+        return ""
+
+    monkeypatch.setattr(wizard.typer, "prompt", fake_prompt)
+    monkeypatch.setattr(wizard.typer, "echo", lambda *a, **k: None)
+
+    schema = CategorySchema(
+        name="widgets",
+        fields=[
+            FieldSpec(name="id", generated=True),
+            FieldSpec(name="weight", type="int"),
+            FieldSpec(name="comment", type="text"),
+            FieldSpec(name="title_en"),
+        ],
+    )
+    wizard.collect_field_values(schema, {})
+
+    assert prompted_fields == ["title_en", "weight", "comment"]
 
 
 def _conditional_schema():

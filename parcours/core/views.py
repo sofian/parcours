@@ -15,6 +15,9 @@ class ViewSpec:
     entry_type: str
     fields: dict[str, Any] = field(default_factory=dict)
     group_by: str | None = None
+    # `filter: {format: showcase}` — like a profile section's own filter,
+    # so one category can feed several views (and sections).
+    filter: dict[str, Any] = field(default_factory=dict)
 
 
 def load_views(path: Path) -> dict[str, ViewSpec]:
@@ -29,5 +32,6 @@ def load_views(path: Path) -> dict[str, ViewSpec]:
             entry_type=view_raw["entry_type"],
             fields=view_raw.get("fields", {}),
             group_by=view_raw.get("group_by"),
+            filter=view_raw.get("filter", {}),
         )
     return views

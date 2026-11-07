@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from parcours.core.build import build_rendercv_data
 from parcours.core.profiles import Profile
 
@@ -895,3 +897,231 @@ def test_showing_only_years_keeps_the_month_and_day_order(tmp_path, monkeypatch)
         date_style="year", hide_repeated_dates=True,
     )
     assert [entry["name"] for entry in entries] == ["Newest", "Late", "Middle", "Early", "Year only"]
+
+
+def _students_repo(tmp_path, monkeypatch, end_required=False, **section):
+    from parcours.core.views import ViewSpec
+    repo = _setup_data_repo(tmp_path)
+    (repo / "categories" / "students.yaml").write_text(f"""
+name: students
+handler: generic
+fields:
+  - {{name: id, generated: true}}
+  - {{name: student_name}}
+  - {{name: degree_type, glossary: degree_type}}
+  - {{name: start_date, type: date}}
+  - {{name: end_date, type: date, required: {str(end_required).lower()}}}
+""")
+    (repo / "entries" / "translations.csv").write_text(
+        "id,category,en,fr\nstudents,section,Students,Étudiants\n"
+        "masters,degree_type,Master's,Maîtrise\ngrad,subsection,Graduate,Cycles supérieurs\n"
+    )
+    (repo / "entries" / "students.csv").write_text(
+        "id,student_name,degree_type,start_date,end_date\n"
+        "s1,Ann,masters,2021,2022\ns2,Bob,doctorate,2021,2022\ns3,Cid,masters,2020,2021\ns4,Dee,honours,2021,\n"
+    )
+    view = ViewSpec(
+        name="students", source="students", entry_type="NormalEntry",
+        fields={"name": "{student_name}", "start_date": "start_date", "end_date": "end_date"},
+    )
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov", "hide_repeated_dates": True},
+        sections=[{"id": "students", "source": "students", "order_by": "start_date desc", **section}],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {"students": view})
+    return repo, profile
+
+
+_GROUPS = {"field": "degree_type", "groups": [
+    {"id": "honours", "values": ["honours"]},
+    {"id": "grad", "values": ["doctorate", "masters"]},
+]}
+
+
+def test_subsections_group_rows_under_translated_headings_in_the_listed_order(tmp_path, monkeypatch):
+    repo, profile = _students_repo(tmp_path, monkeypatch, subsections=_GROUPS)
+    entries = build_rendercv_data(repo, profile)["cv"]["sections"]["Students"]
+    assert [(e["name"], e.get("subsection")) for e in entries] == [
+        ("*honours*", "true"), ("Dee", None),
+        ("*Graduate*", "true"), ("Ann", None), ("Bob", None), ("Cid", None),
+    ]
+
+
+def test_subsections_restart_hidden_dates_under_each_heading(tmp_path, monkeypatch):
+    repo, profile = _students_repo(tmp_path, monkeypatch, subsections=_GROUPS)
+    entries = build_rendercv_data(repo, profile)["cv"]["sections"]["Students"]
+    first_grad = entries[3]
+    assert first_grad["name"] == "Ann" and first_grad["start_date"] == "2021"
+    assert "start_date" not in entries[4]
+
+
+def test_a_row_outside_every_subsection_fails_the_build(tmp_path, monkeypatch):
+    from parcours.core.build import BuildError
+    repo, profile = _students_repo(tmp_path, monkeypatch, subsections={
+        "field": "degree_type", "groups": [{"id": "grad", "values": ["masters"]}],
+    })
+    with pytest.raises(BuildError, match="doctorate"):
+        build_rendercv_data(repo, profile)
+
+
+def test_a_required_end_date_left_blank_is_not_shown_as_ongoing(tmp_path, monkeypatch):
+    repo, profile = _students_repo(tmp_path, monkeypatch, end_required=True)
+    entries = build_rendercv_data(repo, profile)["cv"]["sections"]["Students"]
+    dee = next(e for e in entries if e["name"] == "Dee")
+    assert dee["date"] == "2021" and "start_date" not in dee
+
+
+def test_an_optional_end_date_left_blank_stays_ongoing(tmp_path, monkeypatch):
+    repo, profile = _students_repo(tmp_path, monkeypatch, end_required=False)
+    entries = build_rendercv_data(repo, profile)["cv"]["sections"]["Students"]
+    dee = next(e for e in entries if e["name"] == "Dee")
+    assert dee["start_date"] == "2021" and "date" not in dee
+
+
+def test_a_sentence_field_always_ends_in_punctuation(tmp_path, monkeypatch):
+    from parcours.core.views import ViewSpec
+    repo = _setup_data_repo(tmp_path)
+    (repo / "categories" / "grants.yaml").write_text("""
+name: grants
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: description_en, sentence: true}
+  - {name: description_fr, sentence: true}
+""")
+    (repo / "entries" / "grants.csv").write_text(
+        "id,description_en,description_fr\na,No period ,Sans point\nb,Has one.,\nc,Really?,\nd,,\n"
+    )
+    view = ViewSpec(name="grants", source="grants", entry_type="NormalEntry", fields={"name": "x", "summary": "{description}"})
+    profile = Profile(
+        meta={"language": "fr", "identity_variant": "academic", "theme": "sb2nov"},
+        sections=[{"id": "grants", "source": "grants"}],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {"grants": view})
+    entries = build_rendercv_data(repo, profile)["cv"]["sections"]["Subventions"]
+    assert [e.get("summary") for e in entries] == ["Sans point.", "Has one.", "Really?", None]
+
+
+def test_subsections_can_group_on_the_citation_type(tmp_path, monkeypatch):
+    from parcours.core.views import ViewSpec
+    repo = _setup_data_repo(tmp_path)
+    (repo / "reference").mkdir()
+    (repo / "reference" / "library.json").write_text(json.dumps([
+        {"id": "a", "type": "book", "title": "A Book", "issued": {"date-parts": [[2024]]}},
+        {"id": "b", "type": "chapter", "title": "A Chapter", "issued": {"date-parts": [[2023]]}},
+    ]))
+    (repo / "entries" / "publications.csv").write_text("id,citekey\np1,b\np2,a\n")
+    view = ViewSpec(name="publications", source="publications", entry_type="NormalEntry", fields={"name": "{zotero_title}"})
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},
+        sections=[{"id": "publications", "source": "publications", "subsections": {
+            "field": "zotero_type",
+            "groups": [{"id": "Books", "values": ["book"]}, {"id": "Chapters", "values": ["chapter"]}],
+        }}],
+    )
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {"publications": view})
+
+    entries = build_rendercv_data(repo, profile)["cv"]["sections"]["Publications"]
+
+    assert [e["name"] for e in entries] == ["*Books*", "A Book", "*Chapters*", "A Chapter"]
+
+
+def _exhibitions_repo(tmp_path, monkeypatch):
+    from parcours.core.views import ViewSpec
+    repo = _setup_data_repo(tmp_path)
+    (repo / "categories" / "exhibitions.yaml").write_text("""
+name: exhibitions
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: venue}
+  - {name: format, default: exhibition}
+""")
+    (repo / "entries" / "translations.csv").write_text(
+        "id,category,en,fr\nexhibitions,section,Exhibitions,Expositions\n"
+        "showcases,section,Showcases,Présentations\nperformances,section,Performances,Performances\n"
+    )
+    (repo / "entries" / "exhibitions.csv").write_text(
+        "id,venue,format\na,Gallery,\nb,Museum,exhibition\nc,Theatre,performance\n"
+    )
+    def view(name, fmt):
+        return ViewSpec(name=name, source="exhibitions", entry_type="NormalEntry",
+                        fields={"name": "{venue}"}, filter={"format": fmt})
+    views = {"exhibitions": view("exhibitions", "exhibition"), "showcases": view("showcases", "showcase"),
+             "performances": view("performances", "performance")}
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: views)
+    profile = Profile(
+        meta={"language": "en", "identity_variant": "academic", "theme": "sb2nov"},
+        sections=[{"id": name, "source": name} for name in views],
+    )
+    return repo, profile
+
+
+def test_a_view_filter_splits_one_category_into_sections(tmp_path, monkeypatch):
+    repo, profile = _exhibitions_repo(tmp_path, monkeypatch)
+    sections = build_rendercv_data(repo, profile)["cv"]["sections"]
+    assert [e["name"] for e in sections["Performances"]] == ["Theatre"]
+    assert "Showcases" not in sections
+
+
+def test_a_blank_value_matches_a_filter_on_the_fields_default(tmp_path, monkeypatch):
+    repo, profile = _exhibitions_repo(tmp_path, monkeypatch)
+    sections = build_rendercv_data(repo, profile)["cv"]["sections"]
+    assert [e["name"] for e in sections["Exhibitions"]] == ["Gallery", "Museum"]
+
+
+def test_a_blank_value_falls_in_the_subsection_of_the_fields_default(tmp_path, monkeypatch):
+    repo, profile = _exhibitions_repo(tmp_path, monkeypatch)
+    profile.sections = [{"id": "exhibitions", "source": "exhibitions", "subsections": {
+        "field": "format", "groups": [
+            {"id": "exhibition", "values": ["exhibition"]},
+            {"id": "performance", "values": ["performance"]},
+        ],
+    }}]
+    from parcours.core.views import ViewSpec
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: {"exhibitions": ViewSpec(
+        name="exhibitions", source="exhibitions", entry_type="NormalEntry", fields={"name": "{venue}"},
+    )})
+    entries = build_rendercv_data(repo, profile)["cv"]["sections"]["Exhibitions"]
+    assert [e["name"] for e in entries] == ["*exhibition*", "Gallery", "Museum", "*performance*", "Theatre"]
+
+
+def _curatorship_repo(tmp_path, monkeypatch):
+    from parcours.core.views import ViewSpec
+    repo, profile = _exhibitions_repo(tmp_path, monkeypatch)
+    (repo / "categories" / "curatorship.yaml").write_text("""
+name: curatorship
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: venue}
+""")
+    (repo / "entries" / "curatorship.csv").write_text("id,venue\nk,Biennale\n")
+    with open(repo / "entries" / "translations.csv", "a") as fh:
+        fh.write("curatorship,section,Curatorship,Commissariat\n")
+    views = {name: ViewSpec(name=name, source=name, entry_type="NormalEntry", fields={"name": "{venue}"})
+             for name in ("exhibitions", "curatorship")}
+    monkeypatch.setattr("parcours.core.build.load_views", lambda path: views)
+    return repo, profile
+
+
+def test_a_section_can_be_placed_inside_another_as_a_subsection(tmp_path, monkeypatch):
+    repo, profile = _curatorship_repo(tmp_path, monkeypatch)
+    profile.sections = [
+        {"id": "curatorship", "source": "curatorship", "subsection_of": "exhibitions"},
+        {"id": "exhibitions", "source": "exhibitions", "order_by": "venue"},
+    ]
+    sections = build_rendercv_data(repo, profile)["cv"]["sections"]
+    assert list(sections) == ["Exhibitions"]
+    assert [(e["name"], e.get("subsection")) for e in sections["Exhibitions"]] == [
+        ("Gallery", None), ("Museum", None), ("Theatre", None),
+        ("*Curatorship*", "true"), ("Biennale", None),
+    ]
+
+
+def test_subsection_of_an_unknown_section_fails_the_build(tmp_path, monkeypatch):
+    from parcours.core.build import BuildError
+    repo, profile = _curatorship_repo(tmp_path, monkeypatch)
+    profile.sections = [{"id": "curatorship", "source": "curatorship", "subsection_of": "nowhere"}]
+    with pytest.raises(BuildError, match="nowhere"):
+        build_rendercv_data(repo, profile)

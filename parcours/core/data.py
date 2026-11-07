@@ -41,7 +41,10 @@ def query_category_rows(
     order_by: str | None = None,
     limit: int | None = None,
     date_range: tuple[str, str | None, str | None] | None = None,
+    defaults: dict[str, str] | None = None,
 ) -> list[dict]:
+    """`defaults` maps a field to the value a blank cell stands for, so a
+    filter on that value also matches blank cells."""
     csv_path = category_csv_path(data_dir, category_name)
     if not csv_path.is_file():
         return []
@@ -57,7 +60,11 @@ def query_category_rows(
             if not isinstance(allowed_values, (list, tuple)):
                 allowed_values = [allowed_values]
             placeholders = ", ".join("?" for _ in allowed_values)
-            clauses.append(f'"{field_name}" IN ({placeholders})')
+            column = f'"{field_name}"'
+            if defaults and field_name in defaults:
+                column = f"COALESCE(NULLIF(TRIM({column}), ''), ?)"
+                params.append(defaults[field_name])
+            clauses.append(f"{column} IN ({placeholders})")
             params.extend(allowed_values)
 
     if date_range:

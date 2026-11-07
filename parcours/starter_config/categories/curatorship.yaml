@@ -12,6 +12,7 @@ fields:
   - {name: curator}                                                  # free text — co-curator(s), if any (your own curatorial role is implicit)
   - {name: start_date,   type: date, precision: year, required: true}
   - {name: end_date,     type: date, precision: year}
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search
 require_one_of:
   - [event, venue]                                                   # title is optional: festival appearances are named by event
 dedup:

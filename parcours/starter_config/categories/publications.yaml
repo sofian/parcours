@@ -18,3 +18,4 @@ fields:
   - {name: featured, type: bool}                            # "selected publications"
   - {name: note_en,  type: text}                            # e.g. "Best paper award"
   - {name: note_fr,  type: text}
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search

@@ -12,6 +12,7 @@ fields:
   - {name: end_date,     type: date, precision: year}          # blank = ongoing
   - {name: detail_en}
   - {name: detail_fr}                                            # student name (graduate-examination) / committee name
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search
                                                                   # (funding-review) / which committee, e.g. "Hiring
                                                                   # Committee" (committee) / program title + description
                                                                   # (program-development) / activity description

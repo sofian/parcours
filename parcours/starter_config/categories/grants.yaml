@@ -16,6 +16,7 @@ fields:
   - {name: co_investigators, type: person_list}
   - {name: note_en}
   - {name: note_fr}
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search
 dedup:
   - when: [{exact: funder}, {overlap: [start_date, end_date]}, {fuzzy: [title_en, title_fr]}]
     as: duplicate

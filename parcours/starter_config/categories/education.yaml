@@ -16,6 +16,7 @@ fields:
   - {name: advisor}                                                    # free text — CCV's Supervisors sub-record (name+dates) is joined into this one field on import
   - {name: note_en}
   - {name: note_fr}                                                    # e.g. "Completed with honours"
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search
 dedup:
   - when: [{exact: organization}, {exact: degree_type}, {same_year: start_date}]
     as: duplicate

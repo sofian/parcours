@@ -12,6 +12,7 @@ fields:
   - {name: description_en}
   - {name: description_fr}                                                   # free-form; unused in the reference export, kept for reuse
   - {name: url}                                                              # References / Citations / Web Sites
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search
 dedup:
   - when: [{fuzzy: organization}, {overlap: [start_date, end_date]}]
     as: duplicate

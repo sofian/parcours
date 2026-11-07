@@ -17,6 +17,7 @@ fields:
   - {name: description_fr}
   - {name: co_presenters,   type: person_list}                            # "Last, First; Last, First"
   - {name: url}
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search
 require_one_of:
   - [event_en, event_fr]                                               # title is optional: a panel/festival may only have an event name
 dedup:

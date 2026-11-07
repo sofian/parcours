@@ -15,6 +15,7 @@ fields:
   - {name: thesis_title}                                                   # no translation
   - {name: present_position}                                               # free text — outcome tracking
   - {name: present_organization}
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search
 dedup:
   - when: [{exact: student_name}]
     as: related

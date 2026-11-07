@@ -11,7 +11,10 @@ fields:
   - {name: country,      required: true, required_unless: {city: Online}, glossary: country}                              # pre-populated in translations.csv at `init`, see Translations
   - {name: curator}                                                  # free text — credited curator(s)
   - {name: start_date,   type: date, precision: year, required: true}
-  - {name: end_date,     type: date, precision: year}              # blank = single-day event or unknown
+  - {name: end_date,     type: date, precision: year, required: true}  # same as start_date for a single-day event
+  - {name: format,       vocab: exhibition_format, default: exhibition}  # blank counts as exhibition; showcase/performance get their own CV sections
+  - {name: artworks,     titles_in: artworks}                      # titles of the works shown, `;`-separated; lint warns on a title not in artworks
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search
 require_one_of:
   - [event, venue]                                                   # title is optional: festival appearances are named by event
 dedup:

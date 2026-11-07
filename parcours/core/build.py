@@ -27,6 +27,7 @@ from .translations import load_translations, translations_csv_path
 from .views import ViewSpec, load_views
 
 _DATE_KEYS = ("date", "start_date", "end_date")
+_SENTENCE_ENDINGS = (".", "!", "?", "…")
 
 
 def _csl_date_to_iso(record: dict) -> str | None:
@@ -88,6 +89,7 @@ def _merge_zotero_fields(handler: PublicationsHandler, row: dict) -> dict:
     merged["zotero_doi"] = record.get("DOI", "")
     merged["zotero_url"] = record.get("URL", "")
     merged["zotero_date"] = _csl_date_to_iso(record) or ""
+    merged["zotero_type"] = record.get("type", "")
     return merged
 
 
@@ -237,18 +239,57 @@ def _format_number(value: str, language: str) -> str:
 def _add_display_fields(schema, row: dict, language: str) -> dict:
     """`<field>_display` for views: a `person_list` as "First Last, First
     Last", a `number` with thousands separators. The raw value stays, for
-    ordering and for views that want it as stored."""
+    ordering and for views that want it as stored. A `sentence` field gets
+    its closing period in place."""
     displayed = dict(row)
     for field_spec in schema.fields:
         value = row.get(field_spec.name)
         if not value:
             continue
+        if field_spec.sentence:
+            text = value.rstrip()
+            displayed[field_spec.name] = text if text.endswith(_SENTENCE_ENDINGS) else f"{text}."
         if field_spec.type == "person_list":
             people = parse_person_list(value)
             displayed[f"{field_spec.name}_display"] = ", ".join(f"{p.first} {p.last}" for p in people)
         elif field_spec.type == "number":
             displayed[f"{field_spec.name}_display"] = _format_number(value, language)
     return displayed
+
+
+def _close_open_range(schema, view: ViewSpec, entry: dict) -> dict:
+    """RenderCV shows a start date with no end as "–present", which only
+    holds where the schema lets an end date be blank. Elsewhere the blank
+    is an error lint reports, so a forced build shows the start date alone."""
+    end_field = schema.get_field(view.fields.get("end_date", ""))
+    if not end_field or not end_field.required or "end_date" in entry or "start_date" not in entry:
+        return entry
+    closed = dict(entry)
+    closed["date"] = closed.pop("start_date")
+    return closed
+
+
+def _entries_in_subsections(section: dict, view: ViewSpec, rows: list[dict], translations, language: str) -> list[dict]:
+    """Rows under a heading entry per group, in the profile's listed order.
+    Compares `_subsection_value`, the value as stored, since a glossary may
+    already have translated the column."""
+    spec = section["subsections"]
+    known = {value for group in spec["groups"] for value in group["values"]}
+    strays = sorted({str(row["_subsection_value"]) for row in rows} - {str(value) for value in known})
+    if strays:
+        raise BuildError(
+            f"Section '{section['id']}' has rows with {spec['field']} {', '.join(strays)} "
+            "in none of its subsections"
+        )
+
+    entries = []
+    for group in spec["groups"]:
+        members = [row for row in rows if row["_subsection_value"] in group["values"]]
+        if members:
+            title = translations.resolve_or_literal("subsection", group["id"], language)
+            entries.append({"name": f"*{title}*", "subsection": "true"})
+            entries.extend(_map_row_to_entry(view, row, language) for row in members)
+    return entries
 
 
 def _build_section_entries(
@@ -259,13 +300,25 @@ def _build_section_entries(
     limit = section.get("limit")
     orders_after_merge = isinstance(handler, PublicationsHandler) and "zotero_" in (order_by or "")
 
+    defaults = {
+        f.name: f.default for f in schema.fields
+        if isinstance(f.default, str) and not f.default.startswith("$")
+    }
     rows = query_category_rows(
         data_dir,
         view.source,
-        filters=section.get("filter"),
+        filters={**view.filter, **section.get("filter", {})} or None,
+        defaults=defaults,
         order_by=None if orders_after_merge else order_by,
         limit=None if orders_after_merge else limit,
     )
+    subsection_field = section.get("subsections", {}).get("field")
+    if subsection_field:
+        # A blank cell belongs with its field's default (`format` blank → exhibition).
+        rows = [
+            {**row, "_subsection_value": row.get(subsection_field) or defaults.get(subsection_field)}
+            for row in rows
+        ]
     rows = [_resolve_glossary_fields(schema, row, translations, language) for row in rows]
     rows = [_add_display_fields(schema, row, language) for row in rows]
     labels = {
@@ -276,6 +329,8 @@ def _build_section_entries(
 
     if isinstance(handler, PublicationsHandler):
         rows = [_merge_zotero_fields(handler, row) for row in rows]
+        if subsection_field:
+            rows = [{**row, "_subsection_value": row.get(subsection_field)} for row in rows]
 
     if orders_after_merge:
         rows = _order_merged_rows(rows, order_by)
@@ -288,7 +343,11 @@ def _build_section_entries(
     if view.group_by:
         return _group_entries(view, rows, language)
 
-    return [_map_row_to_entry(view, row, language) for row in rows]
+    if subsection_field:
+        entries = _entries_in_subsections(section, view, rows, translations, language)
+    else:
+        entries = [_map_row_to_entry(view, row, language) for row in rows]
+    return [_close_open_range(schema, view, entry) for entry in entries]
 
 
 # RenderCV's `locale` block is a discriminated union keyed on a spelled-out
@@ -315,6 +374,7 @@ def build_rendercv_data(data_dir: Path, profile: Profile) -> dict:
     cv = resolve_identity(identity, profile.meta["identity_variant"], language)
 
     sections = {}
+    nested = []
     for section in profile.sections:
         # A section's `source` names a *view*; the view's own `source`
         # names the underlying category — the two are only incidentally
@@ -336,9 +396,25 @@ def build_rendercv_data(data_dir: Path, profile: Profile) -> dict:
             section.get("hide_repeated_dates", profile.meta.get("hide_repeated_dates", False)),
         )
         title = translations.resolve_or_literal("section", section["id"], language)
-        sections[title] = entries
+        if section.get("subsection_of"):
+            nested.append((section, title, entries))
+        else:
+            sections[section["id"]] = (title, entries)
 
-    cv["sections"] = sections
+    # `subsection_of: <section id>` puts a section at the end of another,
+    # under its own title as a subsection heading — the way to group
+    # sections that read from different categories.
+    for section, title, entries in nested:
+        parent_id = section["subsection_of"]
+        parent = next((s for s in profile.sections if s["id"] == parent_id), None)
+        if parent is None:
+            raise BuildError(f"Section '{section['id']}' is a subsection_of '{parent_id}', which isn't in the profile")
+        parent_title, parent_entries = sections.get(
+            parent_id, (translations.resolve_or_literal("section", parent_id, language), [])
+        )
+        sections[parent_id] = (parent_title, [*parent_entries, {"name": f"*{title}*", "subsection": "true"}, *entries])
+
+    cv["sections"] = dict(sections[s["id"]] for s in profile.sections if s["id"] in sections)
 
     design = {**profile.meta.get("design", {}), "theme": profile.meta["theme"]}
     extra = resolve_identity_extra(identity, profile.meta["identity_variant"], language)

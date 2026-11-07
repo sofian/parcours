@@ -12,3 +12,4 @@ fields:
                                                                # (blank for print/text pieces)
   - {name: description_en}
   - {name: description_fr}
+  - {name: comment,      type: text}                               # notes for whoever enters the data; never on a CV by default, skipped by --search

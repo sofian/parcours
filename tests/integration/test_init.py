@@ -89,7 +89,7 @@ def test_scaffold_repo_writes_a_flat_profile_for_one_language(tmp_path, monkeypa
     profile = yaml.safe_load((repo / "profiles" / "academic-en.yaml").read_text(encoding="utf-8"))
     assert profile["meta"]["language"] == "en"
     assert "extends" not in profile
-    assert len(profile["sections"]) == 18  # every non-skills view
+    assert len(profile["sections"]) == 20  # every starter view: one per non-skills category, plus showcases and performances
 
 
 def test_scaffold_repo_writes_a_base_plus_extends_children_for_two_languages(tmp_path, monkeypatch):
@@ -100,7 +100,7 @@ def test_scaffold_repo_writes_a_base_plus_extends_children_for_two_languages(tmp
 
     base = yaml.safe_load((repo / "profiles" / "_academic.yaml").read_text(encoding="utf-8"))
     assert "language" not in base["meta"]
-    assert len(base["sections"]) == 18
+    assert len(base["sections"]) == 20
 
     en_child = yaml.safe_load((repo / "profiles" / "academic-en.yaml").read_text(encoding="utf-8"))
     assert en_child == {"extends": "_academic", "meta": {"language": "en"}}

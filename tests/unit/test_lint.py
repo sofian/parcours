@@ -172,3 +172,40 @@ fields:
 
     with pytest.raises(ConfigError, match="nope"):
         run_lint(repo)
+
+
+def _titles_repo(tmp_path, shown):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "categories" / "artworks.yaml").write_text("""
+name: artworks
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: title_en}
+  - {name: title_fr}
+""")
+    (repo / "categories" / "shows.yaml").write_text("""
+name: shows
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: artworks, titles_in: artworks}
+""")
+    (repo / "entries" / "translations.csv").write_text(
+        "id,category,en,fr\nwidgets,section,Widgets,Widgets\nartworks,section,Artworks,Œuvres\nshows,section,Shows,Expos\n"
+    )
+    (repo / "entries" / "artworks.csv").write_text("id,title_en,title_fr\nw1,Tidal Map,\nw2,,Night Garden\n")
+    (repo / "entries" / "shows.csv").write_text(f'id,artworks\ns1,"{shown}"\n')
+    return repo
+
+
+def test_titles_matching_the_referenced_category_have_no_issue(tmp_path):
+    repo = _titles_repo(tmp_path, "tidal map; Night Garden")
+    assert run_lint(repo) == []
+
+
+def test_a_title_missing_from_the_referenced_category_is_a_warning(tmp_path):
+    repo = _titles_repo(tmp_path, "Tidal Map; Glass Choir")
+    issues = run_lint(repo)
+    assert [(i.field, i.severity) for i in issues] == [("artworks", "warning")]
+    assert "Glass Choir" in issues[0].message and "Tidal Map" not in issues[0].message

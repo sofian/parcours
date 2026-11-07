@@ -127,8 +127,11 @@ def collect_field_values(
     # `weight` is a manual ordering hint, filled in last if at all — every
     # schema conventionally declares it right after `id` for CSV column
     # layout, which is not the order it makes sense to prompt for it in.
-    ordered_fields = [f for f in schema.fields if f.name != "weight"]
-    ordered_fields += [f for f in schema.fields if f.name == "weight"]
+    # `comment`, the data-entry note, comes after it.
+    trailing = ("weight", "comment")
+    ordered_fields = [f for f in schema.fields if f.name not in trailing]
+    for name in trailing:
+        ordered_fields += [f for f in schema.fields if f.name == name]
 
     for field in ordered_fields:
         if field.generated:
@@ -210,11 +213,18 @@ def row_summary(schema: CategorySchema, row: dict, extra_fields: list[str] | Non
     return ", ".join(parts)
 
 
+# Notes left while entering data; `parco query` can still search them.
+_UNSEARCHED_FIELDS = ("comment",)
+
+
 def search_rows(rows: list[dict], search_text: str) -> list[dict]:
     needle = search_text.lower()
     return [
         row for row in rows
-        if any(needle in str(value).lower() for value in row.values() if value)
+        if any(
+            needle in str(value).lower()
+            for name, value in row.items() if value and name not in _UNSEARCHED_FIELDS
+        )
     ]
 
 

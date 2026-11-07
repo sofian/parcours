@@ -33,6 +33,12 @@ class FieldSpec:
     # listed field holds the listed value (e.g. an affiliation has no
     # full-time/part-time status), so it stays blank.
     skip_when: dict[str, str] | None = None
+    # `sentence: true` — shown with closing punctuation on a CV, whatever
+    # the CSV holds.
+    sentence: bool = False
+    # `titles_in: artworks` — a `;`-separated list of titles from another
+    # category. A soft link: lint warns on a title it can't find there.
+    titles_in: str | None = None
 
     def is_required(self, entry: dict) -> bool:
         if not self.required:
