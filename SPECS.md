@@ -300,8 +300,8 @@ The wizard asks for it last, after `weight`, and lint never checks it.
 
 **`titles_in: <category>`**: the field holds titles from another
 category, `;`-separated (exhibitions' `artworks`). Lint warns, never
-errors, on a title matching no `title`/`title_*` value there, ignoring
-case.
+errors, on a title matching no `title`, `short_title` or `series` value
+there (or a language variant such as `title_en`), ignoring case.
 
 ### CCV export structure (documented from a real export)
 
@@ -729,6 +729,8 @@ fields:
   - {name: weight,         type: int}                           # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}                                             # usually only one filled — see require_one_of
+  - {name: short_title}                                          # the name the work usually goes by, if shorter than its title
+  - {name: series}                                               # the project several works belong to
   - {name: role,           required: true, vocab: artwork_role, default: author}  # author / collaborator
   - {name: status,         vocab: artwork_status, glossary: artwork_status}  # in-progress / completed — blank = completed
   - {name: date,           type: date, precision: year, required: true, required_unless: {status: in-progress}}  # production year
@@ -744,6 +746,11 @@ dedup:
     as: duplicate
 ```
 
+- `short_title` and `series` exist for exhibitions' `artworks` list
+  (`titles_in: artworks`), which may name a work by its short title or
+  a whole series at once (one series name standing for all its works).
+  Neither is printed by the starter views. Both are single fields:
+  a short title or series name is a proper noun, like most titles.
 - `title_en`/`title_fr` were originally both `required: true`; loosened
   to `require_one_of` (see Category schemas above) once it became clear
   most artwork titles are proper nouns in one language only, and forcing

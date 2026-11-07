@@ -45,9 +45,16 @@ def _split_titles(value: str) -> list[str]:
     return [title.strip() for title in value.split(";") if title.strip()]
 
 
+_TITLE_FIELDS = ("title", "short_title", "series")
+
+
 def _known_titles(data_dir: Path, schema: CategorySchema) -> set[str]:
-    """Every title in a category, any language, case-folded."""
-    title_fields = [name for name in schema.field_names() if name == "title" or name.startswith("title_")]
+    """Every name a row of a category goes by: its title, short title and
+    series, in any language, case-folded."""
+    title_fields = [
+        name for name in schema.field_names()
+        if any(name == base or name.startswith(f"{base}_") for base in _TITLE_FIELDS)
+    ]
     return {
         str(row[name]).strip().casefold()
         for row in load_category_rows(data_dir, schema.name)

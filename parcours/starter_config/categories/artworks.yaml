@@ -5,6 +5,8 @@ fields:
   - {name: weight,         type: int}                           # optional; higher = appears earlier, refines/overrides date-based ordering
   - {name: title_en}
   - {name: title_fr}                                             # usually only one filled — see require_one_of
+  - {name: short_title}                                          # the name the work usually goes by (e.g. in exhibitions' `artworks`), if shorter than its title
+  - {name: series}                                               # the project several works belong to; exhibitions' `artworks` may name it instead of each work
   - {name: role,           required: true, vocab: artwork_role, default: author}  # author / collaborator
   - {name: status,         vocab: artwork_status, glossary: artwork_status}  # in-progress / completed — blank = completed
   - {name: date,           type: date, precision: year, required: true, required_unless: {status: in-progress}}  # production year

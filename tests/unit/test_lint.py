@@ -223,3 +223,23 @@ def test_flags_a_row_with_a_blank_id(tmp_path):
     assert blank[0].severity == "error"
     assert "--fix" in blank[0].message
 
+
+def test_a_short_title_or_series_name_also_matches(tmp_path):
+    # Exhibitions often name a work by its short title, or a whole series at once.
+    repo = _titles_repo(tmp_path, "glass choir; Tides")
+    (repo / "categories" / "artworks.yaml").write_text("""
+name: artworks
+handler: generic
+fields:
+  - {name: id, generated: true}
+  - {name: title_en}
+  - {name: short_title}
+  - {name: series}
+""")
+    (repo / "entries" / "artworks.csv").write_text(
+        "id,title_en,short_title,series\n"
+        "w1,Glass Choir: Songs for Breaking Windows,Glass Choir,\n"
+        "w2,Tidal Map I,,Tides\n"
+        "w3,Tidal Map II,,Tides\n"
+    )
+    assert run_lint(repo) == []

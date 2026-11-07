@@ -178,3 +178,11 @@ def test_exhibitions_have_a_format_defaulting_to_exhibition_and_list_their_artwo
 def test_residency_dates_need_at_least_a_month():
     schema = load_category_schema(_CATEGORIES_DIR / "residencies.yaml")
     assert [schema.get_field(n).precision for n in ("start_date", "end_date")] == ["month", "month"]
+
+
+def test_artworks_have_an_optional_short_title_and_series():
+    schema = load_category_schema(_CATEGORIES_DIR / "artworks.yaml")
+    names = schema.field_names()
+    assert names.index("title_fr") + 1 == names.index("short_title")
+    assert names.index("short_title") + 1 == names.index("series")
+    assert not schema.get_field("short_title").required and not schema.get_field("series").required
