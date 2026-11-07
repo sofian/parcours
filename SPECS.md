@@ -2429,13 +2429,29 @@ clean repo behaves exactly as before this was added.
 
 ### Commit (manually finalize pending changes — hand-edits, or after `parco import`)
 ```
-parco commit                    # stage + commit everything currently uncommitted in the data repo
+parco commit                    # stage + commit pending parco-managed changes in the data repo
 parco commit -m "<message>"     # same, with a custom commit message
 ```
-A thin wrapper: `git add -A && git commit -m "<message>"` scoped to the
-data repo. With no `-m`, the message is generated from the changed
-filenames, exactly as `git status` reports them (e.g. `"Updated
-entries/education.csv, entries/grants.csv"`). This is the
+A thin wrapper around `git add` + `git commit` scoped to the data repo,
+but selective about what it stages, so scratch files sitting in the
+repo don't get swept in:
+- **Tracked files:** every modification and deletion is staged.
+- **New (untracked) files:** staged only if they're a known root config
+  file (`parco.yaml`, `vocab.yaml`, `views.yaml`, `identity.yaml`,
+  `sync.yaml`, `.gitignore`), live under a parco-managed directory
+  (`categories/`, `entries/`, `profiles/`, `themes/`, `reference/`), or
+  sit in a directory that already holds tracked files (e.g. a user's own
+  `csl/` folder). Anything else — a working CSV dropped at the repo
+  root — is left untracked and listed as skipped; `git add` it by hand
+  to start tracking it.
+- **Junk files** (office/editor locks and backups such as LibreOffice's
+  `.~lock.<name>#`, Excel's `~$<name>`, `*~`, `.*.swp`, `.DS_Store`) are
+  never staged anywhere, except that deleting one that was committed by
+  mistake is staged so it drops out of the repo. `parco init` also
+  writes a starter `.gitignore` covering these plus `build/`.
+
+With no `-m`, the message is generated from the staged filenames (e.g.
+`"Updated entries/education.csv, entries/grants.csv"`). This is the
 general-purpose "make it official" step for anything that was written
 without an immediate auto-commit: a hand-edit to a CSV made outside
 `parco` entirely, or (the main case) finishing a review pass after

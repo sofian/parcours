@@ -231,6 +231,24 @@ def _write_profiles(path: Path, answers: InitAnswers) -> None:
         _write_yaml(profiles_dir / f"{answers.variant_name}-{language}.yaml", child)
 
 
+GITIGNORE = """\
+# Build output
+build/
+
+# Editor/office lock, backup and OS files
+.~lock.*#
+~$*
+*~
+.*.swp
+.DS_Store
+Thumbs.db
+"""
+
+
+def _write_gitignore(path: Path) -> None:
+    (path / ".gitignore").write_text(GITIGNORE, encoding="utf-8")
+
+
 def _git_init_and_commit(path: Path) -> None:
     try:
         subprocess.run(["git", "init"], cwd=path, check=True, capture_output=True)
@@ -270,4 +288,5 @@ def scaffold_repo(path: Path, answers: InitAnswers) -> None:
     shutil.copy2(starter_dir / "views.yaml", path / "views.yaml")
     _write_identity_yaml(path, answers)
     _write_profiles(path, answers)
+    _write_gitignore(path)
     _git_init_and_commit(path)

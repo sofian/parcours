@@ -278,10 +278,15 @@ def commit(
         typer.echo(f"Commit failed: {exc}")
         raise typer.Exit(code=1)
 
-    if not result.committed:
+    if result.committed:
+        typer.echo(f"Committed: {', '.join(result.files)}")
+    else:
         typer.echo("Nothing to commit.")
-        return
-    typer.echo(f"Committed: {', '.join(result.files)}")
+    if result.skipped:
+        typer.echo(
+            f"Skipped (not a parco-managed file — `git add` it yourself to track it): "
+            f"{', '.join(result.skipped)}"
+        )
 
 
 def _print_csv(columns: list[str], rows: list[dict]) -> None:
