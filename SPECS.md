@@ -2612,6 +2612,11 @@ parco lint                # check all tables
 parco lint <category>      # check one table
 parco lint --fix           # only unambiguous fixes (e.g. whitespace) — never guesses vocab/translation values
 ```
+`--fix` currently generates an `id` for every row that has none (rows
+typed straight into a CSV), commits each file it changed the way `add`
+does, then lints. A CSV that is open in LibreOffice (a `.~lock.<name>#`
+next to it) is left alone and reported. Plain `lint` reports a row with
+no `id` as an error pointing at `--fix`.
 Checks: vocab conformance, `translations.csv` completeness against all profile
 section ids, date sanity, required fields non-blank, (warning) a
 `glossary:`-backed field's value with no matching `translations.csv`

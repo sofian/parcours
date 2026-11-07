@@ -209,3 +209,17 @@ def test_a_title_missing_from_the_referenced_category_is_a_warning(tmp_path):
     issues = run_lint(repo)
     assert [(i.field, i.severity) for i in issues] == [("artworks", "warning")]
     assert "Glass Choir" in issues[0].message and "Tidal Map" not in issues[0].message
+
+
+def test_flags_a_row_with_a_blank_id(tmp_path):
+    # Rows typed straight into the CSV have no id; lint points at --fix.
+    repo = _setup_data_repo(tmp_path)
+    (repo / "entries" / "widgets.csv").write_text("id,title_en,status\n,A Widget,draft\n")
+
+    issues = run_lint(repo)
+
+    blank = [i for i in issues if i.field == "id"]
+    assert len(blank) == 1
+    assert blank[0].severity == "error"
+    assert "--fix" in blank[0].message
+

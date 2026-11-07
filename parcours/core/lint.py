@@ -97,6 +97,10 @@ def run_lint(data_dir: Path, category_filter: str | None = None) -> list[LintIss
             rows = load_category_rows(data_dir, name)
             handler = load_handler(schema, HandlerContext(data_dir=data_dir))
             for row in rows:
+                if not (row.get("id") or "").strip():
+                    issues.append(LintIssue(
+                        name, None, "id", "row has no id (`parco lint --fix` generates one)",
+                    ))
                 issues.extend(validate_common(schema, row, vocab))
                 issues.extend(handler.validate(row))
                 issues.extend(_check_glossary_fields(schema, row, translations))

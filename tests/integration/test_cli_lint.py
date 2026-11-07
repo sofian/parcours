@@ -177,3 +177,31 @@ def test_fix_interactive_quit_stops_processing_remaining_rows(tmp_path, monkeypa
     content = (repo / "entries" / "widgets.csv").read_text(encoding="utf-8")
     assert "widget-1,,draft" in content
     assert "widget-2,,draft" in content
+
+
+def test_fix_fills_blank_ids_then_lints(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "entries" / "widgets.csv").write_text("id,title_en,status\n,A Widget,draft\n")
+    monkeypatch.chdir(repo)
+    _mock_git(monkeypatch)
+
+    result = runner.invoke(app, ["lint", "--fix"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "Generated 1 missing id(s) in widgets" in result.stdout
+    assert "No lint issues found" in result.stdout
+    row = (repo / "entries" / "widgets.csv").read_text(encoding="utf-8").splitlines()[1]
+    assert len(row.split(",")[0]) == 6
+
+
+def test_fix_reports_a_file_left_alone_because_it_is_open(tmp_path, monkeypatch):
+    repo = _setup_data_repo(tmp_path)
+    (repo / "entries" / "widgets.csv").write_text("id,title_en,status\n,A Widget,draft\n")
+    (repo / "entries" / ".~lock.widgets.csv#").write_text("lock")
+    monkeypatch.chdir(repo)
+    _mock_git(monkeypatch)
+
+    result = runner.invoke(app, ["lint", "--fix"])
+
+    assert result.exit_code == 1
+    assert "widgets.csv is open in another program" in result.stdout

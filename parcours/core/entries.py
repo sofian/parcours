@@ -6,6 +6,7 @@ printing — the CLI wizard owns all of that."""
 import csv
 import secrets
 import subprocess
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .data import category_csv_path, load_category_rows
@@ -125,3 +126,50 @@ def delete_entry(data_dir: Path, schema: CategorySchema, row_id: str) -> None:
     was_already_dirty = is_file_dirty(data_dir, filename)
     write_all_rows(category_csv_path(data_dir, schema.name), schema.field_names(), new_rows)
     git_commit(data_dir, filename, f"Deleted {schema.name} entry {row_id}", was_already_dirty)
+
+
+@dataclass
+class IdFillResult:
+    """What `fill_missing_ids` did: the ids it generated, per category, and
+    the categories it left alone because their CSV was open elsewhere."""
+    filled: dict[str, list[str]] = field(default_factory=dict)
+    locked: list[str] = field(default_factory=list)
+
+
+def is_open_elsewhere(csv_path: Path) -> bool:
+    """LibreOffice keeps `.~lock.<name>#` next to a file it has open;
+    writing under it would be lost when the user saves."""
+    return (csv_path.parent / f".~lock.{csv_path.name}#").exists()
+
+
+def fill_missing_ids(
+    data_dir: Path, schemas: dict[str, CategorySchema], category_filter: str | None = None
+) -> IdFillResult:
+    """Gives every row with a blank `id` (typically typed straight into
+    the CSV) a fresh one, then commits each changed file like `add` does."""
+    result = IdFillResult()
+    for name, schema in schemas.items():
+        if category_filter and name != category_filter:
+            continue
+        rows = load_category_rows(data_dir, name)
+        blank = [row for row in rows if not (row.get("id") or "").strip()]
+        if not blank:
+            continue
+        csv_path = category_csv_path(data_dir, name)
+        if is_open_elsewhere(csv_path):
+            result.locked.append(name)
+            continue
+
+        taken = {row.get("id") for row in rows}
+        for row in blank:
+            while (candidate := secrets.token_hex(_ID_BYTES)) in taken:
+                pass
+            row["id"] = candidate
+            taken.add(candidate)
+
+        filename = csv_path.relative_to(data_dir).as_posix()
+        was_already_dirty = is_file_dirty(data_dir, filename)
+        write_all_rows(csv_path, schema.field_names(), rows)
+        git_commit(data_dir, filename, f"Filled {len(blank)} missing {name} ids", was_already_dirty)
+        result.filled[name] = [row["id"] for row in blank]
+    return result

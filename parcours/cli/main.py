@@ -21,7 +21,7 @@ from ..core.data import (
     query_category_rows,
     run_select_query,
 )
-from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry, is_file_dirty
+from ..core.entries import CommitFailed, add_entry, delete_entry, edit_entry, fill_missing_ids, is_file_dirty
 from ..core.handlers import load_handler
 from ..core.handlers.base import CategoryHandler, HandlerContext
 from ..core.handlers.publications import PublicationsHandler
@@ -81,12 +81,18 @@ def _find_repo_or_exit() -> Path:
 @app.command()
 def lint(
     category: str = typer.Argument(None, help="Only lint this category"),
+    fix: bool = typer.Option(
+        False, "--fix", help="Apply the fixes that need no judgment (generate missing ids) before linting"
+    ),
     fix_interactive: bool = typer.Option(
         False, "--fix-interactive", help="Walk flagged rows one by one and fix them interactively"
     ),
 ):
     """Check category data against its schema, vocab, and translations."""
     data_dir = _find_repo_or_exit()
+
+    if fix:
+        _run_lint_fix(data_dir, category)
 
     try:
         issues = run_lint(data_dir, category_filter=category)
@@ -112,6 +118,18 @@ def lint(
 
     error_count = sum(1 for i in issues if i.severity == "error")
     raise typer.Exit(code=1 if error_count else 0)
+
+
+def _run_lint_fix(data_dir: Path, category: str | None) -> None:
+    try:
+        result = fill_missing_ids(data_dir, load_all_schemas(data_dir / "categories"), category)
+    except CommitFailed as exc:
+        typer.echo(f"The ids were written but not committed: {exc}")
+        raise typer.Exit(code=1)
+    for name, ids in result.filled.items():
+        typer.echo(f"Generated {len(ids)} missing id(s) in {name}.")
+    for name in result.locked:
+        typer.echo(f"Skipped {name}: entries/{name}.csv is open in another program. Close it and run again.")
 
 
 def _ask_fix_choice(default: str = "f") -> str:

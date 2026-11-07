@@ -1,6 +1,6 @@
 import pytest
 
-from parcours.core.entries import EntryNotFound, add_entry, delete_entry, edit_entry, generate_id
+from parcours.core.entries import EntryNotFound, add_entry, delete_entry, edit_entry, fill_missing_ids, generate_id
 from parcours.core.schema import CategorySchema, FieldSpec
 
 
@@ -234,3 +234,48 @@ def test_is_file_dirty_false_on_untracked_file(tmp_path):
     (tmp_path / "widgets.csv").write_text("id,title_en\n", encoding="utf-8")
 
     assert is_file_dirty(tmp_path, "widgets.csv") is False
+
+
+def _write_widgets(tmp_path, body):
+    (tmp_path / "entries").mkdir(exist_ok=True)
+    path = tmp_path / "entries" / "widgets.csv"
+    path.write_text("id,title_en,status\n" + body, encoding="utf-8")
+    return path
+
+
+def test_fill_missing_ids_gives_each_blank_row_a_unique_id_and_keeps_the_others(tmp_path, monkeypatch):
+    calls = _no_commit(monkeypatch)
+    path = _write_widgets(tmp_path, "abc123,First,draft\n,Second,draft\n,Third,\n")
+
+    result = fill_missing_ids(tmp_path, {"widgets": _schema()})
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert lines[1] == "abc123,First,draft"
+    new_ids = [line.split(",")[0] for line in lines[2:]]
+    assert [line.split(",", 1)[1] for line in lines[2:]] == ["Second,draft", "Third,"]
+    assert all(len(i) == 6 for i in new_ids) and len(set(new_ids + ["abc123"])) == 3
+    assert result.filled == {"widgets": new_ids}
+    assert calls[0][1:3] == ("entries/widgets.csv", "Filled 2 missing widgets ids")
+
+
+def test_fill_missing_ids_leaves_complete_files_untouched(tmp_path, monkeypatch):
+    calls = _no_commit(monkeypatch)
+    path = _write_widgets(tmp_path, "abc123,First,draft\n")
+    before = path.read_bytes()
+
+    result = fill_missing_ids(tmp_path, {"widgets": _schema()})
+
+    assert result.filled == {} and calls == []
+    assert path.read_bytes() == before
+
+
+def test_fill_missing_ids_skips_a_file_open_in_libreoffice(tmp_path, monkeypatch):
+    calls = _no_commit(monkeypatch)
+    path = _write_widgets(tmp_path, ",Second,draft\n")
+    (tmp_path / "entries" / ".~lock.widgets.csv#").write_text("lock", encoding="utf-8")
+    before = path.read_bytes()
+
+    result = fill_missing_ids(tmp_path, {"widgets": _schema()})
+
+    assert result.locked == ["widgets"] and result.filled == {} and calls == []
+    assert path.read_bytes() == before
